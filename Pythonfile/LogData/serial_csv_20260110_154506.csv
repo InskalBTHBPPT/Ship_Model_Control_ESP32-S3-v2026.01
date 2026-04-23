@@ -1,0 +1,2045 @@
+timestamp(ms),Current_Angle_Set(deg),ADC_Value(milivolt),Calc_Servo_ANgle(deg)
+2167800,-30.00,1183,-28.46
+2167900,-30.00,1204,-27.21
+2168000,-30.00,1178,-28.76
+2168100,-30.00,1201,-27.39
+2168200,-30.00,1178,-28.76
+2168300,-30.00,1204,-27.21
+2168400,-30.00,1183,-28.46
+2168500,-30.00,1183,-28.46
+2168600,-30.00,1204,-27.21
+2168700,-30.00,1202,-27.33
+2168800,-30.00,1206,-27.09
+2168900,-30.00,1196,-27.69
+2169000,-30.00,1204,-27.21
+2169100,-30.00,1175,-28.94
+2169200,-30.00,1199,-27.51
+2169300,-30.00,1176,-28.88
+2169400,-30.00,1191,-27.98
+2169500,-30.00,1178,-28.76
+2169600,-30.00,1219,-26.32
+2169700,-30.00,1178,-28.76
+2169800,-30.00,1206,-27.09
+2169900,-30.00,1204,-27.21
+2170000,-30.00,1188,-28.16
+2170100,-35.00,1183,-28.46
+2170200,-35.00,1104,-33.16
+2170300,-35.00,1338,-19.24
+2170400,-35.00,1071,-35.12
+2170500,-35.00,1071,-35.12
+2170600,-35.00,1078,-34.71
+2170700,-35.00,1078,-34.71
+2170800,-35.00,1071,-35.12
+2170900,-35.00,1071,-35.12
+2171000,-35.00,1103,-33.22
+2171100,-35.00,1078,-34.71
+2171200,-35.00,1078,-34.71
+2171300,-35.00,1078,-34.71
+2171400,-35.00,1078,-34.71
+2171500,-35.00,1038,-37.09
+2171600,-35.00,1074,-34.94
+2171700,-35.00,1074,-34.94
+2171800,-35.00,1082,-34.47
+2171900,-35.00,1082,-34.47
+2172000,-35.00,1078,-34.71
+2172100,-35.00,1078,-34.71
+2172200,-35.00,1078,-34.71
+2172300,-35.00,1078,-34.71
+2172400,-35.00,1078,-34.71
+2172500,-35.00,1076,-34.83
+2172600,-35.00,1076,-34.83
+2172700,-35.00,1082,-34.47
+2172800,-35.00,1071,-35.12
+2172900,-35.00,1082,-34.47
+2173000,-35.00,1074,-34.94
+2173100,-35.00,1078,-34.71
+2173200,-35.00,1078,-34.71
+2173300,-35.00,1078,-34.71
+2173400,-35.00,1078,-34.71
+2173500,-35.00,1073,-35.00
+2173600,-35.00,1078,-34.71
+2173700,-35.00,1081,-34.53
+2173800,-35.00,1074,-34.94
+2173900,-35.00,1074,-34.94
+2174000,-35.00,1081,-34.53
+2174100,-35.00,1074,-34.94
+2174200,-35.00,1070,-35.18
+2174300,-35.00,1078,-34.71
+2174400,-35.00,1076,-34.83
+2174500,-35.00,887,-46.07
+2174600,-35.00,1067,-35.36
+2174700,-35.00,1087,-34.17
+2174800,-35.00,1092,-33.87
+2174900,-35.00,1078,-34.71
+2175000,-35.00,1074,-34.94
+2175100,-35.00,1078,-34.71
+2175200,-35.00,1071,-35.12
+2175300,-35.00,1082,-34.47
+2175400,-35.00,878,-46.61
+2175500,-35.00,1069,-35.24
+2175600,-35.00,1074,-34.94
+2175700,-35.00,1076,-34.83
+2175800,-35.00,1095,-33.70
+2175900,-35.00,1071,-35.12
+2176000,-35.00,1078,-34.71
+2176100,-35.00,1078,-34.71
+2176200,-35.00,1074,-34.94
+2176300,-35.00,1078,-34.71
+2176400,-35.00,1074,-34.94
+2176500,-35.00,1074,-34.94
+2176600,-35.00,1078,-34.71
+2176700,-35.00,1078,-34.71
+2176800,-35.00,1074,-34.94
+2176900,-35.00,1076,-34.83
+2177000,-35.00,1078,-34.71
+2177100,-35.00,1076,-34.83
+2177200,-35.00,1085,-34.29
+2177300,-35.00,1078,-34.71
+2177400,-35.00,1069,-35.24
+2177500,-35.00,1071,-35.12
+2177600,-35.00,1078,-34.71
+2177700,-35.00,1076,-34.83
+2177800,-35.00,1069,-35.24
+2177900,-35.00,1078,-34.71
+2178000,-35.00,1081,-34.53
+2178100,-35.00,1078,-34.71
+2178200,-35.00,1074,-34.94
+2178300,-35.00,1078,-34.71
+2178400,-35.00,1071,-35.12
+2178500,-35.00,1078,-34.71
+ESP-ROM:esp32s3-20210327
+Build:Mar 27 2021
+rst:0x1 (POWERON),boot:0x8 (SPI_FAST_FLASH_BOOT)
+SPIWP:0xee
+mode:DIO, clock div:1
+load:0x3fce2820,len:0x1180
+load:0x403c8700,len:0xc2c
+load:0x403cb700,len:0x311c
+entry 0x403c88b8
+Servo Rudder attached to pin 5
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===
+Servo Angle Range: 47.5 - 132.9 degrees
+Reference: 90 degrees = neutral position
+=== AUTO CALIBRATION TEST ===

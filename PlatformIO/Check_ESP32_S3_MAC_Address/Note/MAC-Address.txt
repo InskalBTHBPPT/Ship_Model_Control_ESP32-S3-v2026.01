@@ -1,0 +1,4 @@
+ESP32-S3:
+No 1: 94:a9:90:30:ab:c0 as user-side at COM5
+No 2: 10:20:ba:4c:53:fc as remote-side at COM6
+No 3: 10:20:ba:4c:54:bc at COM 7

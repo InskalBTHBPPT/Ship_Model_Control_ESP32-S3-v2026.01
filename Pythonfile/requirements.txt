@@ -1,0 +1,14 @@
+# Requirements untuk Local Monitor Dashboard 1.0.py dan Local Monitor Dashboard beta 1.2.py
+# Dependencies yang diperlukan untuk menjalankan aplikasi dashboard monitoring kapal
+
+# GUI Framework - PySide6 untuk antarmuka pengguna
+PySide6>=6.5.0
+
+# Serial Communication - untuk komunikasi dengan ESP32-S3
+pyserial>=3.5
+
+# Mapping Library - untuk menampilkan peta interaktif
+folium>=0.14.0
+
+# Plotting Library - untuk grafik real-time
+pyqtgraph>=0.13.0

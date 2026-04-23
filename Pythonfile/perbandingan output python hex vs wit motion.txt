@@ -1,0 +1,121 @@
+1. Condition 1: 
+Real Value Mag: X: -490, Y: -3368, Z: 5261, T: 0.00°C
+Witmotion: X: -6.357, Y: -43.797, Z: 68.406, T: 0.00°C
+
+Real Value: Q0: 0.0575, Q1: -0.0007, Q2: -0.0056, Q3: -0.9983
+
+Real Value: Roll: 0.63°, Pitch: -0.12°, Yaw: 186.60°, Version: 18179
+Witmotion: Roll: 0.626°, Pitch: -0.001°, Yaw: -173.403°, Version: 18179
+
+Real Value: X: 0.00 dps, Y: 0.00 dps, Z: 0.00 dps, T: 26.15°C
+
+Real Value: X: 0.003 g, Y: 0.009 g, Z: 0.998 g, T: 26.15°C
+
+
+2. Condition 2:
+Real Value: X: -623, Y: 119, Z: 2168, T: 0.00°C
+Witmotion: X: -8.021, Y: 1.417, Z: 28.288, T: 0.00°C
+
+Real Value: Q0: 0.7570, Q1: -0.0002, Q2: -0.0055, Q3: -0.6533
+
+Real Value: Roll: 0.39°, Pitch: -0.49°, Yaw: 278.42°, Version: 18179
+Witmotion: Roll: 0.385°, Pitch: -0.472°, Yaw: -81.584°, Version: 18179
+
+Real Value: X: 0.00 dps, Y: 0.00 dps, Z: 0.00 dps, T: 26.31°C
+Real Value: X: 0.009 g, Y: 0.006 g, Z: 1.001 g, T: 26.31°C
+
+Condition 3:
+mag:
+ Real Value: X: -542, Y: 113, Z: 2200, T: 0.00°C
+ Witmotion: X: -7.059, Y: 1.482, Z: 28.6, T: 0.00°C
+
+condition 4 (capture 4.jpg)
+[12:58:08.024] ========== PACKAGE DITEMUKAN ==========
+  Raw Package (66 bytes):
+    Hex: 55 50 1A 01 08 0C 3A 05 80 00 93 55 51 12 00 10 00 03 08 51 0A 2E 55 52 00 00 00 00 00 00 51 0A 02 55 53 48 00 A8 FF 3D C7 03 47 E5 55 54 F0 FD 79 00 A5 08 00 00 BC 55 59 2C 62 FF FF 4C FF E1 AD 13
+    Array: [0x55, 0x50, 0x1A, 0x01, 0x08, 0x0C, 0x3A, 0x05, 0x80, 0x00, 0x93, 0x55, 0x51, 0x12, 0x00, 0x10, 0x00, 0x03, 0x08, 0x51, 0x0A, 0x2E, 0x55, 0x52, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x51, 0x0A, 0x02, 0x55, 0x53, 0x48, 0x00, 0xA8, 0xFF, 0x3D, 0xC7, 0x03, 0x47, 0xE5, 0x55, 0x54, 0xF0, 0xFD, 0x79, 0x00, 0xA5, 0x08, 0x00, 0x00, 0xBC, 0x55, 0x59, 0x2C, 0x62, 0xFF, 0xFF, 0x4C, 0xFF, 0xE1, 0xAD, 0x13]
+
+  Grup 1 (ID: 0x50):
+    Hex: 55 50 1A 01 08 0C 3A 05 80 00 93
+    Array: [0x55, 0x50, 0x1A, 0x01, 0x08, 0x0C, 0x3A, 0x05, 0x80, 0x00, 0x93]
+    Type: Time [Checksum: ✓]
+    Real Value: 2026-01-08 12:58:05.128
+
+  Grup 2 (ID: 0x51):
+    Hex: 55 51 12 00 10 00 03 08 51 0A 2E
+    Array: [0x55, 0x51, 0x12, 0x00, 0x10, 0x00, 0x03, 0x08, 0x51, 0x0A, 0x2E]
+    Type: Acceleration [Checksum: ✓]
+    Real Value: X: 0.009 g, Y: 0.008 g, Z: 1.001 g, T: 26.41°C
+
+  Grup 3 (ID: 0x52):
+    Hex: 55 52 00 00 00 00 00 00 51 0A 02
+    Array: [0x55, 0x52, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x51, 0x0A, 0x02]
+    Type: Angular Velocity (Gyro) [Checksum: ✓]
+    Real Value: X: 0.00 dps, Y: 0.00 dps, Z: 0.00 dps, T: 26.41°C
+
+  Grup 4 (ID: 0x53):
+    Hex: 55 53 48 00 A8 FF 3D C7 03 47 E5
+    Array: [0x55, 0x53, 0x48, 0x00, 0xA8, 0xFF, 0x3D, 0xC7, 0x03, 0x47, 0xE5]
+    Type: Angle (Euler) [Checksum: ✓]
+    Real Value: Roll: 0.396° (-180/+180) / 0.40° (0-360), Pitch: -0.483° (-180/+180) / 359.52° (0-360), Yaw: -79.821° (-180/+180) / 280.18° (0-360), Version: 18179
+
+  Grup 5 (ID: 0x54):
+    Hex: 55 54 F0 FD 79 00 A5 08 00 00 BC
+    Array: [0x55, 0x54, 0xF0, 0xFD, 0x79, 0x00, 0xA5, 0x08, 0x00, 0x00, 0xBC]
+    Type: Magnetic [Checksum: ✓]
+    Real Value: Raw: X: -528, Y: 121, Z: 2213, T: 0.00°C | Corrected (÷77): X: -6.857, Y: 1.571, Z: 28.740
+
+  Grup 6 (ID: 0x59):
+    Hex: 55 59 2C 62 FF FF 4C FF E1 AD 13
+    Array: [0x55, 0x59, 0x2C, 0x62, 0xFF, 0xFF, 0x4C, 0xFF, 0xE1, 0xAD, 0x13]
+    Type: Quaternion [Checksum: ✓]
+    Real Value: Q0: 0.7670, Q1: -0.0000, Q2: -0.0055, Q3: -0.6416
+
+[12:58:08.024] =========================================
+
+[12:58:08.032] Buffer: 32/66 bytes - 55 50 1A 01 08 0C 3A 05 8A 00 9D 55 51 12 00 10 00 00 08 51 0A 2B 55 52 00 00 00 00 00 00 51 0A
+[12:58:08.033] Buffer: 64/66 bytes - 55 50 1A 01 08 0C 3A 05 8A 00 9D 55 51 12 00 10 00 00 08 51 0A 2B 55 52 00 00 00 00 00 00 51 0A 02 55 53 48 00 A8 FF 3D C7 03 47 E5 55 54 F1 
+FD 79 00 A5 08 00 00 BD 55 59 2C 62 FF FF 4C FF E1
+
+
+Capture 5:
+[13:34:11.230] ========== PACKAGE DITEMUKAN ==========
+  Raw Package (66 bytes):
+    Hex: 55 50 1A 01 08 0D 22 0A 8C 02 8F 55 51 0E 00 0E 00 01 08 5C 0A 31 55 52 00 00 00 00 00 00 5C 0A 0D 55 53 47 00 AE FF 46 C9 03 47 F5 55 54 BF FD B0 00 8E 08 00 00 AB 55 59 32 64 07 00 54 FF 5C B0 AA
+    Array: [0x55, 0x50, 0x1A, 0x01, 0x08, 0x0D, 0x22, 0x0A, 0x8C, 0x02, 0x8F, 0x55, 0x51, 0x0E, 0x00, 0x0E, 0x00, 0x01, 0x08, 0x5C, 0x0A, 0x31, 0x55, 0x52, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x5C, 0x0A, 0x0D, 0x55, 0x53, 0x47, 0x00, 0xAE, 0xFF, 0x46, 0xC9, 0x03, 0x47, 0xF5, 0x55, 0x54, 0xBF, 0xFD, 0xB0, 0x00, 0x8E, 0x08, 0x00, 0x00, 0xAB, 0x55, 0x59, 0x32, 0x64, 0x07, 0x00, 0x54, 0xFF, 0x5C, 0xB0, 0xAA]
+
+  Grup 1 (ID: 0x50):
+    Hex: 55 50 1A 01 08 0D 22 0A 8C 02 8F
+    Array: [0x55, 0x50, 0x1A, 0x01, 0x08, 0x0D, 0x22, 0x0A, 0x8C, 0x02, 0x8F]
+    Type: Time [Checksum: ✓]
+    Real Value: 2026-01-08 13:34:10.652
+
+  Grup 2 (ID: 0x51):
+    Hex: 55 51 0E 00 0E 00 01 08 5C 0A 31
+    Array: [0x55, 0x51, 0x0E, 0x00, 0x0E, 0x00, 0x01, 0x08, 0x5C, 0x0A, 0x31]
+    Type: Acceleration [Checksum: ✓]
+    Real Value: X: 0.007 g, Y: 0.007 g, Z: 1.000 g, T: 26.52°C
+
+  Grup 3 (ID: 0x52):
+    Hex: 55 52 00 00 00 00 00 00 5C 0A 0D
+    Array: [0x55, 0x52, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x5C, 0x0A, 0x0D]
+    Type: Angular Velocity (Gyro) [Checksum: ✓]
+    Real Value: X: 0.00 dps, Y: 0.00 dps, Z: 0.00 dps, T: 26.52°C
+
+  Grup 4 (ID: 0x53):
+    Hex: 55 53 47 00 AE FF 46 C9 03 47 F5
+    Array: [0x55, 0x53, 0x47, 0x00, 0xAE, 0xFF, 0x46, 0xC9, 0x03, 0x47, 0xF5]
+    Type: Angle (Euler) [Checksum: ✓]
+    Real Value: Roll: 0.390° (-180/+180) / 0.39° (0-360), Pitch: -0.450° (-180/+180) / 359.55° (0-360), Yaw: -76.959° (-180/+180) / 283.04° (0-360), Version: 18179
+
+  Grup 5 (ID: 0x54):
+    Hex: 55 54 BF FD B0 00 8E 08 00 00 AB
+    Array: [0x55, 0x54, 0xBF, 0xFD, 0xB0, 0x00, 0x8E, 0x08, 0x00, 0x00, 0xAB]
+    Type: Magnetic [Checksum: ✓]
+    Real Value: Raw: X: -577, Y: 176, Z: 2190, T: 0.00°C | Corrected (÷77): X: -7.494, Y: 2.286, Z: 28.442
+
+  Grup 6 (ID: 0x59):
+    Hex: 55 59 32 64 07 00 54 FF 5C B0 AA
+    Array: [0x55, 0x59, 0x32, 0x64, 0x07, 0x00, 0x54, 0xFF, 0x5C, 0xB0, 0xAA]
+    Type: Quaternion [Checksum: ✓]
+    Real Value: Q0: 0.7828, Q1: 0.0002, Q2: -0.0052, Q3: -0.6222

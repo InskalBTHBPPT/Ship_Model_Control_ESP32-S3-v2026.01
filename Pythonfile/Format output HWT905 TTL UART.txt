@@ -1,0 +1,66 @@
+Time Output
+0x55 0x50 YY MM DD hh mm ss msL msH SUM
+YY：Year, 20YY Year
+MM：Month
+DD：Day
+hh：hour
+mm：minute
+ss：Second
+ms：Millisecond
+Millisecond calculate formula：
+ms=((msH<<8)|msL)
+Sum=0x55+0x51+YY+MM+DD+hh+mm+ss+ms+TL
+
+Acceleration Output
+0x55 0x51 AxL AxH AyL AyH AzL AzH TL TH SUM
+Calculate formula：
+ax=((AxH<<8)|AxL)/32768*16g(g is Gravity acceleration, 9.8m/s2)
+ay=((AyH<<8)|AyL)/32768*16g(g is Gravity acceleration, 9.8m/s2)
+az=((AzH<<8)|AzL)/32768*16g(g is Gravity acceleration, 9.8m/s2)
+Temperature calculated formular：
+T=((TH<<8)|TL)/100 ℃
+Checksum：
+Sum=0x55+0x51+AxH+AxL+AyH+AyL+AzH+AzL+TH+TL
+
+Angular Velocity Output
+0x55 0x52 wxL wxH wyL wyH wzL wzH TL TH SUM
+Calculated formular：
+wx=((wxH<<8)|wxL)/32768*2000(°/s)
+wy=((wyH<<8)|wyL)/32768*2000(°/s)
+wz=((wzH<<8)|wzL)/32768*2000(°/s)
+Temperature calculated formular：
+T=((TH<<8)|TL) /100 ℃
+Checksum：
+Sum=0x55+0x52+wxH+wxL+wyH+wyL+wzH+wzL+TH+TL
+
+Angle Output
+0x55 0x53 RollL RollH PitchL PitchH YawL YawH VL VH SUM
+Calculated formular：
+Roll(X axis)Roll=((RollH<<8)|RollL)/32768*180(°)
+Pitch(Y axis)Pitch=((PitchH<<8)|PitchL)/32768*180(°)
+Yaw(Z axis)Yaw=((YawH<<8)|YawL)/32768*180(°)
+Version calculated formula：
+Version=(VH<<8)|VL
+Checksum：
+Sum=0x55+0x53+RollH+RollL+PitchH+PitchL+YawH+YawL+VH+VL
+
+Magnetic Output
+0x55 0x54 HxL HxH HyL HyH HzL HzH TL TH SUM
+Calculated formular：
+Magnetic(x axis)Hx=(( HxH<<8)| HxL)
+Magnetic(y axis)Hy=(( HyH <<8)| HyL)
+Magnetic(z axis)Hz =(( HzH<<8)| HzL)
+Temperature calculated formular：
+T=((TH<<8)|TL) /100℃
+Checksum：
+Sum=0x55+0x54+HxH+HxL+HyH+HyL+HzH+HzL+TH+TL
+
+Quaternion
+0x55 0x59 Q0L Q0H Q1L Q1H Q2L Q2H Q3L Q3H SUM
+Calculated formular：
+Q0=((Q0H<<8)|Q0L)/32768
+Q1=((Q1H<<8)|Q1L)/32768
+Q2=((Q2H<<8)|Q2L)/32768
+Q3=((Q3H<<8)|Q3L)/32768
+Checksum：
+Sum=0x55+0x59+Q0L+Q0H+Q1L +Q1H +Q2L+Q2H+Q3L+Q3H
