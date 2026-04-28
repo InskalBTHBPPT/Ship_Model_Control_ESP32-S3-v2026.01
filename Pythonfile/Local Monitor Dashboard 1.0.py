@@ -1,3 +1,33 @@
+"""
+Local Monitor Dashboard 1.0
+
+Ringkasan:
+- Aplikasi dashboard PySide6 untuk monitoring data kapal secara real-time.
+- Menerima data serial dalam format CSV text (UTF-8 compatible).
+- Menyediakan tampilan map, indikator, plotting time-series, logging CSV, dan analyze tab.
+
+Format data serial yang dibaca (15 kolom):
+1) timestamp
+2) latitude
+3) longitude
+4) speedMps
+5) Calc_deg_servo_1
+6) Calc_deg_servo_2
+7) roll
+8) pitch
+9) yaw
+10) zigzag_yaw
+11) rpm_prop_1
+12) rpm_prop_2
+13) battery_1
+14) battery_2
+15) mode_auto
+
+Catatan pengolahan:
+- Parser memproses data per baris newline dan hanya menerima baris dengan 15 kolom.
+- Sebagian nilai diproses lagi untuk kebutuhan visualisasi (mis. koreksi rudder, normalisasi tampilan).
+"""
+
 import csv
 import io
 import sys

@@ -1,3 +1,26 @@
+"""
+Local Monitor Dashboard beta 1.2
+
+Ringkasan:
+- Dashboard PySide6 untuk monitoring telemetry real-time berbasis serial.
+- Fokus telemetry ringkas: posisi GPS, yaw, dan akselerometer 3 sumbu.
+- Menyediakan map live, plot real-time, logging CSV, dan mode analyze.
+
+Format data serial yang dibaca (7 kolom):
+1) timestamp
+2) latitude
+3) longitude
+4) yaw
+5) accel_x
+6) accel_y
+7) accel_z
+
+Catatan pengolahan:
+- Data dibaca sebagai CSV text per baris newline.
+- Baris yang kolomnya bukan 7 akan diabaikan untuk menghindari data parsial/concat.
+- Timestamp serial diperlakukan dalam milidetik lalu dikonversi ke detik untuk plotting.
+"""
+
 import csv
 import io
 import sys

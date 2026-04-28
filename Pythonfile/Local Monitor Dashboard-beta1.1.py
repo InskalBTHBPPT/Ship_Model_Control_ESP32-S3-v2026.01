@@ -1,3 +1,35 @@
+"""
+Local Monitor Dashboard beta 1.1
+
+Ringkasan:
+- Dashboard PySide6 untuk monitoring telemetry kapal secara real-time.
+- Input data berasal dari serial CSV text (UTF-8 compatible).
+- Mendukung map tracking, indikator live, plotting time-series, logging CSV, analyze,
+  serta fitur Home Points dari koordinat serial terbaru.
+
+Format data serial yang dibaca (15 kolom):
+1) timestamp
+2) latitude
+3) longitude
+4) speedMps
+5) Calc_deg_servo_1
+6) Calc_deg_servo_2
+7) roll
+8) pitch
+9) yaw
+10) zigzag_yaw
+11) rpm_prop_1
+12) rpm_prop_2
+13) battery_1
+14) battery_2
+15) mode_auto
+
+Catatan pengolahan:
+- Parser memproses baris utuh yang diakhiri newline dan memvalidasi jumlah kolom = 15.
+- Data lat/lon tervalidasi range; nilai 0,0 dapat diganti default location.
+- Nilai terbaru lat/lon disimpan untuk fitur Home Points.
+"""
+
 import csv
 import io
 import sys
