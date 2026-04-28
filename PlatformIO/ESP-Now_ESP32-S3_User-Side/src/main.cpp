@@ -5,6 +5,7 @@
   Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files.
   The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
 */
+#include <Arduino.h>
 #include <esp_now.h>
 #include <WiFi.h>
 
@@ -13,10 +14,21 @@ uint8_t remote_side_Address[] = {0x10, 0x20, 0xba, 0x4c, 0x53, 0xfc}; // ESP32-S
 // Structure example to send data
 // Must match the receiver structure
 typedef struct receivedfromremoteside {
-  char a[32];
-  int b;
-  float c;
-  bool d;
+  double timestamp;
+  double latitude;
+  double longitude;
+  int16_t speedMps;
+  int16_t Calc_deg_servo_1;
+  int16_t Calc_deg_servo_2;
+  int16_t roll;
+  int16_t pitch;
+  int16_t yaw;
+  int16_t zigzag_yaw;
+  int16_t rpm_prop_1;
+  int16_t rpm_prop_2;
+  int16_t battery_1;
+  int16_t battery_2;
+  uint8_t mode_auto;
 } receivedfromremoteside;
 
 // Create a struct_message called myData
@@ -25,17 +37,22 @@ receivedfromremoteside myReceivedFromremoteSideData;
 // callback function that will be executed when data is receivedfromremoteside
 void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
   memcpy(&myReceivedFromremoteSideData, incomingData, sizeof(myReceivedFromremoteSideData));
-  Serial.print("Bytes receivedfromremoteside from remote Side: ");
-  Serial.println(len);
-  Serial.print("Char from remote Side: ");
-  Serial.println(myReceivedFromremoteSideData.a);
-  Serial.print("Int from remote Side: ");
-  Serial.println(myReceivedFromremoteSideData.b);
-  Serial.print("Float from remote Side: ");
-  Serial.println(myReceivedFromremoteSideData.c);
-  Serial.print("Bool: ");
-  Serial.println(myReceivedFromremoteSideData.d);
-  Serial.println();
+  // Print CSV 15 kolom (raw fixed-point) agar sama format dengan generator
+  Serial.print(myReceivedFromremoteSideData.timestamp, 3); Serial.print(",");
+  Serial.print(myReceivedFromremoteSideData.latitude, 6); Serial.print(",");
+  Serial.print(myReceivedFromremoteSideData.longitude, 6); Serial.print(",");
+  Serial.print(myReceivedFromremoteSideData.speedMps); Serial.print(",");
+  Serial.print(myReceivedFromremoteSideData.Calc_deg_servo_1); Serial.print(",");
+  Serial.print(myReceivedFromremoteSideData.Calc_deg_servo_2); Serial.print(",");
+  Serial.print(myReceivedFromremoteSideData.roll); Serial.print(",");
+  Serial.print(myReceivedFromremoteSideData.pitch); Serial.print(",");
+  Serial.print(myReceivedFromremoteSideData.yaw); Serial.print(",");
+  Serial.print(myReceivedFromremoteSideData.zigzag_yaw); Serial.print(",");
+  Serial.print(myReceivedFromremoteSideData.rpm_prop_1); Serial.print(",");
+  Serial.print(myReceivedFromremoteSideData.rpm_prop_2); Serial.print(",");
+  Serial.print(myReceivedFromremoteSideData.battery_1); Serial.print(",");
+  Serial.print(myReceivedFromremoteSideData.battery_2); Serial.print(",");
+  Serial.println(myReceivedFromremoteSideData.mode_auto);
 } 
 
  // Must match the receiver structure
