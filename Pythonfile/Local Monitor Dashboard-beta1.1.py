@@ -1127,8 +1127,21 @@ class MainWindow(QMainWindow):
         set_param_group.layout().addLayout(set_param_form)
 
         self.set_param_btn = QPushButton("Set Param", self)
+        # Gate awal: tombol baru aktif setelah Connect berhasil (lihat connect_serial / disconnect_serial)
+        self.set_param_btn.setEnabled(False)
         self.set_param_btn.clicked.connect(self.on_set_param_clicked)
         set_param_group.layout().addWidget(self.set_param_btn)
+
+        # Status label untuk menampilkan respons terakhir dari user-side ESP32
+        # (mis. $PACK,OK / $PACK,ERR,<reason>). Akan di-update oleh handler Set Param
+        # & poll_serial saat respons tiba.
+        self.set_param_status_label = QLabel("Status: idle", self)
+        self.set_param_status_label.setObjectName("setParamStatusLabel")
+        self.set_param_status_label.setWordWrap(True)
+        self.set_param_status_label.setStyleSheet(
+            "color: #9ca3af; font-style: italic; padding: 4px 2px 0 2px;"
+        )
+        set_param_group.layout().addWidget(self.set_param_status_label)
 
         map_points_right_panel.layout().addWidget(set_param_group)
         map_points_right_panel.layout().addStretch(1)
@@ -2778,7 +2791,11 @@ class MainWindow(QMainWindow):
             # Enable Home Points button when connected
             if hasattr(self, 'home_points_btn'):
                 self.home_points_btn.setEnabled(True)
-            
+
+            # Enable Set Param button when connected (gate by is_connected)
+            if hasattr(self, 'set_param_btn'):
+                self.set_param_btn.setEnabled(True)
+
             return True
         except Exception as e:
             print(f"[SERIAL] Connect failed: {e}")
@@ -2827,7 +2844,17 @@ class MainWindow(QMainWindow):
             # Disable Home Points button when disconnected
             if hasattr(self, 'home_points_btn'):
                 self.home_points_btn.setEnabled(False)
-            
+
+            # Disable Set Param button when disconnected (gate by is_connected)
+            if hasattr(self, 'set_param_btn'):
+                self.set_param_btn.setEnabled(False)
+            # Reset status label ke idle saat disconnect
+            if hasattr(self, 'set_param_status_label'):
+                self.set_param_status_label.setText("Status: idle")
+                self.set_param_status_label.setStyleSheet(
+                    "color: #9ca3af; font-style: italic; padding: 4px 2px 0 2px;"
+                )
+
             # Reset latest serial coordinates
             self.latest_serial_lat = None
             self.latest_serial_lon = None
