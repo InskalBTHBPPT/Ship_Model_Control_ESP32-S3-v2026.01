@@ -100,8 +100,17 @@ void setup() {
 }
  
 void loop() {
+  static unsigned long lastSendMs = 0;
+  const unsigned long sendIntervalMs = 100;
+  unsigned long now = millis();
+
+  if (now - lastSendMs < sendIntervalMs) {
+    return;
+  }
+  lastSendMs = now;
+
   // Set values to send (mengikuti format Generate_15_random_data_ASCII)
-  mysend_to_user_sideData.timestamp = millis() / 1000.0;
+  mysend_to_user_sideData.timestamp = now / 1000.0;
   mysend_to_user_sideData.latitude = -7.281500 + (random(-500, 501) / 1000000.0);
   mysend_to_user_sideData.longitude = 112.798900 + (random(-500, 501) / 1000000.0);
   mysend_to_user_sideData.speedMps = (int16_t)random(0, 351);
@@ -126,5 +135,4 @@ void loop() {
   // else {
   //   Serial.println("Error sending the data");
   // }
-  delay(2000);
 }
