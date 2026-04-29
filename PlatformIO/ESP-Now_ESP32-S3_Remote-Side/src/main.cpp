@@ -27,7 +27,7 @@ receivedfromuserside myReceivedFromUserSideData;
 // callback function that will be executed when data is receivedfromuserside
 void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
   memcpy(&myReceivedFromUserSideData, incomingData, sizeof(myReceivedFromUserSideData));
-  Serial.print("Bytes receivedfromuserside from User Side: ");
+  Serial.print("Bytes received from User Side: ");
   Serial.println(len);
   Serial.print("Char from User Side: ");
   Serial.println(myReceivedFromUserSideData.a);
