@@ -64,7 +64,7 @@ from PySide6.QtWidgets import (
     QFormLayout,
 )
 import pyqtgraph as pg
-from time import time
+from time import time, strftime
 
 
 class ClickableMapPage(QWebEnginePage):
@@ -1179,6 +1179,13 @@ class MainWindow(QMainWindow):
         self.log_timer = QTimer(self)
         self.log_timer.setInterval(400)  # flush every 400 ms
         self.log_timer.timeout.connect(self.flush_log_buffer)
+
+        # Set Param state: timer timeout untuk menunggu ACK $PACK,... dari user-side
+        self._set_param_pending = False
+        self._set_param_timeout_timer = QTimer(self)
+        self._set_param_timeout_timer.setSingleShot(True)
+        self._set_param_timeout_timer.setInterval(1500)  # 1.5 detik tanpa ACK -> TIMEOUT
+        self._set_param_timeout_timer.timeout.connect(self._on_set_param_timeout)
         
         # Helper connection state method
         def _is_connected() -> bool:
@@ -1984,13 +1991,155 @@ class MainWindow(QMainWindow):
         )
 
     
+    def _update_set_param_status(self, text: str, color: str = "#9ca3af", italic: bool = False):
+        """Update label status di group Set Parameter dengan warna konsisten."""
+        if not hasattr(self, 'set_param_status_label'):
+            return
+        italic_css = "italic" if italic else "normal"
+        self.set_param_status_label.setText(text)
+        self.set_param_status_label.setStyleSheet(
+            f"color: {color}; font-style: {italic_css}; padding: 4px 2px 0 2px;"
+        )
+
     def on_set_param_clicked(self):
         """
         Handler tombol "Set Param" di tab Map Points.
-        Untuk saat ini sengaja dikosongkan; logika pengiriman parameter
-        ke remote-side via user-side ESP32 akan ditambahkan kemudian.
+
+        Alur:
+        1. Gate: pastikan port serial sudah terkoneksi.
+        2. Baca 4 QLineEdit (a, b, c, d) lalu validasi tipe sesuai struct
+           send_to_remote_side di firmware user-side ESP32.
+        3. Susun payload "$PARAM,<a>,<b>,<c>,<d>\\n" dan kirim via Serial.
+        4. Tampilkan status sending..., disable tombol agar tidak double-send,
+           start timeout timer 1.5 detik untuk menunggu balasan $PACK,...
+        5. Update label status sesuai respons di poll_serial /
+           timeout di _on_set_param_timeout.
         """
-        pass
+        if not self.is_connected():
+            self._update_set_param_status(
+                "Status: not connected", color="#f59e0b", italic=True
+            )
+            return
+
+        a_text = self.param_a_input.text()
+        b_text = self.param_b_input.text().strip()
+        c_text = self.param_c_input.text().strip()
+        d_text = self.param_d_input.text().strip()
+
+        # Validasi 'a' (char[32]): tidak boleh ada CR/LF (akan memutus protokol)
+        # dan panjang max 31 karakter (sisa 1 byte untuk null terminator).
+        if "\n" in a_text or "\r" in a_text:
+            self._update_set_param_status(
+                "Status: ERR - a contains newline", color="#ef4444"
+            )
+            return
+        if len(a_text) > 31:
+            self._update_set_param_status(
+                f"Status: ERR - a too long ({len(a_text)}/31)", color="#ef4444"
+            )
+            return
+
+        # Validasi 'b' (int 32-bit)
+        try:
+            b_val = int(b_text)
+        except ValueError:
+            self._update_set_param_status(
+                "Status: ERR - b not int", color="#ef4444"
+            )
+            return
+        if b_val < -(2 ** 31) or b_val > (2 ** 31 - 1):
+            self._update_set_param_status(
+                "Status: ERR - b out of int32 range", color="#ef4444"
+            )
+            return
+
+        # Validasi 'c' (float)
+        try:
+            float(c_text)
+        except ValueError:
+            self._update_set_param_status(
+                "Status: ERR - c not float", color="#ef4444"
+            )
+            return
+
+        # Validasi 'd' (bool); normalisasi ke 'true'/'false' agar firmware konsisten
+        d_lower = d_text.lower()
+        if d_lower in ("true", "1"):
+            d_norm = "true"
+        elif d_lower in ("false", "0"):
+            d_norm = "false"
+        else:
+            self._update_set_param_status(
+                "Status: ERR - d not bool (true/false/1/0)", color="#ef4444"
+            )
+            return
+
+        # Susun payload. Pertahankan teks asli b/c agar format mengikuti input
+        # (mis. "3.40" tidak berubah jadi "3.4"); a juga dikirim apa adanya.
+        payload = f"$PARAM,{a_text},{b_text},{c_text},{d_norm}\n"
+
+        try:
+            self.ser.write(payload.encode("utf-8"))
+            try:
+                self.ser.flush()
+            except Exception:
+                pass
+        except Exception as e:
+            self._update_set_param_status(
+                f"Status: ERR - write failed: {e}", color="#ef4444"
+            )
+            return
+
+        # Sukses kirim ke serial; sekarang tunggu ACK
+        ts = strftime("%H:%M:%S")
+        self._update_set_param_status(
+            f"Status: sending... ({ts})", color="#f59e0b", italic=True
+        )
+        self._set_param_pending = True
+        if hasattr(self, 'set_param_btn'):
+            self.set_param_btn.setEnabled(False)
+        self._set_param_timeout_timer.start()
+
+    def _on_set_param_timeout(self):
+        """Dipanggil bila tidak ada $PACK,... dalam 1.5 detik setelah pengiriman."""
+        if not self._set_param_pending:
+            return
+        self._set_param_pending = False
+        ts = strftime("%H:%M:%S")
+        self._update_set_param_status(
+            f"Status: TIMEOUT no ACK ({ts})", color="#f59e0b"
+        )
+        if self.is_connected() and hasattr(self, 'set_param_btn'):
+            self.set_param_btn.setEnabled(True)
+
+    def _handle_set_param_response(self, text: str):
+        """
+        Diparse dari poll_serial saat baris diawali '$PACK'.
+        Format yang diharapkan:
+          $PACK,OK
+          $PACK,ERR,<reason>
+        """
+        if self._set_param_timeout_timer.isActive():
+            self._set_param_timeout_timer.stop()
+        self._set_param_pending = False
+
+        parts = [p.strip() for p in text.split(",")]
+        ts = strftime("%H:%M:%S")
+        if len(parts) >= 2 and parts[1] == "OK":
+            self._update_set_param_status(
+                f"Status: OK ({ts})", color="#10b981"
+            )
+        elif len(parts) >= 3 and parts[1] == "ERR":
+            self._update_set_param_status(
+                f"Status: ERR - {parts[2]} ({ts})", color="#ef4444"
+            )
+        else:
+            self._update_set_param_status(
+                f"Status: {text} ({ts})", color="#f59e0b"
+            )
+
+        if self.is_connected() and hasattr(self, 'set_param_btn'):
+            self.set_param_btn.setEnabled(True)
 
 
     def update_indicators(self, roll: float, pitch: float, yaw: float,
@@ -2848,6 +2997,13 @@ class MainWindow(QMainWindow):
             # Disable Set Param button when disconnected (gate by is_connected)
             if hasattr(self, 'set_param_btn'):
                 self.set_param_btn.setEnabled(False)
+            # Reset Set Param state (timeout timer + pending flag) saat disconnect
+            try:
+                if hasattr(self, '_set_param_timeout_timer') and self._set_param_timeout_timer.isActive():
+                    self._set_param_timeout_timer.stop()
+                self._set_param_pending = False
+            except Exception:
+                pass
             # Reset status label ke idle saat disconnect
             if hasattr(self, 'set_param_status_label'):
                 self.set_param_status_label.setText("Status: idle")
@@ -2889,6 +3045,11 @@ class MainWindow(QMainWindow):
                 line, self.serial_buffer = self.serial_buffer.split(b"\n", 1)
                 text = line.decode('utf-8', errors='replace').strip()
                 if not text:
+                    continue
+                # Tangkap respons control protocol dari user-side ESP32 sebelum
+                # filter telemetri 15-kolom, agar $PACK,... tidak ikut di-drop.
+                if text.startswith("$PACK"):
+                    self._handle_set_param_response(text)
                     continue
                 # Format target: 1854.900,-7.286621,112.796040,1.53,-3.95,7.07,3.18,62.33,98.57,0.00,463.38,2880.63,10.54,11.88
                 parts = [p.strip() for p in text.split(',')]
