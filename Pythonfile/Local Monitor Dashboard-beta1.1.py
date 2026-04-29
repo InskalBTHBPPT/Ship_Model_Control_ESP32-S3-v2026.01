@@ -2076,27 +2076,41 @@ class MainWindow(QMainWindow):
         """
         Update label informasi jumlah waypoint di group Send Way Points.
 
-        Format yang ditampilkan:
-        - "Points: 0  (need >= 3)"           jika belum cukup
-        - "Points: N  (Home + (N-1) WP)"     jika sudah cukup
-        Dipanggil dari MapPointsWebView.update_table() setiap kali
-        click_marker_coords berubah.
+        Layout sekarang: Home (dari "Set Home Point") TERPISAH dari
+        click_marker_coords. Total point yang akan dikirim ke remote =
+        1 (Home, kalau sudah set) + len(click_marker_coords).
+        Minimal 3 total point untuk bisa kirim.
+
+        Dipanggil dari:
+        - MapPointsWebView.update_table()          (saat marker add/delete)
+        - set_home_point_from_serial()             (saat Home di-set)
+        - delete_home_point()                      (saat Home di-hapus)
         """
         if not hasattr(self, 'waypoints_info_label'):
             return
-        n = 0
+        home_set = bool(getattr(self, 'home_point_coords', None))
+        n_wp = 0
         if hasattr(self, 'map_points_webview') and self.map_points_webview:
-            n = len(self.map_points_webview.click_marker_coords)
-        if n >= 3:
+            n_wp = len(self.map_points_webview.click_marker_coords)
+        total = (1 if home_set else 0) + n_wp
+
+        if home_set and total >= 3:
             self.waypoints_info_label.setText(
-                f"Points: {n}  (Home + {n - 1} WP)"
+                f"Home: ✓  WP: {n_wp}  (total {total})"
             )
             self.waypoints_info_label.setStyleSheet(
                 "color: #10b981; padding: 2px 0;"
             )
         else:
+            need = []
+            if not home_set:
+                need.append("Home")
+            wp_short = max(0, 2 - n_wp) if home_set else max(0, 3 - n_wp - 1)
+            if wp_short > 0:
+                need.append(f"{wp_short} more WP")
+            need_text = " + ".join(need) if need else "—"
             self.waypoints_info_label.setText(
-                f"Points: {n}  (need >= 3)"
+                f"Home: {'✓' if home_set else '✗'}  WP: {n_wp}  (need {need_text})"
             )
             self.waypoints_info_label.setStyleSheet(
                 "color: #f59e0b; padding: 2px 0;"
@@ -2104,21 +2118,22 @@ class MainWindow(QMainWindow):
 
     def on_set_param_clicked(self):
         """
-        Handler tombol "Send Way Points" di tab Map Points (Step 1).
+        Handler tombol "Send Way Points" di tab Map Points.
 
         Alur:
         1. Gate: pastikan port serial sudah terkoneksi.
-        2. Validasi: minimal 3 marker (Home + minimal 2 waypoint navigasi)
-           pada self.map_points_webview.click_marker_coords.
+        2. Validasi:
+           - Home harus sudah di-set (self.home_point_coords).
+           - Total minimal 3 point: 1 Home + minimal 2 waypoint navigasi
+             dari self.map_points_webview.click_marker_coords.
+           - Tiap koordinat numerik dan dalam rentang lat/lon valid.
         3. Susun payload protokol baru:
-             $WPSET,<home_lat>,<home_lon>,<count>,<lat1>,<lon1>,...,<latN>,<lonN>\n
-           dengan count = jumlah waypoint navigasi (= total points - 1).
-        4. Tulis ke serial. Pada Step 1, firmware user-side belum mendukung
-           $WPSET (parser lama hanya match "$PARAM,"), jadi paket akan
-           diabaikan oleh firmware -> aman, tidak merusak alur lama.
-           Verifikasi visual via PlatformIO Serial Monitor user-side.
-        5. Update status. Untuk sementara timeout/ACK ($WACK) belum dipakai
-           sampai Step 2 (firmware user-side parser baru).
+             $WPSET,<home_lat>,<home_lon>,<wp_count>,<lat1>,<lon1>,...,<latN>,<lonN>\n
+           dengan wp_count = jumlah waypoint navigasi (= len(click_marker_coords)).
+        4. Tulis ke serial.
+        5. Tunggu balasan $WACK,OK / $WACK,ERR,<reason> dari firmware
+           user-side dengan timeout 1.5 detik (lihat poll_serial -> handler
+           akan dipanggil saat respons tiba).
         """
         if not self.is_connected():
             self._update_set_param_status(
@@ -2126,53 +2141,62 @@ class MainWindow(QMainWindow):
             )
             return
 
-        coords = []
-        if hasattr(self, 'map_points_webview') and self.map_points_webview:
-            coords = list(self.map_points_webview.click_marker_coords)
-
-        n = len(coords)
-        if n < 3:
+        if getattr(self, 'home_point_coords', None) is None:
             self._update_set_param_status(
-                f"Status: ERR - need at least 3 points (current: {n})",
+                "Status: ERR - Home not set (use Set Home Point)",
                 color="#ef4444",
             )
             return
 
-        # Validasi rentang lat/lon dan tidak ada NaN/inf
-        for i, (lat, lon) in enumerate(coords):
+        clicks = []
+        if hasattr(self, 'map_points_webview') and self.map_points_webview:
+            clicks = list(self.map_points_webview.click_marker_coords)
+
+        total = 1 + len(clicks)
+        if total < 3:
+            self._update_set_param_status(
+                f"Status: ERR - need at least 3 points "
+                f"(have Home + {len(clicks)} WP, total {total})",
+                color="#ef4444",
+            )
+            return
+
+        all_points = [self.home_point_coords] + clicks
+        for i, point in enumerate(all_points):
             try:
-                lat_f = float(lat)
-                lon_f = float(lon)
-            except (TypeError, ValueError):
+                lat_f = float(point[0])
+                lon_f = float(point[1])
+            except (TypeError, ValueError, IndexError):
                 self._update_set_param_status(
                     f"Status: ERR - point {i} not numeric", color="#ef4444"
                 )
                 return
             if not (-90.0 <= lat_f <= 90.0):
+                tag = "Home" if i == 0 else f"WP {i}"
                 self._update_set_param_status(
-                    f"Status: ERR - point {i} lat out of range", color="#ef4444"
+                    f"Status: ERR - {tag} lat out of range", color="#ef4444"
                 )
                 return
             if not (-180.0 <= lon_f <= 180.0):
+                tag = "Home" if i == 0 else f"WP {i}"
                 self._update_set_param_status(
-                    f"Status: ERR - point {i} lon out of range", color="#ef4444"
+                    f"Status: ERR - {tag} lon out of range", color="#ef4444"
                 )
                 return
 
         # Susun payload $WPSET
-        # Format: $WPSET,<home_lat>,<home_lon>,<wp_count>,<lat1>,<lon1>,...
-        home_lat, home_lon = coords[0]
-        wps = coords[1:]
-        wp_count = len(wps)
+        home_lat = float(self.home_point_coords[0])
+        home_lon = float(self.home_point_coords[1])
+        wp_count = len(clicks)
         parts = [
             "$WPSET",
             f"{home_lat:.6f}",
             f"{home_lon:.6f}",
             str(wp_count),
         ]
-        for lat_f, lon_f in wps:
-            parts.append(f"{lat_f:.6f}")
-            parts.append(f"{lon_f:.6f}")
+        for lat_v, lon_v in clicks:
+            parts.append(f"{float(lat_v):.6f}")
+            parts.append(f"{float(lon_v):.6f}")
         payload = ",".join(parts) + "\n"
 
         try:
@@ -2187,17 +2211,21 @@ class MainWindow(QMainWindow):
             )
             return
 
-        # Step 1: belum ada ACK $WACK dari firmware. Status langsung "SENT".
-        # Akan diganti jadi "sending... -> $WACK" pada Step 2.
         ts = strftime("%H:%M:%S")
         self._update_set_param_status(
-            f"Status: SENT {n} points ({ts})", color="#10b981"
+            f"Status: sending {total} points... ({ts})",
+            color="#f59e0b",
+            italic=True,
         )
+        self._set_param_pending = True
+        if hasattr(self, 'set_param_btn'):
+            self.set_param_btn.setEnabled(False)
+        self._set_param_timeout_timer.start()
         # Debug print ke konsol Python supaya mudah verifikasi payload
         print(f"[WPSET] {payload.strip()}")
 
     def _on_set_param_timeout(self):
-        """Dipanggil bila tidak ada $PACK,... dalam 1.5 detik setelah pengiriman."""
+        """Dipanggil bila tidak ada $WACK,... dalam 1.5 detik setelah pengiriman."""
         if not self._set_param_pending:
             return
         self._set_param_pending = False
@@ -2210,10 +2238,12 @@ class MainWindow(QMainWindow):
 
     def _handle_set_param_response(self, text: str):
         """
-        Diparse dari poll_serial saat baris diawali '$PACK'.
+        Diparse dari poll_serial saat baris diawali '$WACK' (atau '$PACK'
+        legacy; lihat poll_serial filter).
+
         Format yang diharapkan:
-          $PACK,OK
-          $PACK,ERR,<reason>
+          $WACK,OK
+          $WACK,ERR,<reason>[,<extra>...]
         """
         if self._set_param_timeout_timer.isActive():
             self._set_param_timeout_timer.stop()
@@ -2226,8 +2256,10 @@ class MainWindow(QMainWindow):
                 f"Status: OK ({ts})", color="#10b981"
             )
         elif len(parts) >= 3 and parts[1] == "ERR":
+            # Gabungkan reason + field extra (mis. COUNT_MISMATCH,5,exp,7)
+            reason = ",".join(parts[2:])
             self._update_set_param_status(
-                f"Status: ERR - {parts[2]} ({ts})", color="#ef4444"
+                f"Status: ERR - {reason} ({ts})", color="#ef4444"
             )
         else:
             self._update_set_param_status(
@@ -2903,7 +2935,10 @@ class MainWindow(QMainWindow):
         
         # Draw marker Home di peta
         self.map_points_webview.add_home_marker(self.home_point_coords)
-        
+
+        # Update label info Send Way Points (Home + WP count)
+        self.update_waypoints_info_label()
+
         print(f"[MAP POINTS] Home point set: Lat={self.home_point_coords[0]:.6f}, Lon={self.home_point_coords[1]:.6f}")
     
     def update_home_point_table(self):
@@ -2958,7 +2993,10 @@ class MainWindow(QMainWindow):
         
         # Hapus marker Home dari peta
         self.map_points_webview.remove_home_marker()
-        
+
+        # Update label info Send Way Points (Home + WP count)
+        self.update_waypoints_info_label()
+
         print("[MAP POINTS] Home point deleted")
 
     def toggle_connection(self, checked: bool):
@@ -3143,8 +3181,11 @@ class MainWindow(QMainWindow):
                 if not text:
                     continue
                 # Tangkap respons control protocol dari user-side ESP32 sebelum
-                # filter telemetri 15-kolom, agar $PACK,... tidak ikut di-drop.
-                if text.startswith("$PACK"):
+                # filter telemetri 15-kolom, agar tidak ikut di-drop.
+                # $WACK,... = balasan baru untuk $WPSET (Send Way Points).
+                # $PACK,... = balasan lama untuk $PARAM (deprecated, masih
+                #             di-handle untuk backward compatibility singkat).
+                if text.startswith("$WACK") or text.startswith("$PACK"):
                     self._handle_set_param_response(text)
                     continue
                 # Format target: 1854.900,-7.286621,112.796040,1.53,-3.95,7.07,3.18,62.33,98.57,0.00,463.38,2880.63,10.54,11.88
