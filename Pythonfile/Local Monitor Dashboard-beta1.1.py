@@ -60,9 +60,11 @@ from PySide6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QHeaderView,
+    QLineEdit,
+    QFormLayout,
 )
 import pyqtgraph as pg
-from time import time
+from time import time, strftime
 
 
 class ClickableMapPage(QWebEnginePage):
@@ -271,23 +273,42 @@ class MapWebView(QWebEngineView):
         else:
             popup_content = f'📍 Point {self.marker_count}\\nLat: {coords[0]:.6f}\\nLon: {coords[1]:.6f}'
         
+        # Step 1 (self-heal): bungkus dengan IIFE + guard. Kalau Leaflet/L, peta,
+        # atau window.trailMarkers belum siap (mis. add_initial_marker gagal di
+        # awal karena race condition QTimer.singleShot vs page load), kita
+        # buat sendiri di sini agar marker tetap tampil dan tidak melempar error.
         js_code = f"""
-        // Add new marker
-        var newMarker = L.marker({list(coords)})
-            .bindPopup('{popup_content}')
-            .bindTooltip('Point {self.marker_count}');
-        
-        // Add to marker group
-        window.trailMarkers.addLayer(newMarker);
-        
-        // Update trail line with all coordinates
-        if (window.trailLine) {{
+        (function() {{
+            if (typeof L === 'undefined') {{
+                console.warn('Leaflet (L) not ready, skip add_marker_js');
+                return;
+            }}
+            if (typeof {map_name} === 'undefined' || !{map_name}) {{
+                console.warn('Map {map_name} not ready, skip add_marker_js');
+                return;
+            }}
+            if (!window.trailMarkers) {{
+                window.trailMarkers = L.layerGroup().addTo({map_name});
+            }}
+
+            var newMarker = L.marker({list(coords)})
+                .bindPopup('{popup_content}')
+                .bindTooltip('Point {self.marker_count}');
+            window.trailMarkers.addLayer(newMarker);
+
+            if (!window.trailLine) {{
+                window.trailLine = L.polyline([{list(coords)}], {{
+                    color: '#3b82f6', weight: 3, opacity: 0.8,
+                    lineCap: 'round', lineJoin: 'round'
+                }}).addTo({map_name});
+            }}
+
             var allCoords = {[list(coord) for coord in self.trail_coords]};
             window.trailLine.setLatLngs(allCoords);
-            window.trailLine.bringToFront();  // Pastikan visible di depan
-        }}
-        
-        console.log('✅ Marker {self.marker_count} added at {list(coords)} | Trail points: {len(self.trail_coords)}');
+            window.trailLine.bringToFront();
+
+            console.log('Marker {self.marker_count} added at {list(coords)} | Trail points: {len(self.trail_coords)}');
+        }})();
         """
         
         self.page().runJavaScript(js_code)
@@ -528,11 +549,13 @@ class MapWebView(QWebEngineView):
           // Clear trail line
           if (window.trailLine) {{
             {map_name}.removeLayer(window.trailLine);
+            window.trailLine = null;  // null-kan agar self-heal di add_marker_js bisa create ulang
           }}
           
           // Clear heading line
           if (window.headingLine) {{
             {map_name}.removeLayer(window.headingLine);
+            window.headingLine = null;  // null-kan agar update_heading_line bisa create ulang dengan bersih
           }}
 
           // Clear multiple heading lines (Analyze tab)
@@ -1092,8 +1115,58 @@ class MainWindow(QMainWindow):
         # (akan di-update oleh update_home_point_table jika Home point sudah di-set)
         self.update_home_point_table()
         map_points_right_panel.layout().addWidget(map_points_table_group)
+
+        # Group "Set Parameter" untuk konfigurasi parameter ke remote-side
+        # Field mengikuti struct send_to_remote_side pada
+        # PlatformIO/ESP-Now_ESP32-S3_User-Side/src/main.cpp (baris 60-63)
+        set_param_group = QGroupBox("Set Parameter", self)
+        set_param_group.setLayout(QVBoxLayout())
+        set_param_group.layout().setContentsMargins(12, 12, 12, 12)
+
+        set_param_form = QFormLayout()
+        set_param_form.setContentsMargins(0, 0, 0, 0)
+        set_param_form.setSpacing(8)
+
+        self.param_a_input = QLineEdit("THIS IS A CHAR", self)
+        self.param_a_input.setMaxLength(31)  # char a[32] -> max 31 char + null terminator
+        self.param_a_input.setPlaceholderText("char a[32]")
+
+        self.param_b_input = QLineEdit("1", self)
+        self.param_b_input.setPlaceholderText("int b")
+
+        self.param_c_input = QLineEdit("3.4", self)
+        self.param_c_input.setPlaceholderText("float c")
+
+        self.param_d_input = QLineEdit("true", self)
+        self.param_d_input.setPlaceholderText("bool d (true/false)")
+
+        set_param_form.addRow(QLabel("a (char[32])"), self.param_a_input)
+        set_param_form.addRow(QLabel("b (int)"), self.param_b_input)
+        set_param_form.addRow(QLabel("c (float)"), self.param_c_input)
+        set_param_form.addRow(QLabel("d (bool)"), self.param_d_input)
+
+        set_param_group.layout().addLayout(set_param_form)
+
+        self.set_param_btn = QPushButton("Set Param", self)
+        # Gate awal: tombol baru aktif setelah Connect berhasil (lihat connect_serial / disconnect_serial)
+        self.set_param_btn.setEnabled(False)
+        self.set_param_btn.clicked.connect(self.on_set_param_clicked)
+        set_param_group.layout().addWidget(self.set_param_btn)
+
+        # Status label untuk menampilkan respons terakhir dari user-side ESP32
+        # (mis. $PACK,OK / $PACK,ERR,<reason>). Akan di-update oleh handler Set Param
+        # & poll_serial saat respons tiba.
+        self.set_param_status_label = QLabel("Status: idle", self)
+        self.set_param_status_label.setObjectName("setParamStatusLabel")
+        self.set_param_status_label.setWordWrap(True)
+        self.set_param_status_label.setStyleSheet(
+            "color: #9ca3af; font-style: italic; padding: 4px 2px 0 2px;"
+        )
+        set_param_group.layout().addWidget(self.set_param_status_label)
+
+        map_points_right_panel.layout().addWidget(set_param_group)
         map_points_right_panel.layout().addStretch(1)
-        
+
         # Simpan reference ke map_points_webview untuk update table
         self.map_points_webview.set_table_widget(self.map_points_table)
         
@@ -1127,6 +1200,13 @@ class MainWindow(QMainWindow):
         self.log_timer = QTimer(self)
         self.log_timer.setInterval(400)  # flush every 400 ms
         self.log_timer.timeout.connect(self.flush_log_buffer)
+
+        # Set Param state: timer timeout untuk menunggu ACK $PACK,... dari user-side
+        self._set_param_pending = False
+        self._set_param_timeout_timer = QTimer(self)
+        self._set_param_timeout_timer.setSingleShot(True)
+        self._set_param_timeout_timer.setInterval(1500)  # 1.5 detik tanpa ACK -> TIMEOUT
+        self._set_param_timeout_timer.timeout.connect(self._on_set_param_timeout)
         
         # Helper connection state method
         def _is_connected() -> bool:
@@ -1909,8 +1989,180 @@ class MainWindow(QMainWindow):
             }
             """
         )
+        # Apply dark style to "Set Parameter" group on Map Points right panel
+        set_param_group.setStyleSheet(
+            """
+            QGroupBox { background: #1f2937; border: 1px solid #374151; border-radius: 10px; margin-top: 8px; }
+            QGroupBox::title { color: #e5e7eb; subcontrol-origin: margin; left: 10px; padding: 0 4px; }
+            QLabel { color: #e5e7eb; }
+            QLineEdit {
+                background: #111827;
+                color: #e5e7eb;
+                border: 1px solid #374151;
+                border-radius: 6px;
+                padding: 4px 6px;
+                selection-background-color: #3b82f6;
+            }
+            QLineEdit:focus { border: 1px solid #3b82f6; }
+            QPushButton { background-color: #3b82f6; color: #fff; }
+            QPushButton:hover { background-color: #2563eb; }
+            QPushButton:pressed { background-color: #1d4ed8; }
+            QPushButton:disabled { background-color: #6b7280; color: #d1d5db; }
+            """
+        )
 
     
+    def _update_set_param_status(self, text: str, color: str = "#9ca3af", italic: bool = False):
+        """Update label status di group Set Parameter dengan warna konsisten."""
+        if not hasattr(self, 'set_param_status_label'):
+            return
+        italic_css = "italic" if italic else "normal"
+        self.set_param_status_label.setText(text)
+        self.set_param_status_label.setStyleSheet(
+            f"color: {color}; font-style: {italic_css}; padding: 4px 2px 0 2px;"
+        )
+
+    def on_set_param_clicked(self):
+        """
+        Handler tombol "Set Param" di tab Map Points.
+
+        Alur:
+        1. Gate: pastikan port serial sudah terkoneksi.
+        2. Baca 4 QLineEdit (a, b, c, d) lalu validasi tipe sesuai struct
+           send_to_remote_side di firmware user-side ESP32.
+        3. Susun payload "$PARAM,<a>,<b>,<c>,<d>\\n" dan kirim via Serial.
+        4. Tampilkan status sending..., disable tombol agar tidak double-send,
+           start timeout timer 1.5 detik untuk menunggu balasan $PACK,...
+        5. Update label status sesuai respons di poll_serial /
+           timeout di _on_set_param_timeout.
+        """
+        if not self.is_connected():
+            self._update_set_param_status(
+                "Status: not connected", color="#f59e0b", italic=True
+            )
+            return
+
+        a_text = self.param_a_input.text()
+        b_text = self.param_b_input.text().strip()
+        c_text = self.param_c_input.text().strip()
+        d_text = self.param_d_input.text().strip()
+
+        # Validasi 'a' (char[32]): tidak boleh ada CR/LF (akan memutus protokol)
+        # dan panjang max 31 karakter (sisa 1 byte untuk null terminator).
+        if "\n" in a_text or "\r" in a_text:
+            self._update_set_param_status(
+                "Status: ERR - a contains newline", color="#ef4444"
+            )
+            return
+        if len(a_text) > 31:
+            self._update_set_param_status(
+                f"Status: ERR - a too long ({len(a_text)}/31)", color="#ef4444"
+            )
+            return
+
+        # Validasi 'b' (int 32-bit)
+        try:
+            b_val = int(b_text)
+        except ValueError:
+            self._update_set_param_status(
+                "Status: ERR - b not int", color="#ef4444"
+            )
+            return
+        if b_val < -(2 ** 31) or b_val > (2 ** 31 - 1):
+            self._update_set_param_status(
+                "Status: ERR - b out of int32 range", color="#ef4444"
+            )
+            return
+
+        # Validasi 'c' (float)
+        try:
+            float(c_text)
+        except ValueError:
+            self._update_set_param_status(
+                "Status: ERR - c not float", color="#ef4444"
+            )
+            return
+
+        # Validasi 'd' (bool); normalisasi ke 'true'/'false' agar firmware konsisten
+        d_lower = d_text.lower()
+        if d_lower in ("true", "1"):
+            d_norm = "true"
+        elif d_lower in ("false", "0"):
+            d_norm = "false"
+        else:
+            self._update_set_param_status(
+                "Status: ERR - d not bool (true/false/1/0)", color="#ef4444"
+            )
+            return
+
+        # Susun payload. Pertahankan teks asli b/c agar format mengikuti input
+        # (mis. "3.40" tidak berubah jadi "3.4"); a juga dikirim apa adanya.
+        payload = f"$PARAM,{a_text},{b_text},{c_text},{d_norm}\n"
+
+        try:
+            self.ser.write(payload.encode("utf-8"))
+            try:
+                self.ser.flush()
+            except Exception:
+                pass
+        except Exception as e:
+            self._update_set_param_status(
+                f"Status: ERR - write failed: {e}", color="#ef4444"
+            )
+            return
+
+        # Sukses kirim ke serial; sekarang tunggu ACK
+        ts = strftime("%H:%M:%S")
+        self._update_set_param_status(
+            f"Status: sending... ({ts})", color="#f59e0b", italic=True
+        )
+        self._set_param_pending = True
+        if hasattr(self, 'set_param_btn'):
+            self.set_param_btn.setEnabled(False)
+        self._set_param_timeout_timer.start()
+
+    def _on_set_param_timeout(self):
+        """Dipanggil bila tidak ada $PACK,... dalam 1.5 detik setelah pengiriman."""
+        if not self._set_param_pending:
+            return
+        self._set_param_pending = False
+        ts = strftime("%H:%M:%S")
+        self._update_set_param_status(
+            f"Status: TIMEOUT no ACK ({ts})", color="#f59e0b"
+        )
+        if self.is_connected() and hasattr(self, 'set_param_btn'):
+            self.set_param_btn.setEnabled(True)
+
+    def _handle_set_param_response(self, text: str):
+        """
+        Diparse dari poll_serial saat baris diawali '$PACK'.
+        Format yang diharapkan:
+          $PACK,OK
+          $PACK,ERR,<reason>
+        """
+        if self._set_param_timeout_timer.isActive():
+            self._set_param_timeout_timer.stop()
+        self._set_param_pending = False
+
+        parts = [p.strip() for p in text.split(",")]
+        ts = strftime("%H:%M:%S")
+        if len(parts) >= 2 and parts[1] == "OK":
+            self._update_set_param_status(
+                f"Status: OK ({ts})", color="#10b981"
+            )
+        elif len(parts) >= 3 and parts[1] == "ERR":
+            self._update_set_param_status(
+                f"Status: ERR - {parts[2]} ({ts})", color="#ef4444"
+            )
+        else:
+            self._update_set_param_status(
+                f"Status: {text} ({ts})", color="#f59e0b"
+            )
+
+        if self.is_connected() and hasattr(self, 'set_param_btn'):
+            self.set_param_btn.setEnabled(True)
+
+
     def update_indicators(self, roll: float, pitch: float, yaw: float,
                           rud1: float, rud2: float,
                           rpm1: int, rpm2: int,
@@ -2709,7 +2961,11 @@ class MainWindow(QMainWindow):
             # Enable Home Points button when connected
             if hasattr(self, 'home_points_btn'):
                 self.home_points_btn.setEnabled(True)
-            
+
+            # Enable Set Param button when connected (gate by is_connected)
+            if hasattr(self, 'set_param_btn'):
+                self.set_param_btn.setEnabled(True)
+
             return True
         except Exception as e:
             print(f"[SERIAL] Connect failed: {e}")
@@ -2758,7 +3014,24 @@ class MainWindow(QMainWindow):
             # Disable Home Points button when disconnected
             if hasattr(self, 'home_points_btn'):
                 self.home_points_btn.setEnabled(False)
-            
+
+            # Disable Set Param button when disconnected (gate by is_connected)
+            if hasattr(self, 'set_param_btn'):
+                self.set_param_btn.setEnabled(False)
+            # Reset Set Param state (timeout timer + pending flag) saat disconnect
+            try:
+                if hasattr(self, '_set_param_timeout_timer') and self._set_param_timeout_timer.isActive():
+                    self._set_param_timeout_timer.stop()
+                self._set_param_pending = False
+            except Exception:
+                pass
+            # Reset status label ke idle saat disconnect
+            if hasattr(self, 'set_param_status_label'):
+                self.set_param_status_label.setText("Status: idle")
+                self.set_param_status_label.setStyleSheet(
+                    "color: #9ca3af; font-style: italic; padding: 4px 2px 0 2px;"
+                )
+
             # Reset latest serial coordinates
             self.latest_serial_lat = None
             self.latest_serial_lon = None
@@ -2793,6 +3066,11 @@ class MainWindow(QMainWindow):
                 line, self.serial_buffer = self.serial_buffer.split(b"\n", 1)
                 text = line.decode('utf-8', errors='replace').strip()
                 if not text:
+                    continue
+                # Tangkap respons control protocol dari user-side ESP32 sebelum
+                # filter telemetri 15-kolom, agar $PACK,... tidak ikut di-drop.
+                if text.startswith("$PACK"):
+                    self._handle_set_param_response(text)
                     continue
                 # Format target: 1854.900,-7.286621,112.796040,1.53,-3.95,7.07,3.18,62.33,98.57,0.00,463.38,2880.63,10.54,11.88
                 parts = [p.strip() for p in text.split(',')]
