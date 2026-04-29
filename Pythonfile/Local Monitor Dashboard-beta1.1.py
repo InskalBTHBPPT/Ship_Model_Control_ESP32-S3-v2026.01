@@ -273,23 +273,42 @@ class MapWebView(QWebEngineView):
         else:
             popup_content = f'📍 Point {self.marker_count}\\nLat: {coords[0]:.6f}\\nLon: {coords[1]:.6f}'
         
+        # Step 1 (self-heal): bungkus dengan IIFE + guard. Kalau Leaflet/L, peta,
+        # atau window.trailMarkers belum siap (mis. add_initial_marker gagal di
+        # awal karena race condition QTimer.singleShot vs page load), kita
+        # buat sendiri di sini agar marker tetap tampil dan tidak melempar error.
         js_code = f"""
-        // Add new marker
-        var newMarker = L.marker({list(coords)})
-            .bindPopup('{popup_content}')
-            .bindTooltip('Point {self.marker_count}');
-        
-        // Add to marker group
-        window.trailMarkers.addLayer(newMarker);
-        
-        // Update trail line with all coordinates
-        if (window.trailLine) {{
+        (function() {{
+            if (typeof L === 'undefined') {{
+                console.warn('Leaflet (L) not ready, skip add_marker_js');
+                return;
+            }}
+            if (typeof {map_name} === 'undefined' || !{map_name}) {{
+                console.warn('Map {map_name} not ready, skip add_marker_js');
+                return;
+            }}
+            if (!window.trailMarkers) {{
+                window.trailMarkers = L.layerGroup().addTo({map_name});
+            }}
+
+            var newMarker = L.marker({list(coords)})
+                .bindPopup('{popup_content}')
+                .bindTooltip('Point {self.marker_count}');
+            window.trailMarkers.addLayer(newMarker);
+
+            if (!window.trailLine) {{
+                window.trailLine = L.polyline([{list(coords)}], {{
+                    color: '#3b82f6', weight: 3, opacity: 0.8,
+                    lineCap: 'round', lineJoin: 'round'
+                }}).addTo({map_name});
+            }}
+
             var allCoords = {[list(coord) for coord in self.trail_coords]};
             window.trailLine.setLatLngs(allCoords);
-            window.trailLine.bringToFront();  // Pastikan visible di depan
-        }}
-        
-        console.log('✅ Marker {self.marker_count} added at {list(coords)} | Trail points: {len(self.trail_coords)}');
+            window.trailLine.bringToFront();
+
+            console.log('Marker {self.marker_count} added at {list(coords)} | Trail points: {len(self.trail_coords)}');
+        }})();
         """
         
         self.page().runJavaScript(js_code)
