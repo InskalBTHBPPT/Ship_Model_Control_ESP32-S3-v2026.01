@@ -618,6 +618,9 @@ class MapPointsWebView(MapWebView):
         self.click_marker_coords = []
         # Reference ke table widget untuk menampilkan data marker
         self.table_widget = None
+        # Optional callback untuk diberitahu saat jumlah marker berubah
+        # (dipakai MainWindow untuk update label "Points: N").
+        self._on_change_callback = None
         # Maksimum jumlah marker yang diperbolehkan
         self.max_markers = 10
         
@@ -708,12 +711,29 @@ class MapPointsWebView(MapWebView):
             table_widget: QTableWidget untuk menampilkan data marker
         """
         self.table_widget = table_widget
-    
+
+    def set_change_callback(self, callback):
+        """
+        Set callback yang akan dipanggil setiap kali click_marker_coords
+        berubah (add / delete). Dipakai MainWindow untuk meng-update
+        label info jumlah waypoint di group Send Way Points.
+        """
+        self._on_change_callback = callback
+
+    def _notify_change(self):
+        """Panggil callback perubahan jika sudah di-set."""
+        if self._on_change_callback:
+            try:
+                self._on_change_callback()
+            except Exception:
+                pass
+
     def update_table(self):
         """
         Update table dengan data marker yang sudah ditambahkan.
         """
         if not self.table_widget:
+            self._notify_change()
             return
         
         # Clear semua baris terlebih dahulu (termasuk widget tombol)
@@ -760,7 +780,10 @@ class MapPointsWebView(MapWebView):
             delete_btn.setMaximumHeight(25)
             delete_btn.clicked.connect(lambda checked, marker_idx=idx: self.delete_marker(marker_idx))
             self.table_widget.setCellWidget(table_row, 3, delete_btn)
-    
+
+        # Notifikasi MainWindow agar label info waypoint ikut ter-update.
+        self._notify_change()
+
     def delete_marker(self, marker_index: int):
         """
         Hapus marker berdasarkan index dan update peta serta tabel.
@@ -1060,7 +1083,7 @@ class MainWindow(QMainWindow):
         home_points_btn_group.setLayout(QVBoxLayout())
         home_points_btn_group.layout().setContentsMargins(12, 12, 12, 12)
         
-        self.home_points_btn = QPushButton("Home Points", self)
+        self.home_points_btn = QPushButton("Set Home Point", self)
         self.home_points_btn.setEnabled(False)  # Disabled by default, akan di-enable saat connected
         self.home_points_btn.clicked.connect(self.set_home_point_from_serial)
         home_points_btn_group.layout().addWidget(self.home_points_btn)
@@ -1116,10 +1139,16 @@ class MainWindow(QMainWindow):
         self.update_home_point_table()
         map_points_right_panel.layout().addWidget(map_points_table_group)
 
-        # Group "Set Parameter" untuk konfigurasi parameter ke remote-side
-        # Field mengikuti struct send_to_remote_side pada
-        # PlatformIO/ESP-Now_ESP32-S3_User-Side/src/main.cpp (baris 60-63)
-        set_param_group = QGroupBox("Set Parameter", self)
+        # Group "Send Way Points" untuk mengirim Home + waypoint ke remote-side.
+        # Catatan migrasi (Step 1):
+        # - Field lama a/b/c/d (struct send_to_remote_side) tetap dipertahankan
+        #   di kode tapi DISEMBUNYIKAN supaya mudah revert. Akan dihapus
+        #   permanen di Step 4 setelah firmware user-side & remote-side migrasi
+        #   ke struct waypoints_payload.
+        # - Tombol & status label internal masih bernama set_param_btn /
+        #   set_param_status_label untuk menjaga referensi lain (connect_serial,
+        #   disconnect_serial) tidak putus selama transisi.
+        set_param_group = QGroupBox("Send Way Points", self)
         set_param_group.setLayout(QVBoxLayout())
         set_param_group.layout().setContentsMargins(12, 12, 12, 12)
 
@@ -1140,22 +1169,36 @@ class MainWindow(QMainWindow):
         self.param_d_input = QLineEdit("true", self)
         self.param_d_input.setPlaceholderText("bool d (true/false)")
 
+        # Bungkus form a/b/c/d dalam container terpisah supaya bisa di-hide
+        # sebagai satu kesatuan tanpa membongkar layout.
+        self._legacy_param_form_widget = QWidget(self)
+        self._legacy_param_form_widget.setLayout(set_param_form)
         set_param_form.addRow(QLabel("a (char[32])"), self.param_a_input)
         set_param_form.addRow(QLabel("b (int)"), self.param_b_input)
         set_param_form.addRow(QLabel("c (float)"), self.param_c_input)
         set_param_form.addRow(QLabel("d (bool)"), self.param_d_input)
+        # Sembunyikan field a/b/c/d - tidak relevan lagi untuk Send Way Points.
+        # Tetap di kode (tidak dihapus) supaya mudah dikembalikan jika perlu.
+        self._legacy_param_form_widget.setVisible(False)
 
-        set_param_group.layout().addLayout(set_param_form)
+        set_param_group.layout().addWidget(self._legacy_param_form_widget)
 
-        self.set_param_btn = QPushButton("Set Param", self)
+        # Info singkat untuk menggantikan form a/b/c/d. Akan di-update tiap
+        # ada perubahan jumlah marker (handler dipanggil di update_table()).
+        self.waypoints_info_label = QLabel("Points: 0  (need ≥ 3)", self)
+        self.waypoints_info_label.setObjectName("waypointsInfoLabel")
+        self.waypoints_info_label.setStyleSheet("color: #e5e7eb; padding: 2px 0;")
+        set_param_group.layout().addWidget(self.waypoints_info_label)
+
+        self.set_param_btn = QPushButton("Send Way Points", self)
         # Gate awal: tombol baru aktif setelah Connect berhasil (lihat connect_serial / disconnect_serial)
         self.set_param_btn.setEnabled(False)
         self.set_param_btn.clicked.connect(self.on_set_param_clicked)
         set_param_group.layout().addWidget(self.set_param_btn)
 
         # Status label untuk menampilkan respons terakhir dari user-side ESP32
-        # (mis. $PACK,OK / $PACK,ERR,<reason>). Akan di-update oleh handler Set Param
-        # & poll_serial saat respons tiba.
+        # (mis. $WACK,OK / $WACK,ERR,<reason>). Akan di-update oleh handler &
+        # poll_serial saat respons tiba.
         self.set_param_status_label = QLabel("Status: idle", self)
         self.set_param_status_label.setObjectName("setParamStatusLabel")
         self.set_param_status_label.setWordWrap(True)
@@ -1169,6 +1212,13 @@ class MainWindow(QMainWindow):
 
         # Simpan reference ke map_points_webview untuk update table
         self.map_points_webview.set_table_widget(self.map_points_table)
+
+        # Hubungkan perubahan jumlah marker -> update label info waypoints.
+        # Dipanggil otomatis dari MapPointsWebview.update_table()
+        # (yang dipanggil oleh add_click_marker dan delete_marker).
+        self.map_points_webview.set_change_callback(self.update_waypoints_info_label)
+        # Inisialisasi label dengan state awal (0 points).
+        self.update_waypoints_info_label()
         
         # Add panels to tab with ratio 3.75:1
         map_points_tab.layout().addWidget(map_points_left_panel, 3.75)
@@ -2022,19 +2072,53 @@ class MainWindow(QMainWindow):
             f"color: {color}; font-style: {italic_css}; padding: 4px 2px 0 2px;"
         )
 
+    def update_waypoints_info_label(self):
+        """
+        Update label informasi jumlah waypoint di group Send Way Points.
+
+        Format yang ditampilkan:
+        - "Points: 0  (need >= 3)"           jika belum cukup
+        - "Points: N  (Home + (N-1) WP)"     jika sudah cukup
+        Dipanggil dari MapPointsWebView.update_table() setiap kali
+        click_marker_coords berubah.
+        """
+        if not hasattr(self, 'waypoints_info_label'):
+            return
+        n = 0
+        if hasattr(self, 'map_points_webview') and self.map_points_webview:
+            n = len(self.map_points_webview.click_marker_coords)
+        if n >= 3:
+            self.waypoints_info_label.setText(
+                f"Points: {n}  (Home + {n - 1} WP)"
+            )
+            self.waypoints_info_label.setStyleSheet(
+                "color: #10b981; padding: 2px 0;"
+            )
+        else:
+            self.waypoints_info_label.setText(
+                f"Points: {n}  (need >= 3)"
+            )
+            self.waypoints_info_label.setStyleSheet(
+                "color: #f59e0b; padding: 2px 0;"
+            )
+
     def on_set_param_clicked(self):
         """
-        Handler tombol "Set Param" di tab Map Points.
+        Handler tombol "Send Way Points" di tab Map Points (Step 1).
 
         Alur:
         1. Gate: pastikan port serial sudah terkoneksi.
-        2. Baca 4 QLineEdit (a, b, c, d) lalu validasi tipe sesuai struct
-           send_to_remote_side di firmware user-side ESP32.
-        3. Susun payload "$PARAM,<a>,<b>,<c>,<d>\\n" dan kirim via Serial.
-        4. Tampilkan status sending..., disable tombol agar tidak double-send,
-           start timeout timer 1.5 detik untuk menunggu balasan $PACK,...
-        5. Update label status sesuai respons di poll_serial /
-           timeout di _on_set_param_timeout.
+        2. Validasi: minimal 3 marker (Home + minimal 2 waypoint navigasi)
+           pada self.map_points_webview.click_marker_coords.
+        3. Susun payload protokol baru:
+             $WPSET,<home_lat>,<home_lon>,<count>,<lat1>,<lon1>,...,<latN>,<lonN>\n
+           dengan count = jumlah waypoint navigasi (= total points - 1).
+        4. Tulis ke serial. Pada Step 1, firmware user-side belum mendukung
+           $WPSET (parser lama hanya match "$PARAM,"), jadi paket akan
+           diabaikan oleh firmware -> aman, tidak merusak alur lama.
+           Verifikasi visual via PlatformIO Serial Monitor user-side.
+        5. Update status. Untuk sementara timeout/ACK ($WACK) belum dipakai
+           sampai Step 2 (firmware user-side parser baru).
         """
         if not self.is_connected():
             self._update_set_param_status(
@@ -2042,62 +2126,54 @@ class MainWindow(QMainWindow):
             )
             return
 
-        a_text = self.param_a_input.text()
-        b_text = self.param_b_input.text().strip()
-        c_text = self.param_c_input.text().strip()
-        d_text = self.param_d_input.text().strip()
+        coords = []
+        if hasattr(self, 'map_points_webview') and self.map_points_webview:
+            coords = list(self.map_points_webview.click_marker_coords)
 
-        # Validasi 'a' (char[32]): tidak boleh ada CR/LF (akan memutus protokol)
-        # dan panjang max 31 karakter (sisa 1 byte untuk null terminator).
-        if "\n" in a_text or "\r" in a_text:
+        n = len(coords)
+        if n < 3:
             self._update_set_param_status(
-                "Status: ERR - a contains newline", color="#ef4444"
-            )
-            return
-        if len(a_text) > 31:
-            self._update_set_param_status(
-                f"Status: ERR - a too long ({len(a_text)}/31)", color="#ef4444"
+                f"Status: ERR - need at least 3 points (current: {n})",
+                color="#ef4444",
             )
             return
 
-        # Validasi 'b' (int 32-bit)
-        try:
-            b_val = int(b_text)
-        except ValueError:
-            self._update_set_param_status(
-                "Status: ERR - b not int", color="#ef4444"
-            )
-            return
-        if b_val < -(2 ** 31) or b_val > (2 ** 31 - 1):
-            self._update_set_param_status(
-                "Status: ERR - b out of int32 range", color="#ef4444"
-            )
-            return
+        # Validasi rentang lat/lon dan tidak ada NaN/inf
+        for i, (lat, lon) in enumerate(coords):
+            try:
+                lat_f = float(lat)
+                lon_f = float(lon)
+            except (TypeError, ValueError):
+                self._update_set_param_status(
+                    f"Status: ERR - point {i} not numeric", color="#ef4444"
+                )
+                return
+            if not (-90.0 <= lat_f <= 90.0):
+                self._update_set_param_status(
+                    f"Status: ERR - point {i} lat out of range", color="#ef4444"
+                )
+                return
+            if not (-180.0 <= lon_f <= 180.0):
+                self._update_set_param_status(
+                    f"Status: ERR - point {i} lon out of range", color="#ef4444"
+                )
+                return
 
-        # Validasi 'c' (float)
-        try:
-            float(c_text)
-        except ValueError:
-            self._update_set_param_status(
-                "Status: ERR - c not float", color="#ef4444"
-            )
-            return
-
-        # Validasi 'd' (bool); normalisasi ke 'true'/'false' agar firmware konsisten
-        d_lower = d_text.lower()
-        if d_lower in ("true", "1"):
-            d_norm = "true"
-        elif d_lower in ("false", "0"):
-            d_norm = "false"
-        else:
-            self._update_set_param_status(
-                "Status: ERR - d not bool (true/false/1/0)", color="#ef4444"
-            )
-            return
-
-        # Susun payload. Pertahankan teks asli b/c agar format mengikuti input
-        # (mis. "3.40" tidak berubah jadi "3.4"); a juga dikirim apa adanya.
-        payload = f"$PARAM,{a_text},{b_text},{c_text},{d_norm}\n"
+        # Susun payload $WPSET
+        # Format: $WPSET,<home_lat>,<home_lon>,<wp_count>,<lat1>,<lon1>,...
+        home_lat, home_lon = coords[0]
+        wps = coords[1:]
+        wp_count = len(wps)
+        parts = [
+            "$WPSET",
+            f"{home_lat:.6f}",
+            f"{home_lon:.6f}",
+            str(wp_count),
+        ]
+        for lat_f, lon_f in wps:
+            parts.append(f"{lat_f:.6f}")
+            parts.append(f"{lon_f:.6f}")
+        payload = ",".join(parts) + "\n"
 
         try:
             self.ser.write(payload.encode("utf-8"))
@@ -2111,15 +2187,14 @@ class MainWindow(QMainWindow):
             )
             return
 
-        # Sukses kirim ke serial; sekarang tunggu ACK
+        # Step 1: belum ada ACK $WACK dari firmware. Status langsung "SENT".
+        # Akan diganti jadi "sending... -> $WACK" pada Step 2.
         ts = strftime("%H:%M:%S")
         self._update_set_param_status(
-            f"Status: sending... ({ts})", color="#f59e0b", italic=True
+            f"Status: SENT {n} points ({ts})", color="#10b981"
         )
-        self._set_param_pending = True
-        if hasattr(self, 'set_param_btn'):
-            self.set_param_btn.setEnabled(False)
-        self._set_param_timeout_timer.start()
+        # Debug print ke konsol Python supaya mudah verifikasi payload
+        print(f"[WPSET] {payload.strip()}")
 
     def _on_set_param_timeout(self):
         """Dipanggil bila tidak ada $PACK,... dalam 1.5 detik setelah pengiriman."""
