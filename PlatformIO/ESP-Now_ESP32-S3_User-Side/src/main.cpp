@@ -68,11 +68,11 @@ send_to_remote_side mysend_to_remote_sideData;
 
 esp_now_peer_info_t peerInfo;
 
-// callback when data is send_to_remote_side
-void OnDatasend_to_remote_side(const uint8_t *mac_addr, esp_now_send_status_t status) {
-  Serial.print("\r\nLast Packet Send Status:\t");
-  Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
-}
+// // callback when data is send_to_remote_side
+// void OnDatasend_to_remote_side(const uint8_t *mac_addr, esp_now_send_status_t status) {
+//   Serial.print("\r\nLast Packet Send Status:\t");
+//   Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
+// }
  
 void setup() {
   // Initialize Serial Monitor
@@ -113,11 +113,11 @@ void loop() {
   // Send message via ESP-NOW
   esp_err_t result = esp_now_send(remote_side_Address, (uint8_t *) &mysend_to_remote_sideData, sizeof(mysend_to_remote_sideData));
    
-  if (result == ESP_OK) {
-    Serial.println("send_to_remote_side with success");
-  }
-  else {
-    Serial.println("Error sending the data");
-  }
+  // if (result == ESP_OK) {
+  //   Serial.println("send_to_remote_side with success");
+  // }
+  // else {
+  //   Serial.println("Error sending the data");
+  // }
   delay(2000);
 }
