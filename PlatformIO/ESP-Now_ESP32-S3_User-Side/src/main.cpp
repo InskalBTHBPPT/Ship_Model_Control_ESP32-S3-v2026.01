@@ -218,6 +218,7 @@ void loop() {
     }
     if (ch == '\n') {
       processSerialLine(rxBuf);
+      Serial.println("Data sent to remote side");
       rxBuf = "";
     } else {
       // Guard panjang buffer untuk antisipasi input rusak/runaway
