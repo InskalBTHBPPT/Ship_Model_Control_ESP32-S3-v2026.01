@@ -549,11 +549,13 @@ class MapWebView(QWebEngineView):
           // Clear trail line
           if (window.trailLine) {{
             {map_name}.removeLayer(window.trailLine);
+            window.trailLine = null;  // null-kan agar self-heal di add_marker_js bisa create ulang
           }}
           
           // Clear heading line
           if (window.headingLine) {{
             {map_name}.removeLayer(window.headingLine);
+            window.headingLine = null;  // null-kan agar update_heading_line bisa create ulang dengan bersih
           }}
 
           // Clear multiple heading lines (Analyze tab)
