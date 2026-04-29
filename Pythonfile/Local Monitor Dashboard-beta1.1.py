@@ -60,6 +60,8 @@ from PySide6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QHeaderView,
+    QLineEdit,
+    QFormLayout,
 )
 import pyqtgraph as pg
 from time import time
@@ -1092,8 +1094,45 @@ class MainWindow(QMainWindow):
         # (akan di-update oleh update_home_point_table jika Home point sudah di-set)
         self.update_home_point_table()
         map_points_right_panel.layout().addWidget(map_points_table_group)
+
+        # Group "Set Parameter" untuk konfigurasi parameter ke remote-side
+        # Field mengikuti struct send_to_remote_side pada
+        # PlatformIO/ESP-Now_ESP32-S3_User-Side/src/main.cpp (baris 60-63)
+        set_param_group = QGroupBox("Set Parameter", self)
+        set_param_group.setLayout(QVBoxLayout())
+        set_param_group.layout().setContentsMargins(12, 12, 12, 12)
+
+        set_param_form = QFormLayout()
+        set_param_form.setContentsMargins(0, 0, 0, 0)
+        set_param_form.setSpacing(8)
+
+        self.param_a_input = QLineEdit("THIS IS A CHAR", self)
+        self.param_a_input.setMaxLength(31)  # char a[32] -> max 31 char + null terminator
+        self.param_a_input.setPlaceholderText("char a[32]")
+
+        self.param_b_input = QLineEdit("1", self)
+        self.param_b_input.setPlaceholderText("int b")
+
+        self.param_c_input = QLineEdit("3.4", self)
+        self.param_c_input.setPlaceholderText("float c")
+
+        self.param_d_input = QLineEdit("true", self)
+        self.param_d_input.setPlaceholderText("bool d (true/false)")
+
+        set_param_form.addRow(QLabel("a (char[32])"), self.param_a_input)
+        set_param_form.addRow(QLabel("b (int)"), self.param_b_input)
+        set_param_form.addRow(QLabel("c (float)"), self.param_c_input)
+        set_param_form.addRow(QLabel("d (bool)"), self.param_d_input)
+
+        set_param_group.layout().addLayout(set_param_form)
+
+        self.set_param_btn = QPushButton("Set Param", self)
+        self.set_param_btn.clicked.connect(self.on_set_param_clicked)
+        set_param_group.layout().addWidget(self.set_param_btn)
+
+        map_points_right_panel.layout().addWidget(set_param_group)
         map_points_right_panel.layout().addStretch(1)
-        
+
         # Simpan reference ke map_points_webview untuk update table
         self.map_points_webview.set_table_widget(self.map_points_table)
         
@@ -1909,8 +1948,38 @@ class MainWindow(QMainWindow):
             }
             """
         )
+        # Apply dark style to "Set Parameter" group on Map Points right panel
+        set_param_group.setStyleSheet(
+            """
+            QGroupBox { background: #1f2937; border: 1px solid #374151; border-radius: 10px; margin-top: 8px; }
+            QGroupBox::title { color: #e5e7eb; subcontrol-origin: margin; left: 10px; padding: 0 4px; }
+            QLabel { color: #e5e7eb; }
+            QLineEdit {
+                background: #111827;
+                color: #e5e7eb;
+                border: 1px solid #374151;
+                border-radius: 6px;
+                padding: 4px 6px;
+                selection-background-color: #3b82f6;
+            }
+            QLineEdit:focus { border: 1px solid #3b82f6; }
+            QPushButton { background-color: #3b82f6; color: #fff; }
+            QPushButton:hover { background-color: #2563eb; }
+            QPushButton:pressed { background-color: #1d4ed8; }
+            QPushButton:disabled { background-color: #6b7280; color: #d1d5db; }
+            """
+        )
 
     
+    def on_set_param_clicked(self):
+        """
+        Handler tombol "Set Param" di tab Map Points.
+        Untuk saat ini sengaja dikosongkan; logika pengiriman parameter
+        ke remote-side via user-side ESP32 akan ditambahkan kemudian.
+        """
+        pass
+
+
     def update_indicators(self, roll: float, pitch: float, yaw: float,
                           rud1: float, rud2: float,
                           rpm1: int, rpm2: int,
