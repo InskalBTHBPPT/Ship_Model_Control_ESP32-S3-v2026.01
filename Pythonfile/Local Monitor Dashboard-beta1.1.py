@@ -1159,21 +1159,16 @@ class MainWindow(QMainWindow):
         home_points_btn_group.setLayout(QVBoxLayout())
         home_points_btn_group.layout().setContentsMargins(12, 12, 12, 12)
         
-        self.home_points_btn = QPushButton("Set Home Point", self)
-        self.home_points_btn.setEnabled(False)  # Disabled by default, akan di-enable saat connected
-        self.home_points_btn.clicked.connect(self.set_home_point_from_serial)
-        home_points_btn_group.layout().addWidget(self.home_points_btn)
-
-        # Label info posisi live terbaru dari serial (grid 2 baris x 3 kolom)
+        # Label info posisi live terbaru dari serial (grid 2 baris x 3 kolom) — di atas tombol
         live_pos_grid_widget = QWidget(self)
         live_pos_grid = QGridLayout(live_pos_grid_widget)
-        live_pos_grid.setContentsMargins(0, 4, 0, 0)
+        live_pos_grid.setContentsMargins(0, 0, 0, 6)
         live_pos_grid.setSpacing(2)
 
         header_style = "color: #9ca3af; font-size: 10px; font-family: monospace;"
         value_style  = "color: #f97316; font-size: 11px; font-family: monospace; font-weight: bold;"
 
-        for col, name in enumerate(["Lat", "Lon", "Hdg"]):
+        for col, name in enumerate(["Latitude (°)", "Longitude (°)", "Heading (°)"]):
             lbl = QLabel(name, self)
             lbl.setStyleSheet(header_style)
             lbl.setAlignment(Qt.AlignCenter)
@@ -1188,6 +1183,11 @@ class MainWindow(QMainWindow):
             live_pos_grid.addWidget(lbl, 1, col)
 
         home_points_btn_group.layout().addWidget(live_pos_grid_widget)
+
+        self.home_points_btn = QPushButton("Set Home Point", self)
+        self.home_points_btn.setEnabled(False)  # Disabled by default, akan di-enable saat connected
+        self.home_points_btn.clicked.connect(self.set_home_point_from_serial)
+        home_points_btn_group.layout().addWidget(self.home_points_btn)
 
         map_points_right_panel.layout().addWidget(home_points_btn_group)
         
