@@ -1164,15 +1164,30 @@ class MainWindow(QMainWindow):
         self.home_points_btn.clicked.connect(self.set_home_point_from_serial)
         home_points_btn_group.layout().addWidget(self.home_points_btn)
 
-        # Label info posisi live terbaru dari serial (di bawah tombol Set Home Point)
-        self.live_pos_label = QLabel("Lat: —\nLon: —\nHdg: —", self)
-        self.live_pos_label.setAlignment(Qt.AlignLeft)
-        self.live_pos_label.setStyleSheet(
-            "color: #f97316; font-size: 11px; font-family: monospace;"
-            " padding: 6px 2px 2px 2px;"
-        )
-        self.live_pos_label.setWordWrap(True)
-        home_points_btn_group.layout().addWidget(self.live_pos_label)
+        # Label info posisi live terbaru dari serial (grid 2 baris x 3 kolom)
+        live_pos_grid_widget = QWidget(self)
+        live_pos_grid = QGridLayout(live_pos_grid_widget)
+        live_pos_grid.setContentsMargins(0, 4, 0, 0)
+        live_pos_grid.setSpacing(2)
+
+        header_style = "color: #9ca3af; font-size: 10px; font-family: monospace;"
+        value_style  = "color: #f97316; font-size: 11px; font-family: monospace; font-weight: bold;"
+
+        for col, name in enumerate(["Lat", "Lon", "Hdg"]):
+            lbl = QLabel(name, self)
+            lbl.setStyleSheet(header_style)
+            lbl.setAlignment(Qt.AlignCenter)
+            live_pos_grid.addWidget(lbl, 0, col)
+
+        self.live_lat_val  = QLabel("—", self)
+        self.live_lon_val  = QLabel("—", self)
+        self.live_hdg_val  = QLabel("—", self)
+        for col, lbl in enumerate([self.live_lat_val, self.live_lon_val, self.live_hdg_val]):
+            lbl.setStyleSheet(value_style)
+            lbl.setAlignment(Qt.AlignCenter)
+            live_pos_grid.addWidget(lbl, 1, col)
+
+        home_points_btn_group.layout().addWidget(live_pos_grid_widget)
 
         map_points_right_panel.layout().addWidget(home_points_btn_group)
         
@@ -3237,8 +3252,10 @@ class MainWindow(QMainWindow):
             self.latest_serial_heading = None
 
             # Reset label live position di Map Points
-            if hasattr(self, 'live_pos_label'):
-                self.live_pos_label.setText("Lat: —\nLon: —\nHdg: —")
+            if hasattr(self, 'live_lat_val'):
+                self.live_lat_val.setText("—")
+                self.live_lon_val.setText("—")
+                self.live_hdg_val.setText("—")
 
     def poll_serial(self):
         """
@@ -3323,12 +3340,10 @@ class MainWindow(QMainWindow):
                 self.plot_counter += 1
                 
                 # Update label lat/lon/heading setiap data (real-time, tanpa decimation)
-                if hasattr(self, 'live_pos_label'):
-                    self.live_pos_label.setText(
-                        f"Lat: {lat:.6f}\n"
-                        f"Lon: {lon:.6f}\n"
-                        f"Hdg: {heading:.1f}°"
-                    )
+                if hasattr(self, 'live_lat_val'):
+                    self.live_lat_val.setText(f"{lat:.6f}")
+                    self.live_lon_val.setText(f"{lon:.6f}")
+                    self.live_hdg_val.setText(f"{heading:.1f}°")
 
                 # Update peta hanya setiap N data (decimation untuk performa)
                 if self.plot_counter >= self.plot_interval:
