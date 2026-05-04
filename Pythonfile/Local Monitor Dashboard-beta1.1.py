@@ -924,7 +924,82 @@ class MapPointsWebView(MapWebView):
         }})();
         """
         self.page().runJavaScript(js_code)
-    
+
+    def update_live_position(self, coords: tuple[float, float], heading_deg: float | None = None):
+        """
+        Update marker posisi live (data serial terbaru) di peta Map Points.
+
+        Menggunakan window.livePositionMarker (lingkaran oranye) dan
+        window.liveHeadingLine (oranye) terpisah dari homeMarker dan click markers.
+        """
+        import math
+        map_name = self.folium_map.get_name()
+
+        heading_line_js = "null"
+        if heading_deg is not None:
+            try:
+                lat1 = math.radians(coords[0])
+                lon1 = math.radians(coords[1])
+                brng = math.radians(float(heading_deg) % 360.0)
+                R = 6371000.0
+                dR = 5.0 / R
+                lat2 = math.asin(
+                    math.sin(lat1) * math.cos(dR)
+                    + math.cos(lat1) * math.sin(dR) * math.cos(brng)
+                )
+                lon2 = lon1 + math.atan2(
+                    math.sin(brng) * math.sin(dR) * math.cos(lat1),
+                    math.cos(dR) - math.sin(lat1) * math.sin(lat2),
+                )
+                dest = [math.degrees(lat2), math.degrees(lon2)]
+                heading_line_js = str(dest)
+            except Exception:
+                pass
+
+        heading_str = f"{heading_deg:.1f}" if heading_deg is not None else "N/A"
+        popup_content = (
+            f"📡 Live Position\\n"
+            f"Lat: {coords[0]:.6f}\\n"
+            f"Lon: {coords[1]:.6f}\\n"
+            f"Hdg: {heading_str}°"
+        )
+
+        js_code = f"""
+        (function() {{
+            if (typeof L === 'undefined' || typeof {map_name} === 'undefined') return;
+
+            if (!window.livePositionMarker) {{
+                window.livePositionMarker = L.circleMarker({list(coords)}, {{
+                    radius: 8, color: '#ea580c', weight: 2,
+                    fillColor: '#f97316', fillOpacity: 0.9
+                }}).addTo({map_name})
+                  .bindPopup('{popup_content}')
+                  .bindTooltip('📡 Live', {{permanent: true, direction: 'top', offset: [0, -10]}});
+            }} else {{
+                window.livePositionMarker.setLatLng({list(coords)});
+                window.livePositionMarker.setPopupContent('{popup_content}');
+            }}
+
+            var destPt = {heading_line_js};
+            if (destPt !== null) {{
+                var pts = [{list(coords)}, destPt];
+                if (!window.liveHeadingLine) {{
+                    window.liveHeadingLine = L.polyline(pts, {{
+                        color: '#ea580c', weight: 3, opacity: 0.9
+                    }}).addTo({map_name});
+                }} else {{
+                    window.liveHeadingLine.setLatLngs(pts);
+                }}
+            }} else {{
+                if (window.liveHeadingLine) {{
+                    {map_name}.removeLayer(window.liveHeadingLine);
+                    window.liveHeadingLine = null;
+                }}
+            }}
+        }})();
+        """
+        self.page().runJavaScript(js_code)
+
     def add_click_marker(self, coords: tuple[float, float]):
         """
         Tambahkan marker di peta untuk setiap titik yang diklik dan buat garis penghubung.
@@ -1058,6 +1133,7 @@ class MainWindow(QMainWindow):
         self.home_point_coords = None  # Tuple (lat, lon) atau None
         self.latest_serial_lat = None  # Latest latitude dari serial
         self.latest_serial_lon = None  # Latest longitude dari serial
+        self.latest_serial_heading = None  # Latest heading dari serial
         
         # Tab "Map Points" - tab baru sebelum Live Data
         map_points_tab = QWidget(self)
@@ -1087,7 +1163,17 @@ class MainWindow(QMainWindow):
         self.home_points_btn.setEnabled(False)  # Disabled by default, akan di-enable saat connected
         self.home_points_btn.clicked.connect(self.set_home_point_from_serial)
         home_points_btn_group.layout().addWidget(self.home_points_btn)
-        
+
+        # Label info posisi live terbaru dari serial (di bawah tombol Set Home Point)
+        self.live_pos_label = QLabel("Lat: —\nLon: —\nHdg: —", self)
+        self.live_pos_label.setAlignment(Qt.AlignLeft)
+        self.live_pos_label.setStyleSheet(
+            "color: #f97316; font-size: 11px; font-family: monospace;"
+            " padding: 6px 2px 2px 2px;"
+        )
+        self.live_pos_label.setWordWrap(True)
+        home_points_btn_group.layout().addWidget(self.live_pos_label)
+
         map_points_right_panel.layout().addWidget(home_points_btn_group)
         
         # Table untuk menampilkan marker points di panel kanan
@@ -3148,6 +3234,11 @@ class MainWindow(QMainWindow):
             # Reset latest serial coordinates
             self.latest_serial_lat = None
             self.latest_serial_lon = None
+            self.latest_serial_heading = None
+
+            # Reset label live position di Map Points
+            if hasattr(self, 'live_pos_label'):
+                self.live_pos_label.setText("Lat: —\nLon: —\nHdg: —")
 
     def poll_serial(self):
         """
@@ -3217,6 +3308,7 @@ class MainWindow(QMainWindow):
                     roll = float(parts[6])
                     pitch = float(parts[7])
                     heading = float(parts[8])
+                    self.latest_serial_heading = heading  # Simpan heading terbaru
                     zigzag_yaw = float(parts[9])*-1  # Nilai yaw zigzag dikali -1 untuk menyamakan dengan sudut rudder
                     rpm1 = int(parts[10])  # Direct integer value (no conversion)
                     rpm2 = int(parts[11])  # Direct integer value (no conversion)
@@ -3233,6 +3325,17 @@ class MainWindow(QMainWindow):
                 # Update peta hanya setiap N data (decimation untuk performa)
                 if self.plot_counter >= self.plot_interval:
                     self.map_webview.update_map((lat, lon), heading)
+
+                    # Update live position marker + heading line di tab Map Points
+                    self.map_points_webview.update_live_position((lat, lon), heading)
+                    # Update label teks lat/lon/heading di panel kanan Map Points
+                    if hasattr(self, 'live_pos_label'):
+                        self.live_pos_label.setText(
+                            f"Lat: {lat:.6f}\n"
+                            f"Lon: {lon:.6f}\n"
+                            f"Hdg: {heading:.1f}°"
+                        )
+
                     self.plot_counter = 0  # Reset counter
                 
                 # Update indicators tetap setiap data (real-time)
