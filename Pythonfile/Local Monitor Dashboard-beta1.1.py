@@ -3322,19 +3322,20 @@ class MainWindow(QMainWindow):
                 # Increment plot counter
                 self.plot_counter += 1
                 
+                # Update label lat/lon/heading setiap data (real-time, tanpa decimation)
+                if hasattr(self, 'live_pos_label'):
+                    self.live_pos_label.setText(
+                        f"Lat: {lat:.6f}\n"
+                        f"Lon: {lon:.6f}\n"
+                        f"Hdg: {heading:.1f}°"
+                    )
+
                 # Update peta hanya setiap N data (decimation untuk performa)
                 if self.plot_counter >= self.plot_interval:
                     self.map_webview.update_map((lat, lon), heading)
 
                     # Update live position marker + heading line di tab Map Points
                     self.map_points_webview.update_live_position((lat, lon), heading)
-                    # Update label teks lat/lon/heading di panel kanan Map Points
-                    if hasattr(self, 'live_pos_label'):
-                        self.live_pos_label.setText(
-                            f"Lat: {lat:.6f}\n"
-                            f"Lon: {lon:.6f}\n"
-                            f"Hdg: {heading:.1f}°"
-                        )
 
                     self.plot_counter = 0  # Reset counter
                 
