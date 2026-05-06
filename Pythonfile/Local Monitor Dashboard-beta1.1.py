@@ -32,8 +32,10 @@ Catatan pengolahan:
 
 import csv
 import io
+import os
 import sys
 from bisect import bisect_left
+from datetime import datetime
 import folium
 import serial
 from serial.tools import list_ports
@@ -2300,6 +2302,14 @@ class MainWindow(QMainWindow):
             parts.append(f"{float(lon_v):.6f}")
         payload = ",".join(parts) + "\n"
 
+        # Simpan snapshot tabel waypoint sebelum mengirim ke remote
+        # (agar data yang dikirim bisa dilacak kembali walaupun serial write/ACK gagal).
+        try:
+            self._save_waypoints_table_snapshot_csv()
+        except Exception as e:
+            # Jangan mengganggu pengiriman protokol jika file snapshot gagal.
+            print(f"[WP SAVE] Failed: {e}")
+
         try:
             self.ser.write(payload.encode("utf-8"))
             try:
@@ -2324,6 +2334,60 @@ class MainWindow(QMainWindow):
         self._set_param_timeout_timer.start()
         # Debug print ke konsol Python supaya mudah verifikasi payload
         print(f"[WPSET] {payload.strip()}")
+
+    def _save_waypoints_table_snapshot_csv(self) -> str | None:
+        """
+        Simpan isi tabel Map Points (kolom No/Lat/Long) ke file CSV snapshot.
+
+        File tersimpan di folder 'WayPoints' yang lokasinya berdampingan dengan file py ini,
+        dengan nama: DDMMYYYY_HHMM_WayPoints.csv
+        """
+        if not hasattr(self, "map_points_table") or not self.map_points_table:
+            return None
+
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        out_dir = os.path.join(base_dir, "WayPoints")
+        os.makedirs(out_dir, exist_ok=True)
+
+        ts = datetime.now().strftime("%d%m%Y_%H%M")
+        base_name = f"{ts}_WayPoints"
+        file_path = os.path.join(out_dir, f"{base_name}.csv")
+
+        # Hindari overwrite jika user menekan dalam menit yang sama
+        if os.path.exists(file_path):
+            idx = 1
+            while True:
+                candidate = os.path.join(out_dir, f"{base_name}_{idx:02d}.csv")
+                if not os.path.exists(candidate):
+                    file_path = candidate
+                    break
+                idx += 1
+
+        rows: list[tuple[str, str, str]] = []
+        # Table row 0 berisi Home ("No" = "Home"), waypoint klik mulai dari row 1
+        for r in range(self.map_points_table.rowCount()):
+            no_item = self.map_points_table.item(r, 0)
+            lat_item = self.map_points_table.item(r, 1)
+            lon_item = self.map_points_table.item(r, 2)
+
+            lat_txt = lat_item.text().strip() if lat_item and lat_item.text() else ""
+            lon_txt = lon_item.text().strip() if lon_item and lon_item.text() else ""
+            if not lat_txt or not lon_txt:
+                continue
+
+            no_txt = no_item.text().strip() if no_item and no_item.text() else ""
+            rows.append((no_txt, lat_txt, lon_txt))
+
+        if not rows:
+            return None
+
+        with open(file_path, "w", encoding="utf-8", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(["No", "Lat", "Long"])
+            writer.writerows(rows)
+
+        print(f"[WP SAVE] Snapshot saved: {file_path}")
+        return file_path
 
     def _on_set_param_timeout(self):
         """Dipanggil bila tidak ada $WACK,... dalam 1.5 detik setelah pengiriman."""
