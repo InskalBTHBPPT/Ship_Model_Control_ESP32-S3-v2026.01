@@ -32,6 +32,7 @@ Catatan pengolahan:
 
 import csv
 import io
+import math
 import os
 import sys
 from bisect import bisect_left
@@ -39,7 +40,8 @@ from datetime import datetime
 import folium
 import serial
 from serial.tools import list_ports
-from PySide6.QtCore import Qt, QTimer, QUrl
+from PySide6.QtCore import Qt, QTimer, QUrl, QSize
+from PySide6.QtGui import QPainter, QPen, QBrush, QColor, QFont
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebEngineCore import QWebEnginePage
 from PySide6.QtWidgets import (
@@ -67,6 +69,104 @@ from PySide6.QtWidgets import (
 )
 import pyqtgraph as pg
 from time import time, strftime
+
+
+class HeadingCompassWidget(QWidget):
+    """
+    Indikator kompas visual untuk yaw/heading (0° = Utara, searah jarum jam).
+    Konvensi sama dengan garis heading di peta.
+    """
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._heading: float = 0.0
+        self.setMinimumSize(100, 100)
+
+    def set_heading(self, heading_deg: float) -> None:
+        normalized = float(heading_deg) % 360.0
+        if abs(normalized - self._heading) < 0.05:
+            return
+        self._heading = normalized
+        self.update()
+
+    def sizeHint(self) -> QSize:
+        return QSize(140, 140)
+
+    def paintEvent(self, event):
+        side = min(self.width(), self.height())
+        if side < 20:
+            return
+
+        cx = self.width() / 2.0
+        cy = self.height() / 2.0
+        radius = side / 2.0 - 8.0
+
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        # Lingkaran dasar
+        painter.setPen(QPen(QColor("#4b5563"), 2))
+        painter.setBrush(QBrush(QColor("#111827")))
+        painter.drawEllipse(int(cx - radius), int(cy - radius), int(radius * 2), int(radius * 2))
+
+        # Garis tick tiap 30°
+        tick_font = QFont("monospace", max(7, int(side * 0.07)))
+        painter.setFont(tick_font)
+        for deg in range(0, 360, 30):
+            rad = math.radians(deg - 90)
+            inner = radius * 0.82
+            outer = radius * 0.94
+            x1 = cx + inner * math.cos(rad)
+            y1 = cy + inner * math.sin(rad)
+            x2 = cx + outer * math.cos(rad)
+            y2 = cy + outer * math.sin(rad)
+            painter.setPen(QPen(QColor("#6b7280"), 1))
+            painter.drawLine(int(x1), int(y1), int(x2), int(y2))
+
+        # Label arah mata angin
+        cardinals = (("N", 0, "#f97316"), ("E", 90, "#9ca3af"), ("S", 180, "#9ca3af"), ("W", 270, "#9ca3af"))
+        label_font = QFont("sans-serif", max(8, int(side * 0.09)), QFont.Bold)
+        painter.setFont(label_font)
+        label_r = radius * 0.68
+        for text, deg, color in cardinals:
+            rad = math.radians(deg - 90)
+            lx = cx + label_r * math.cos(rad)
+            ly = cy + label_r * math.sin(rad)
+            painter.setPen(QColor(color))
+            rect_w = int(side * 0.18)
+            rect_h = int(side * 0.12)
+            painter.drawText(
+                int(lx - rect_w / 2), int(ly - rect_h / 2), rect_w, rect_h,
+                Qt.AlignCenter, text,
+            )
+
+        # Jarum heading (merah) — putar searah jarum jam dari Utara
+        painter.save()
+        painter.translate(cx, cy)
+        painter.rotate(self._heading)
+        needle_len = radius * 0.62
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(QBrush(QColor("#ef4444")))
+        painter.drawPolygon([
+            (0, -needle_len),
+            (-side * 0.04, side * 0.06),
+            (0, side * 0.03),
+            (side * 0.04, side * 0.06),
+        ])
+        painter.setBrush(QBrush(QColor("#6b7280")))
+        painter.drawEllipse(int(-side * 0.035), int(-side * 0.035), int(side * 0.07), int(side * 0.07))
+        painter.restore()
+
+        # Nilai heading di tengah bawah kompas
+        value_font = QFont("monospace", max(8, int(side * 0.08)), QFont.Bold)
+        painter.setFont(value_font)
+        painter.setPen(QColor("#e5e7eb"))
+        painter.drawText(
+            int(cx - radius), int(cy + radius * 0.35), int(radius * 2), int(side * 0.14),
+            Qt.AlignCenter, f"{self._heading:.1f}°",
+        )
+
+        painter.end()
 
 
 class ClickableMapPage(QWebEnginePage):
@@ -1441,6 +1541,16 @@ class MainWindow(QMainWindow):
         indicator_panel = QGroupBox("", self)
         indicator_panel.setLayout(QVBoxLayout())
         indicator_panel.layout().setContentsMargins(12, 12, 12, 12)
+
+        compass_title = QLabel("Heading Compass", self)
+        compass_title.setAlignment(Qt.AlignCenter)
+        compass_title.setStyleSheet("color: #9ca3af; font-size: 10px; font-weight: bold;")
+        indicator_panel.layout().addWidget(compass_title)
+        self.heading_compass = HeadingCompassWidget(self)
+        self.heading_compass.setMinimumHeight(120)
+        self.heading_compass.setMaximumHeight(150)
+        indicator_panel.layout().addWidget(self.heading_compass, alignment=Qt.AlignCenter)
+
         # indicator indicators grid
         indicator = QWidget(self)
         indicator.setLayout(QGridLayout())
@@ -2466,6 +2576,8 @@ class MainWindow(QMainWindow):
             self.zigzag_yaw_label.setText(f"{zigzag_yaw:.1f}°")
             self.rud1_label.setText(f"{rud1:.1f}°")
             self.rud2_label.setText(f"{rud2:.1f}°")
+            if hasattr(self, "heading_compass"):
+                self.heading_compass.set_heading(yaw)
         except Exception:
             pass
 
