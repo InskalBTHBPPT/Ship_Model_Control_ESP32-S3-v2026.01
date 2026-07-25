@@ -830,12 +830,140 @@ class MapWebView(QWebEngineView):
             {map_name}.removeLayer(window.startMarker);
             window.startMarker = null;
           }}
+
+          if (window.liveWpHomeMarker) {{
+            {map_name}.removeLayer(window.liveWpHomeMarker);
+            window.liveWpHomeMarker = null;
+          }}
+          if (window.liveWpMarkers) {{
+            window.liveWpMarkers.clearLayers();
+            {map_name}.removeLayer(window.liveWpMarkers);
+            window.liveWpMarkers = null;
+          }}
+          if (window.liveWpRouteLine) {{
+            {map_name}.removeLayer(window.liveWpRouteLine);
+            window.liveWpRouteLine = null;
+          }}
           
           console.log('✅ All map markers cleared');
         }})();
         """
         self.page().runJavaScript(js_code)
         print("[MAP] All markers and trails cleared")
+
+    def clear_waypoint_route(self):
+        """Hapus layer Home/WP route dari peta (tab Live)."""
+        map_name = self.folium_map.get_name()
+        js_code = f"""
+        (function() {{
+          if (window.liveWpHomeMarker) {{
+            {map_name}.removeLayer(window.liveWpHomeMarker);
+            window.liveWpHomeMarker = null;
+          }}
+          if (window.liveWpMarkers) {{
+            window.liveWpMarkers.clearLayers();
+            {map_name}.removeLayer(window.liveWpMarkers);
+            window.liveWpMarkers = null;
+          }}
+          if (window.liveWpRouteLine) {{
+            {map_name}.removeLayer(window.liveWpRouteLine);
+            window.liveWpRouteLine = null;
+          }}
+        }})();
+        """
+        self.page().runJavaScript(js_code)
+
+    def show_waypoint_route(
+        self,
+        home: tuple[float, float] | None,
+        waypoints: list[tuple[float, float]],
+    ) -> None:
+        """
+        Tampilkan Home + waypoint navigasi dan garis rute di peta Live.
+        Layer terpisah dari trail posisi kapal (trailLine).
+        """
+        if home is None and not waypoints:
+            self.clear_waypoint_route()
+            return
+
+        map_name = self.folium_map.get_name()
+        line_coords: list[list[float]] = []
+        if home is not None:
+            line_coords.append([home[0], home[1]])
+        for wp in waypoints:
+            line_coords.append([wp[0], wp[1]])
+
+        home_js = "null"
+        if home is not None:
+            home_js = str([home[0], home[1]])
+        wp_coords_js = [[c[0], c[1]] for c in waypoints]
+
+        js_code = f"""
+        (function() {{
+            if (typeof L === 'undefined' || typeof {map_name} === 'undefined') return;
+
+            if (window.liveWpHomeMarker) {{
+                {map_name}.removeLayer(window.liveWpHomeMarker);
+                window.liveWpHomeMarker = null;
+            }}
+            if (window.liveWpMarkers) {{
+                window.liveWpMarkers.clearLayers();
+            }} else {{
+                window.liveWpMarkers = L.layerGroup().addTo({map_name});
+            }}
+            if (window.liveWpRouteLine) {{
+                {map_name}.removeLayer(window.liveWpRouteLine);
+                window.liveWpRouteLine = null;
+            }}
+
+            var homeCoord = {home_js};
+            if (homeCoord !== null) {{
+                window.liveWpHomeMarker = L.marker(homeCoord, {{
+                    icon: L.icon({{
+                        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-green.png',
+                        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                        iconSize: [25, 41],
+                        iconAnchor: [12, 41],
+                        popupAnchor: [1, -34],
+                        shadowSize: [41, 41]
+                    }})
+                }})
+                    .addTo({map_name})
+                    .bindPopup('🏠 Home Point (route)')
+                    .bindTooltip('Home');
+            }}
+
+            var wpCoords = {wp_coords_js};
+            wpCoords.forEach(function(coord, idx) {{
+                L.marker(coord, {{
+                    icon: L.icon({{
+                        iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-blue.png',
+                        shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
+                        iconSize: [25, 41],
+                        iconAnchor: [12, 41],
+                        popupAnchor: [1, -34],
+                        shadowSize: [41, 41]
+                    }})
+                }})
+                    .addTo(window.liveWpMarkers)
+                    .bindPopup('📍 WP ' + (idx + 1))
+                    .bindTooltip('WP ' + (idx + 1));
+            }});
+
+            var lineCoords = {line_coords};
+            if (lineCoords.length > 0) {{
+                window.liveWpRouteLine = L.polyline(lineCoords, {{
+                    color: '#3b82f6',
+                    weight: 3,
+                    opacity: 0.85,
+                    lineCap: 'round',
+                    lineJoin: 'round'
+                }}).addTo({map_name});
+                window.liveWpRouteLine.bringToFront();
+            }}
+        }})();
+        """
+        self.page().runJavaScript(js_code)
     
     def enable_click_handler(self, click_callback=None):
         """
@@ -2470,6 +2598,20 @@ class MainWindow(QMainWindow):
             self.waypoints_info_label.setStyleSheet(
                 "color: #f59e0b; padding: 2px 0;"
             )
+        self._update_live_waypoint_route()
+
+    def _update_live_waypoint_route(self) -> None:
+        """Sinkronkan Home + waypoint dari tab Map Points ke peta tab Live."""
+        if not hasattr(self, "map_webview") or not self.map_webview:
+            return
+        home = getattr(self, "home_point_coords", None)
+        waypoints: list[tuple[float, float]] = []
+        if hasattr(self, "map_points_webview") and self.map_points_webview:
+            waypoints = list(self.map_points_webview.click_marker_coords)
+        if home is None and not waypoints:
+            self.map_webview.clear_waypoint_route()
+            return
+        self.map_webview.show_waypoint_route(home, waypoints)
 
     def on_set_param_clicked(self):
         """
@@ -2584,6 +2726,7 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'set_param_btn'):
             self.set_param_btn.setEnabled(False)
         self._set_param_timeout_timer.start()
+        self._update_live_waypoint_route()
         # Debug print ke konsol Python supaya mudah verifikasi payload
         print(f"[WPSET] {payload.strip()}")
 
@@ -3302,6 +3445,7 @@ class MainWindow(QMainWindow):
             self.clear_all_plots()
             # Clear all markers from map when connecting
             self.map_webview.clear_markers()
+            self._update_live_waypoint_route()
             self.serial_timer.start(50)  # poll every 50 ms
             self.connect_btn.setText("Disconnect")
             print(f"[SERIAL] Connected to {port} @ {baud}")
