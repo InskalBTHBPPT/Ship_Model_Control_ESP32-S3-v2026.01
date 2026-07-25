@@ -78,6 +78,9 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QFormLayout,
     QSplitter,
+    QDialog,
+    QDialogButtonBox,
+    QDoubleSpinBox,
 )
 import pyqtgraph as pg
 from time import time, strftime
@@ -96,6 +99,98 @@ def _make_live_stat_cell(parent: QWidget, title: str, value_label: QLabel) -> QW
     layout.addWidget(title_lbl)
     layout.addWidget(value_label)
     return cell
+
+
+class LiveRudderSetupDialog(QDialog):
+  """Dialog koreksi rudder untuk tab Live Data (display + log saja)."""
+
+  CORRECTION_TOOLTIP = (
+      "Rentang input ±5°.\n"
+      "Koreksi hanya berlaku untuk nilai di dashboard dan file log CSV "
+      "setelah data diterima via serial.\n"
+      "Tidak mengubah data yang dikirim Remote-Side / User-Side."
+  )
+
+  def __init__(self, parent: "MainWindow"):
+      super().__init__(parent)
+      self.setWindowTitle("Live Data Setup — Rudder Correction")
+      self.setMinimumWidth(420)
+
+      layout = QVBoxLayout(self)
+
+      info = QLabel(self.CORRECTION_TOOLTIP, self)
+      info.setWordWrap(True)
+      info.setStyleSheet("color: #9ca3af; font-size: 10pt; padding: 4px 0 8px 0;")
+      layout.addWidget(info)
+
+      form = QFormLayout()
+      form.setSpacing(10)
+
+      self.cb_rud1 = QCheckBox("Rudder 1 correction", self)
+      self.sp_rud1 = QDoubleSpinBox(self)
+      self.sp_rud1.setRange(-5.0, 5.0)
+      self.sp_rud1.setDecimals(2)
+      self.sp_rud1.setSingleStep(0.1)
+      self.sp_rud1.setToolTip(self.CORRECTION_TOOLTIP)
+
+      self.cb_rud2 = QCheckBox("Rudder 2 correction", self)
+      self.sp_rud2 = QDoubleSpinBox(self)
+      self.sp_rud2.setRange(-5.0, 5.0)
+      self.sp_rud2.setDecimals(2)
+      self.sp_rud2.setSingleStep(0.1)
+      self.sp_rud2.setToolTip(self.CORRECTION_TOOLTIP)
+
+      self.cb_rud_cmd = QCheckBox("Rudder cmd correction", self)
+      self.sp_rud_cmd = QDoubleSpinBox(self)
+      self.sp_rud_cmd.setRange(-5.0, 5.0)
+      self.sp_rud_cmd.setDecimals(2)
+      self.sp_rud_cmd.setSingleStep(0.1)
+      self.sp_rud_cmd.setToolTip(self.CORRECTION_TOOLTIP)
+
+      for cb, sp in (
+          (self.cb_rud1, self.sp_rud1),
+          (self.cb_rud2, self.sp_rud2),
+          (self.cb_rud_cmd, self.sp_rud_cmd),
+      ):
+          row = QWidget(self)
+          row_layout = QHBoxLayout(row)
+          row_layout.setContentsMargins(0, 0, 0, 0)
+          row_layout.addWidget(cb)
+          row_layout.addWidget(sp)
+          form.addRow(row)
+          sp.setEnabled(cb.isChecked())
+          cb.toggled.connect(sp.setEnabled)
+
+      layout.addLayout(form)
+
+      buttons = QDialogButtonBox(
+          QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel,
+          self,
+      )
+      buttons.accepted.connect(self.accept)
+      buttons.rejected.connect(self.reject)
+      layout.addWidget(buttons)
+
+      self._load_from_parent(parent)
+
+  def _load_from_parent(self, parent: "MainWindow") -> None:
+      self.cb_rud1.setChecked(parent.rudder1_correction_enabled)
+      self.sp_rud1.setValue(parent.rudder1_correction_value)
+      self.cb_rud2.setChecked(parent.rudder2_correction_enabled)
+      self.sp_rud2.setValue(parent.rudder2_correction_value)
+      self.cb_rud_cmd.setChecked(parent.rudder_cmd_correction_enabled)
+      self.sp_rud_cmd.setValue(parent.rudder_cmd_correction_value)
+      self.sp_rud1.setEnabled(self.cb_rud1.isChecked())
+      self.sp_rud2.setEnabled(self.cb_rud2.isChecked())
+      self.sp_rud_cmd.setEnabled(self.cb_rud_cmd.isChecked())
+
+  def apply_to_parent(self, parent: "MainWindow") -> None:
+      parent.rudder1_correction_enabled = self.cb_rud1.isChecked()
+      parent.rudder1_correction_value = self.sp_rud1.value()
+      parent.rudder2_correction_enabled = self.cb_rud2.isChecked()
+      parent.rudder2_correction_value = self.sp_rud2.value()
+      parent.rudder_cmd_correction_enabled = self.cb_rud_cmd.isChecked()
+      parent.rudder_cmd_correction_value = self.sp_rud_cmd.value()
 
 
 class ClickableMapPage(QWebEnginePage):
@@ -1360,9 +1455,13 @@ class MainWindow(QMainWindow):
         live_tab.setLayout(QHBoxLayout())
         live_tab.layout().setContentsMargins(0, 0, 0, 0)
         
-        # Rudder correction offsets (deg)
-        self.correction_deg_servo_1 = -1.643
-        self.correction_deg_servo_2 = -1.436
+        # Koreksi rudder (display + log CSV saja, setelah terima serial)
+        self.rudder1_correction_enabled = False
+        self.rudder1_correction_value = 0.0
+        self.rudder2_correction_enabled = False
+        self.rudder2_correction_value = 0.0
+        self.rudder_cmd_correction_enabled = False
+        self.rudder_cmd_correction_value = 0.0
         
         # Serial state
         self.ser = None
@@ -1458,6 +1557,9 @@ class MainWindow(QMainWindow):
         self.log_btn.setCheckable(True)
         self.log_btn.clicked.connect(self.toggle_logging)
         row3.layout().addWidget(self.log_btn)
+        self.live_setup_btn = QPushButton("Setup", self)
+        self.live_setup_btn.clicked.connect(self._open_live_setup_dialog)
+        row3.layout().addWidget(self.live_setup_btn)
         controls_panel.layout().addWidget(row3)
 
         # Initial UI states
@@ -3206,6 +3308,39 @@ class MainWindow(QMainWindow):
                 self.live_lon_val.setText("—")
                 self.live_hdg_val.setText("—")
 
+    def _apply_rudder_correction_deg(
+        self, value_deg: float, enabled: bool, correction_deg: float,
+    ) -> float:
+        if not enabled:
+            return value_deg
+        return value_deg - correction_deg
+
+    def _apply_rudder_raw_field_correction(
+        self, raw_str: str, enabled: bool, correction_deg: float,
+    ) -> str:
+        if not enabled:
+            return raw_str
+        corrected_deg = float(raw_str) / 100.0 - correction_deg
+        return str(int(round(corrected_deg * 100.0)))
+
+    def _format_telemetry_log_line(self, parts: list[str]) -> str:
+        """Bangun baris log CSV; koreksi rudder opsional pada kolom raw."""
+        log_parts = list(parts)
+        if len(log_parts) < TELEMETRY_COL_COUNT:
+            return ",".join(parts)
+        log_parts[4] = self._apply_rudder_raw_field_correction(
+            log_parts[4], self.rudder1_correction_enabled, self.rudder1_correction_value)
+        log_parts[5] = self._apply_rudder_raw_field_correction(
+            log_parts[5], self.rudder2_correction_enabled, self.rudder2_correction_value)
+        log_parts[9] = self._apply_rudder_raw_field_correction(
+            log_parts[9], self.rudder_cmd_correction_enabled, self.rudder_cmd_correction_value)
+        return ",".join(log_parts)
+
+    def _open_live_setup_dialog(self) -> None:
+        dialog = LiveRudderSetupDialog(self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            dialog.apply_to_parent(self)
+
     def poll_serial(self):
         """
         Poll serial port untuk membaca data baru.
@@ -3266,12 +3401,24 @@ class MainWindow(QMainWindow):
                     self.latest_serial_lon = lon
 
                     speed = _telemetry_scale(parts, 3)
-                    rud1_sensor = _telemetry_scale(parts, 4) - self.correction_deg_servo_1
-                    rud2_sensor = _telemetry_scale(parts, 5) - self.correction_deg_servo_2
+                    rud1_sensor = self._apply_rudder_correction_deg(
+                        _telemetry_scale(parts, 4),
+                        self.rudder1_correction_enabled,
+                        self.rudder1_correction_value,
+                    )
+                    rud2_sensor = self._apply_rudder_correction_deg(
+                        _telemetry_scale(parts, 5),
+                        self.rudder2_correction_enabled,
+                        self.rudder2_correction_value,
+                    )
                     heading = _telemetry_scale(parts, 6)
                     heading_setpoint = _telemetry_scale(parts, 7)
                     heading_error = _telemetry_scale(parts, 8)
-                    rudder_cmd = _telemetry_scale(parts, 9)
+                    rudder_cmd = self._apply_rudder_correction_deg(
+                        _telemetry_scale(parts, 9),
+                        self.rudder_cmd_correction_enabled,
+                        self.rudder_cmd_correction_value,
+                    )
                     track_wp_index = int(parts[10])
                     distance_to_wp = _telemetry_scale(parts, 11, 10.0)
                     rpm1 = _telemetry_scale(parts, 18)
@@ -3312,7 +3459,7 @@ class MainWindow(QMainWindow):
                 # Append raw CSV line to log buffer if logging enabled
                 if self.log_file is not None:
                     try:
-                        self.log_buffer.append(text + "\n")
+                        self.log_buffer.append(self._format_telemetry_log_line(parts) + "\n")
                     except Exception:
                         pass
         except Exception as e:
@@ -3457,8 +3604,8 @@ class MainWindow(QMainWindow):
                     if is_v23:
                         rpm1 = float(_csv_row_value(row, "rpm_prop_1 (raw)", "rpm_prop_1")) / 100.0
                         rpm2 = float(_csv_row_value(row, "rpm_prop_2 (raw)", "rpm_prop_2")) / 100.0
-                        rud1 = float(_csv_row_value(row, "Calc_deg_servo_1 (raw)", "Calc_deg_servo_1")) / 100.0 - self.correction_deg_servo_1
-                        rud2 = float(_csv_row_value(row, "Calc_deg_servo_2 (raw)", "Calc_deg_servo_2")) / 100.0 - self.correction_deg_servo_2
+                        rud1 = float(_csv_row_value(row, "Calc_deg_servo_1 (raw)", "Calc_deg_servo_1")) / 100.0
+                        rud2 = float(_csv_row_value(row, "Calc_deg_servo_2 (raw)", "Calc_deg_servo_2")) / 100.0
                         yaw = float(_csv_row_value(row, "yaw (raw)", "yaw")) / 100.0
                         zigzag_yaw = float(_csv_row_value(row, "heading_setpoint (raw)", "heading_setpoint")) / 100.0
                         roll = 0.0
@@ -3470,8 +3617,8 @@ class MainWindow(QMainWindow):
                         zigzag_yaw = float(_csv_row_value(row, "zigzag_yaw (°)", "zigzag_yaw"))
                         rpm1 = float(_csv_row_value(row, "rpm_prop_1 (rpm)", "rpm_prop_1"))
                         rpm2 = float(_csv_row_value(row, "rpm_prop_2 (rpm)", "rpm_prop_2"))
-                        rud1 = float(_csv_row_value(row, "Calc_deg_servo_1 (°)", "Calc_deg_servo_1")) - self.correction_deg_servo_1
-                        rud2 = float(_csv_row_value(row, "Calc_deg_servo_2 (°)", "Calc_deg_servo_2")) - self.correction_deg_servo_2
+                        rud1 = float(_csv_row_value(row, "Calc_deg_servo_1 (°)", "Calc_deg_servo_1"))
+                        rud2 = float(_csv_row_value(row, "Calc_deg_servo_2 (°)", "Calc_deg_servo_2"))
                 except ValueError:
                     continue
                 
