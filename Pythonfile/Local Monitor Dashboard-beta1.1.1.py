@@ -76,6 +76,7 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QLineEdit,
     QFormLayout,
+    QSplitter,
 )
 import pyqtgraph as pg
 from time import time, strftime
@@ -1536,11 +1537,14 @@ class MainWindow(QMainWindow):
         indicator_panel.layout().addWidget(indicator)
         indicator_panel.layout().addStretch(1)
 
-        # Left: Map (full height) | 3 plot vertikal (Yaw, Rudder1, Rudder2)
-        left_panel = QWidget(self)
-        left_panel.setLayout(QHBoxLayout())
-        left_panel.layout().setContentsMargins(0, 0, 0, 0)
-        left_panel.layout().setSpacing(0)
+        # Map | plots — QSplitter agar lebar bisa di-drag
+        left_panel = QSplitter(Qt.Orientation.Horizontal, self)
+        left_panel.setChildrenCollapsible(False)
+        left_panel.setHandleWidth(6)
+        left_panel.setStyleSheet(
+            "QSplitter::handle { background: #4b5563; margin: 0 1px; }"
+            "QSplitter::handle:hover { background: #6b7280; }"
+        )
 
         left_panel_map = QWidget(self)
         left_panel_map.setLayout(QVBoxLayout())
@@ -1619,8 +1623,12 @@ class MainWindow(QMainWindow):
         left_panel_plots.layout().addWidget(self.rudder1_plot_widget, 1)
         left_panel_plots.layout().addWidget(self.rudder2_plot_widget, 1)
 
-        left_panel.layout().addWidget(left_panel_map, 2)
-        left_panel.layout().addWidget(left_panel_plots, 1)
+        left_panel.addWidget(left_panel_map)
+        left_panel.addWidget(left_panel_plots)
+        left_panel.setStretchFactor(0, 2)
+        left_panel.setStretchFactor(1, 1)
+        left_panel.setSizes([680, 340])
+        self.live_map_plots_splitter = left_panel
 
         # Assemble right panel with stretch ratio 1:2 (controls : reserved)
         right_panel.layout().addWidget(controls_panel, 1)
