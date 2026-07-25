@@ -1453,12 +1453,6 @@ class MainWindow(QMainWindow):
         indicator_panel = QGroupBox("", self)
         indicator_panel.setLayout(QVBoxLayout())
         indicator_panel.layout().setContentsMargins(12, 12, 12, 12)
-        # indicator indicators grid
-        indicator = QWidget(self)
-        indicator.setLayout(QGridLayout())
-        indicator.layout().setContentsMargins(0, 0, 0, 0)
-        indicator.layout().setHorizontalSpacing(10)
-        indicator.layout().setVerticalSpacing(8)
 
         # Live indicators grid (nav + motor, tanpa accel/gyro)
         indicator = QWidget(self)
@@ -1474,6 +1468,8 @@ class MainWindow(QMainWindow):
         self.mode_label = QLabel("Manual", self)
         self.mode_label.setStyleSheet("color: #10b981; font-weight: bold; font-size: 12pt; text-align: center;")
 
+        self.yaw_label = QLabel("0.0°", self)
+        self.yaw_label.setStyleSheet(value_style)
         self.hdg_sp_label = QLabel("0.0°", self)
         self.hdg_sp_label.setStyleSheet(value_style)
         self.hdg_err_label = QLabel("0.0°", self)
@@ -1481,58 +1477,67 @@ class MainWindow(QMainWindow):
 
         self.rudder_cmd_label = QLabel("0.0°", self)
         self.rudder_cmd_label.setStyleSheet(value_style)
+        self.track_wp_label = QLabel("—", self)
+        self.track_wp_label.setStyleSheet(value_style)
         self.dist_wp_label = QLabel("— m", self)
         self.dist_wp_label.setStyleSheet(value_style)
 
-        self.track_wp_label = QLabel("—", self)
-        self.track_wp_label.setStyleSheet(value_style)
         self.rpm1_label = QLabel("0 RPM", self)
         self.rpm1_label.setStyleSheet(value_style)
-
         self.rpm2_label = QLabel("0 RPM", self)
         self.rpm2_label.setStyleSheet(value_style)
+
         self.bat1_label = QLabel("12.00 V", self)
         self.bat1_label.setStyleSheet("color: #10b981; font-weight: bold; font-size: 12pt; text-align: center;")
-
         self.bat2_label = QLabel("12.00 V", self)
         self.bat2_label.setStyleSheet("color: #10b981; font-weight: bold; font-size: 12pt; text-align: center;")
+
         self.rud1_label = QLabel("0.0°", self)
         self.rud1_label.setStyleSheet(value_style)
         self.rud2_label = QLabel("0.0°", self)
         self.rud2_label.setStyleSheet(value_style)
 
+        # Baris 0–1: kecepatan & mode
         indicator.layout().addWidget(QLabel("GPS Speed (m/s)"), 0, 0)
         indicator.layout().addWidget(QLabel("Mode"), 0, 1)
         indicator.layout().addWidget(self.speed_label, 1, 0)
         indicator.layout().addWidget(self.mode_label, 1, 1)
 
-        indicator.layout().addWidget(QLabel("Heading Setpoint (°)"), 2, 0)
-        indicator.layout().addWidget(QLabel("Heading Error (°)"), 2, 1)
-        indicator.layout().addWidget(self.hdg_sp_label, 3, 0)
-        indicator.layout().addWidget(self.hdg_err_label, 3, 1)
+        # Baris 2–3: yaw aktual & setpoint
+        indicator.layout().addWidget(QLabel("Yaw (°)"), 2, 0)
+        indicator.layout().addWidget(QLabel("Heading Setpoint (°)"), 2, 1)
+        indicator.layout().addWidget(self.yaw_label, 3, 0)
+        indicator.layout().addWidget(self.hdg_sp_label, 3, 1)
 
-        indicator.layout().addWidget(QLabel("Rudder Cmd (°)"), 4, 0)
-        indicator.layout().addWidget(QLabel("Distance WP (m)"), 4, 1)
-        indicator.layout().addWidget(self.rudder_cmd_label, 5, 0)
-        indicator.layout().addWidget(self.dist_wp_label, 5, 1)
+        # Baris 4–5: error heading & perintah rudder
+        indicator.layout().addWidget(QLabel("Heading Error (°)"), 4, 0)
+        indicator.layout().addWidget(QLabel("Rudder Cmd (°)"), 4, 1)
+        indicator.layout().addWidget(self.hdg_err_label, 5, 0)
+        indicator.layout().addWidget(self.rudder_cmd_label, 5, 1)
 
+        # Baris 6–7: waypoint aktif & jarak
         indicator.layout().addWidget(QLabel("Track WP"), 6, 0)
-        indicator.layout().addWidget(QLabel("RPM Propeller 1"), 6, 1)
+        indicator.layout().addWidget(QLabel("Distance WP (m)"), 6, 1)
         indicator.layout().addWidget(self.track_wp_label, 7, 0)
-        indicator.layout().addWidget(self.rpm1_label, 7, 1)
+        indicator.layout().addWidget(self.dist_wp_label, 7, 1)
 
-        indicator.layout().addWidget(QLabel("RPM Propeller 2"), 8, 0)
-        indicator.layout().addWidget(QLabel("Battery Control"), 8, 1)
-        indicator.layout().addWidget(self.rpm2_label, 9, 0)
-        indicator.layout().addWidget(self.bat1_label, 9, 1)
+        # Baris 8–9: RPM propeller
+        indicator.layout().addWidget(QLabel("RPM Propeller 1"), 8, 0)
+        indicator.layout().addWidget(QLabel("RPM Propeller 2"), 8, 1)
+        indicator.layout().addWidget(self.rpm1_label, 9, 0)
+        indicator.layout().addWidget(self.rpm2_label, 9, 1)
 
-        indicator.layout().addWidget(QLabel("Battery Motor"), 10, 0)
-        indicator.layout().addWidget(QLabel("Rudder 1 Sensor (°)"), 10, 1)
-        indicator.layout().addWidget(self.bat2_label, 11, 0)
-        indicator.layout().addWidget(self.rud1_label, 11, 1)
+        # Baris 10–11: battery
+        indicator.layout().addWidget(QLabel("Battery Control"), 10, 0)
+        indicator.layout().addWidget(QLabel("Battery Motor"), 10, 1)
+        indicator.layout().addWidget(self.bat1_label, 11, 0)
+        indicator.layout().addWidget(self.bat2_label, 11, 1)
 
-        indicator.layout().addWidget(QLabel("Rudder 2 Sensor (°)"), 12, 0)
-        indicator.layout().addWidget(self.rud2_label, 13, 0)
+        # Baris 12–13: feedback sensor rudder
+        indicator.layout().addWidget(QLabel("Rudder 1 Sensor (°)"), 12, 0)
+        indicator.layout().addWidget(QLabel("Rudder 2 Sensor (°)"), 12, 1)
+        indicator.layout().addWidget(self.rud1_label, 13, 0)
+        indicator.layout().addWidget(self.rud2_label, 13, 1)
 
         indicator_panel.layout().addWidget(indicator)
         indicator_panel.layout().addStretch(1)
@@ -2385,6 +2390,7 @@ class MainWindow(QMainWindow):
                           mode_auto: int = 0, timestamp: float = 0.0):
         """Update panel indikator live dan time-series plots."""
         try:
+            self.yaw_label.setText(f"{yaw:.1f}°")
             self.hdg_sp_label.setText(f"{heading_setpoint:.1f}°")
             self.hdg_err_label.setText(f"{heading_error:.1f}°")
             self.rudder_cmd_label.setText(f"{rudder_cmd:.1f}°")
