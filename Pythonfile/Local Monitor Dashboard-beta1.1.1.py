@@ -120,7 +120,7 @@ class LiveRudderSetupDialog(QDialog):
 
       info = QLabel(self.CORRECTION_TOOLTIP, self)
       info.setWordWrap(True)
-      info.setStyleSheet("color: #9ca3af; font-size: 10pt; padding: 4px 0 8px 0;")
+      info.setStyleSheet("color: #000000; font-size: 10pt; padding: 4px 0 8px 0;")
       layout.addWidget(info)
 
       form = QFormLayout()
@@ -1557,9 +1557,6 @@ class MainWindow(QMainWindow):
         self.log_btn.setCheckable(True)
         self.log_btn.clicked.connect(self.toggle_logging)
         row3.layout().addWidget(self.log_btn)
-        self.live_setup_btn = QPushButton("Setup", self)
-        self.live_setup_btn.clicked.connect(self._open_live_setup_dialog)
-        row3.layout().addWidget(self.live_setup_btn)
         controls_panel.layout().addWidget(row3)
 
         # Initial UI states
@@ -1664,6 +1661,10 @@ class MainWindow(QMainWindow):
 
         indicator_panel.layout().addWidget(indicator)
         indicator_panel.layout().addStretch(1)
+
+        self.live_setup_btn = QPushButton("Setup", self)
+        self.live_setup_btn.clicked.connect(self._open_live_setup_dialog)
+        indicator_panel.layout().addWidget(self.live_setup_btn)
 
         # Map | plots — QSplitter agar lebar bisa di-drag
         left_panel = QSplitter(Qt.Orientation.Horizontal, self)
