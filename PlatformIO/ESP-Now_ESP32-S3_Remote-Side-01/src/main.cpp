@@ -1,11 +1,11 @@
-/**
+﻿/**
  * @file main.cpp
- * @brief ESP32-S3 Remote-Side-01 — Ship Model Control System
+ * @brief ESP32-S3 Remote-Side-01 â€” Ship Model Control System
  *
  * @description
  * Firmware sisi kapal (Remote-Side) yang mengumpulkan data sensor dan
  * actuator, menjalankan kontrol rudder/propeller, lalu mengirim telemetry
- * 15-kolom ke User-Side via ESP-NOW.
+ * 12-kolom telemetry ke User-Side via ESP-NOW.
  *
  * Clone dari ESP_Now_Send_Ver2025_revJan2026.
  *
@@ -18,9 +18,8 @@
  * - ADC untuk monitoring baterai
  *
  * Fitur kontrol:
- * - Mode Manual: Kontrol rudder langsung dari RC
- * - Mode Auto - Turning Left/Right: Rudder bergerak bertahap
- * - Mode Auto - Zigzag 10°/20°: Zigzag dengan sudut tertentu
+ * - Mode Manual: Kontrol rudder langsung dari RC (CH1)
+ * - Mode Auto: auto_track() (stub - hold rudder netral)
  *
  * @author Chandra P - Ship Model Control System
  * @version 1.0 (Remote-Side-01)
@@ -28,8 +27,8 @@
  *
  * @note
  * - Update rate: 10 Hz (setiap 100ms)
- * - Data dikirim dalam format fixed-point (× 100) untuk efisiensi
- * - Struktur data harus sama dengan ESP-Now_ESP32-S3_User-Side
+ * - Data dikirim dalam format fixed-point (Ã— 100) untuk efisiensi
+ * - Struktur data harus sama dengan ESP-Now_ESP32-S3_User-Side (PENDING: penyesuaian)
  * - PENDING: penerimaan waypoint dari User-Side (belum di-port)
  */
 
@@ -85,9 +84,9 @@ void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
  */
 #define PPM_PIN 4                    ///< GPIO pin untuk input PPM
 #define CHANNEL_COUNT 8              ///< Jumlah channel PPM (FS-iA6B memiliki 8 channel)
-#define PPM_SYNC_THRESHOLD 2500      ///< Threshold untuk sync pulse (µs) - nilai > ini adalah sync pulse
-#define PPM_MIN_CHANNEL_VALUE 600    ///< Nilai minimum channel (µs) - FS-iA6B lowest
-#define PPM_MAX_CHANNEL_VALUE 1600   ///< Nilai maksimum channel (µs) - FS-iA6B highest
+#define PPM_SYNC_THRESHOLD 2500      ///< Threshold untuk sync pulse (Âµs) - nilai > ini adalah sync pulse
+#define PPM_MIN_CHANNEL_VALUE 600    ///< Nilai minimum channel (Âµs) - FS-iA6B lowest
+#define PPM_MAX_CHANNEL_VALUE 1600   ///< Nilai maksimum channel (Âµs) - FS-iA6B highest
 
 // ============================================================================
 // Rotary Encoder Configuration (RPM Measurement)
@@ -143,20 +142,19 @@ const long intervaltime = 100;       ///< Interval waktu dalam ms (100ms = 10 Hz
  * @brief Struktur untuk menyimpan input kontrol dari receiver RC
  * 
  * @details
- * Data berasal dari PPM receiver RC yang sudah di-mapping ke range 1000-2000 µs
+ * Data berasal dari PPM receiver RC yang sudah di-mapping ke range 1000-2000 Âµs
  * (standard servo range).
  */
 struct ControlInput {
-    uint16_t rudder;           ///< Channel 1: Kontrol rudder / Turning mode
+    uint16_t rudder;           ///< Channel 1: Kontrol rudder (manual)
     uint16_t propSpeed;        ///< Channel 3: Kecepatan motor propeller
     uint16_t propDirection;    ///< Channel 5: Arah motor propeller
-    uint16_t mode_auto_manual; ///< Channel 6: Mode auto/manual (≥1750: Auto, <1750: Manual)
-    uint16_t mode_zigzag;      ///< Channel 2: Mode zigzag (≤1250: Zigzag 10°, ≥1750: Zigzag 20°)
+    uint16_t mode_auto_manual; ///< Channel 6: Mode auto/manual (â‰¥1750: Auto, <1750: Manual)
 };
 
 volatile ControlInput controlInput = {0};  ///< Buffer untuk input kontrol dari RC
-volatile uint16_t ppm_values[CHANNEL_COUNT] = {0};      ///< Nilai PPM mentah (600-1600 µs)
-volatile uint16_t ppm_mapped[CHANNEL_COUNT] = {0};     ///< Nilai PPM yang sudah di-mapping (1000-2000 µs)
+volatile uint16_t ppm_values[CHANNEL_COUNT] = {0};      ///< Nilai PPM mentah (600-1600 Âµs)
+volatile uint16_t ppm_mapped[CHANNEL_COUNT] = {0};     ///< Nilai PPM yang sudah di-mapping (1000-2000 Âµs)
 volatile uint8_t current_channel = 0;      ///< Channel PPM saat ini yang sedang diproses
 volatile uint32_t rising_time = 0;         ///< Waktu rising edge untuk menghitung pulse width
 
@@ -188,44 +186,15 @@ uint32_t servo_duty = 307;  ///< Duty saat ini (start di posisi neutral)
  * Konversi dari sudut (derajat) ke duty value:
  * - Reference: 307 duty = 90 derajat (neutral)
  * - Conversion: 12 duty = 5 derajat, jadi 1 derajat = 2.4 duty
- * - Range: 47.5° hingga 132.9° (sesuai dengan duty 205-410)
+ * - Range: 47.5Â° hingga 132.9Â° (sesuai dengan duty 205-410)
  */
 const float REFERENCE_ANGLE = 90.0;        ///< Sudut referensi (neutral position)
 const uint32_t REFERENCE_DUTY = 307;       ///< Duty referensi (neutral position)
 const float DUTY_PER_DEGREE = 12.0 / 5.0; ///< Konversi: 2.4 duty per derajat
 const float ANGLE_MIN = 47.5;              ///< Sudut minimum (205 duty)
 const float ANGLE_MAX = 132.9;             ///< Sudut maksimum (410 duty)
-uint32_t current_angle = 90;               ///< Sudut saat ini (start di 90°)
-float servo_angle_current_offset = 0;     ///< Offset sudut dari posisi neutral (-40° hingga +40°)
-
-// ============================================================================
-// Control Mode Flags
-// ============================================================================
-
-/**
- * @brief Flag untuk reset step turning/zigzag functions
- * 
- * @details
- * Flag ini digunakan untuk mereset state machine ketika beralih mode.
- * Set ke true ketika masuk mode manual atau beralih mode auto.
- */
-bool g_reset_turning_left = false;   ///< Flag reset untuk turning left
-bool g_reset_turning_right = false; ///< Flag reset untuk turning right
-bool g_reset_zigzag_left = false;   ///< Flag reset untuk zigzag left
-bool g_reset_zigzag_right = false;  ///< Flag reset untuk zigzag right
-
-/**
- * @brief Variable kontrol interval step rudder
- * 
- * @details
- * Menentukan berapa iterasi yang diperlukan sebelum step rudder di-update.
- * Default: 2 iterasi per step (setiap 200ms @ 100ms interval).
- * 
- * @note
- * Nilai lebih besar = rudder bergerak lebih lambat
- * Nilai lebih kecil = rudder bergerak lebih cepat
- */
-uint8_t rudder_step_interval = 2;  ///< Interval iterasi per step (default: 2)
+uint32_t current_angle = 90;               ///< Sudut saat ini (start di 90Â°)
+float servo_angle_current_offset = 0;     ///< Offset sudut dari posisi neutral (-40Â° hingga +40Â°)
 
 // Servo Pin Configuration
 // #define SERVO_RUDDER_PIN 5
@@ -254,7 +223,7 @@ uint8_t ADC_PIN_BATT_2 = 2;   // GPIO2 = ADC1_1 pin for analog input (ESP32-S3)
 #define SERVO_PROP_SPEED_PIN 6
 #define SERVO_PROP_DIRECTION_PIN 7
 
-// Servo PWM parameters (range: 1000-2000 µs)
+// Servo PWM parameters (range: 1000-2000 Âµs)
 #define SERVO_MIN_US 1000
 #define SERVO_MAX_US 2000
 #define SERVO_HZ 50
@@ -307,47 +276,18 @@ struct DatatoSend {
   double timestamp;       // detik sejak boot (millis()/1000.0)
   double latitude;        // dari latestGpsData.latitude
   double longitude;       // dari latestGpsData.longitude
-  uint16_t speedMps;      // dari latestGpsData.speedMps (× 100, range 0-655.35 m/s)
-  int16_t Calc_deg_servo_1; // derajat hasil kalkulasi feedback servo 1 (× 100)
-  int16_t Calc_deg_servo_2; // derajat hasil kalkulasi feedback servo 2 (× 100)
-  int16_t roll;           // derajat roll (× 100)
-  int16_t pitch;          // derajat pitch (× 100)
-  uint16_t yaw;           // derajat yaw (× 100, 0-360°)
-  //*****settingan state untuk zigzag********//
-  int16_t zigzag_yaw;     // zigzag yaw (× 100)
-  uint16_t rpm_prop_1;    // rpm motor propeller 1 (× 100)
-  uint16_t rpm_prop_2;    // rpm motor propeller 2 (× 100)
-  uint16_t battery_1;     // batere for ESP32-S3, Servo, HWT905TTL, Receiver RC, GNSS, Rotary Encoder (× 100)
-  uint16_t battery_2;     // batere for motor propeller (× 100)
-  uint8_t mode_auto;      // 0: manual, 1: turning left, 2: turning right, 3: zigzag 10, 4: zigzag 20
+  uint16_t speedMps;      // dari latestGpsData.speedMps (Ã— 100, range 0-655.35 m/s)
+  int16_t Calc_deg_servo_1; // derajat hasil kalkulasi feedback servo 1 (Ã— 100)
+  int16_t Calc_deg_servo_2; // derajat hasil kalkulasi feedback servo 2 (Ã— 100)
+  uint16_t yaw;           // derajat yaw (Ã— 100, 0-360Â°)
+  uint16_t rpm_prop_1;    // rpm motor propeller 1 (Ã— 100)
+  uint16_t rpm_prop_2;    // rpm motor propeller 2 (Ã— 100)
+  uint16_t battery_1;     // batere for ESP32-S3, Servo, HWT905TTL, Receiver RC, GNSS, Rotary Encoder (Ã— 100)
+  uint16_t battery_2;     // batere for motor propeller (Ã— 100)
+  uint8_t mode_auto;      // 0: manual, 1: auto track
 };
 
 DatatoSend dataToSend;
-
-  //*****settingan state untuk zigzag********//
-  float zigzag_setpoint;
-/*
-Identify which states are Transitional (T) and
-which are Static (S). A
-Static state is one in which the FSM is waiting for stimulus, and is
-taking no actions.
-A Transitional State is a state which causes actions, but doesn't look
-for stimulus.
-Use names for states so it's easier to understand what the code is doing */
-
-const int belok_kanan_1a = 0;   // State 0: belok_kanan_1a rudder belok 20 derajat ke kanan (T)
-const int belok_kanan_1b = 1;   // State 1: belok_kanan_1b tunggu heading >= 20 derajat (S)
-const int belok_kiri_1a = 2;    // State 2: belok_kiri_1a rudder belok 20 derajat ke kiri  (T)
-const int belok_kiri_1b = 3;    // State 3: belok_kiri_1b tunggu heading <= -20 derajat (S)
-const int belok_kanan_2a = 4;   // State 4: belok_kanan_2a rudder belok 20 derajat ke kanan (T)
-const int belok_kanan_2b = 5;   // State 5: belok_kanan_2b tunggu heading >= 20 derajat (S)
-const int belok_kiri_2a = 6;    // State 6: belok_kiri_2a rudder belok 20 derajat ke kiri  (T)
-const int belok_kiri_2b = 7;    // State 6: belok_kiri_2b tunggu heading <= -20 derajat (S)
-const int belok_kanan_3a = 8;  // State 7: belok_kanan_3a rudder belok 20 derajat ke kanan (T)
-const int belok_kanan_3b = 9;  // State 8: belok_kanan_3b tunggu heading >= 20 derajat (S)
-const int lurus_akhir = 10;     // State 10: lurus_akhir rudder lurus (T)
-
-static int state; 
 
 // Utility: map long to float with custom output range
 static inline float mapFloat(long x, long in_min, long in_max, float out_min, float out_max) {
@@ -362,8 +302,8 @@ static inline float mapFloat(long x, long in_min, long in_max, float out_min, fl
  * (CHANGE interrupt). Menggunakan edge detection untuk mengukur pulse width.
  * 
  * PPM Format:
- * - Sync pulse: Pulse panjang (>2500µs) menandai awal frame
- * - Channel pulses: Pulse pendek (600-1600µs) adalah nilai channel
+ * - Sync pulse: Pulse panjang (>2500Âµs) menandai awal frame
+ * - Channel pulses: Pulse pendek (600-1600Âµs) adalah nilai channel
  * 
  * @note
  * Function ini harus dideklarasikan dengan IRAM_ATTR karena dipanggil dari interrupt.
@@ -541,7 +481,7 @@ void saveUbxConfig(bool toBBR, bool toFlash) {
 /**
  * @brief Konversi sudut (derajat) ke duty value untuk servo
  * 
- * @param angle Sudut dalam derajat (47.5° hingga 132.9°)
+ * @param angle Sudut dalam derajat (47.5Â° hingga 132.9Â°)
  * @return uint32_t Duty value (205-410 untuk 12-bit resolution)
  * 
  * @details
@@ -573,20 +513,20 @@ uint32_t angleToDuty(float angle) {
 /**
  * @brief Konversi pulse width (microseconds) ke duty cycle untuk LEDC
  * 
- * @param microseconds Pulse width dalam microseconds (1000-2000 µs)
+ * @param microseconds Pulse width dalam microseconds (1000-2000 Âµs)
  * @return uint32_t Duty cycle value (205-410 untuk 12-bit, 50 Hz)
  * 
  * @details
  * Formula: duty = round((microseconds / period) * max_duty)
- * Period = 20000 µs (50 Hz)
+ * Period = 20000 Âµs (50 Hz)
  * Max duty = 4095 (12-bit)
  * 
  * Verifikasi:
- * - 1000 µs → duty = 205 → pulse = 1000.61 µs (error: +0.61 µs)
- * - 1500 µs → duty = 307 → pulse = 1499.39 µs (error: -0.61 µs)
- * - 2000 µs → duty = 410 → pulse = 2000.49 µs (error: +0.49 µs)
+ * - 1000 Âµs â†’ duty = 205 â†’ pulse = 1000.61 Âµs (error: +0.61 Âµs)
+ * - 1500 Âµs â†’ duty = 307 â†’ pulse = 1499.39 Âµs (error: -0.61 Âµs)
+ * - 2000 Âµs â†’ duty = 410 â†’ pulse = 2000.49 Âµs (error: +0.49 Âµs)
  * 
- * Error maksimal: ±0.61 µs (sangat kecil, acceptable untuk servo)
+ * Error maksimal: Â±0.61 Âµs (sangat kecil, acceptable untuk servo)
  */
 uint32_t microsecondsToDuty(uint16_t microseconds) {
   // Clamp input ke range valid
@@ -600,949 +540,41 @@ uint32_t microsecondsToDuty(uint16_t microseconds) {
   uint32_t duty = ((uint32_t)microseconds * 4095 + 10000) / 20000;  // +10000 untuk rounding (half of 20000)
   
   // Clamp hasil ke range valid (double check)
-  if (duty < 205) duty = 205;  // Min duty untuk 1000 µs
-  if (duty > 410) duty = 410;  // Max duty untuk 2000 µs
+  if (duty < 205) duty = 205;  // Min duty untuk 1000 Âµs
+  if (duty > 410) duty = 410;  // Max duty untuk 2000 Âµs
   
   return duty;
 }
 
 /**
- * @brief Mode Manual - Kontrol rudder langsung dari receiver RC
- * 
- * @details
- * Function ini mengontrol rudder secara langsung berdasarkan input dari channel 1 RC.
- * Range kontrol: -40° hingga +40° dari posisi neutral (90°).
- * 
- * @note
- * - Reset semua flag turning/zigzag ketika masuk mode manual
- * - Zigzag setpoint di-update dari yaw saat ini
- * - Zigzag yaw di-set ke 0 karena tidak ada zigzag di mode manual
+ * @brief Mode Manual - Kontrol rudder langsung dari receiver RC (CH1)
  */
 void rudder_manual() {
-  // ========== Reset State Machine ==========
-  // Reset semua flag turning/zigzag ketika masuk mode manual
-  g_reset_turning_left = true;
-  g_reset_turning_right = true;
-  g_reset_zigzag_left = true;
-  g_reset_zigzag_right = true;
-  state = belok_kanan_1a;  // Reset state ke awal
-  
-  // ========== Map RC Input ke Servo Offset ==========
-  // Map rudder (1000..1992) ke servo_angle_current_offset (-40..40 derajat)
   servo_angle_current_offset = mapFloat(controlInput.rudder, 1000, 1992, -40.0f, 40.0f);
   servo_angle_current_offset = constrain(servo_angle_current_offset, -40.0f, 40.0f);
 
-  // ========== Calculate dan Set Servo Position ==========
   float calculated_angle = REFERENCE_ANGLE + servo_angle_current_offset;
   servo_duty = angleToDuty(calculated_angle);
-  bool write_result = ledcWrite(SERVO_RUDDER_pin, servo_duty);
-
-  // ========== Update Zigzag Setpoint ==========
-  // Set zigzag setpoint dari yaw saat ini (untuk digunakan saat masuk mode zigzag)
-  // dataToSend.yaw dalam uint16_t (× 100), jadi bagi 100 dulu
-  zigzag_setpoint = dataToSend.yaw / 100.0;
-  // zigzag_yaw = 0 saat manual (tidak ada zigzag)
-  dataToSend.zigzag_yaw = (int16_t)(((dataToSend.yaw / 100.0) - zigzag_setpoint ) * 100);
+  ledcWrite(SERVO_RUDDER_pin, servo_duty);
 }
 
-void rudder_turning_right() {
-  static float current_step = 0.0f;
-  static uint8_t iteration_counter = 0;  // Counter untuk menghitung iterasi
-  
-  // Check if reset was requested
-  if (g_reset_turning_left) {
-    current_step = 0.0f;
-    iteration_counter = 0;  // Reset counter juga
-    g_reset_turning_left = false;
-  }
-  
-  // Set offset dengan step saat ini
-  servo_angle_current_offset = current_step;
-  
-  // Increment counter
-  iteration_counter++;
-  
-  // Hanya update step jika counter mencapai interval
-  if (iteration_counter >= rudder_step_interval) {
-    if (current_step < 35.0f) {
-      current_step += 5.0f;
-      if (current_step > 35.0f) {
-        current_step = 35.0f;
-      }
-    }
-    iteration_counter = 0;  // Reset counter
-  }
-  
-  float calculated_angle = REFERENCE_ANGLE + servo_angle_current_offset;
-
-  // Set duty cycle to be write for servo rudder degree move
-  servo_duty = angleToDuty(calculated_angle);
-  bool write_result = ledcWrite(SERVO_RUDDER_pin, servo_duty);
-
-  // Set zigzag setpoint dan hitung zigzag_yaw
-  zigzag_setpoint = dataToSend.yaw / 100.0;
-  dataToSend.zigzag_yaw = (int16_t)(((dataToSend.yaw / 100.0) - zigzag_setpoint) * 100);  // tidak ada zigzag saat turning
-}
-
-void rudder_turning_left() {
-  static float current_step = 0.0f;
-  static uint8_t iteration_counter = 0;  // Counter untuk menghitung iterasi
-  
-  // Check if reset was requested
-  if (g_reset_turning_right) {
-    current_step = 0.0f;
-    iteration_counter = 0;  // Reset counter juga
-    g_reset_turning_right = false;
-  }
-  
-  // Set offset dengan step saat ini
-  servo_angle_current_offset = current_step;
-  
-  // Increment counter
-  iteration_counter++;
-  
-  // Hanya update step jika counter mencapai interval
-  if (iteration_counter >= rudder_step_interval) {
-    if (current_step > -35.0f) {
-      current_step -= 5.0f;
-      if (current_step < -35.0f) {
-        current_step = -35.0f;
-      }
-    }
-    iteration_counter = 0;  // Reset counter
-  }
-  
-  float calculated_angle = REFERENCE_ANGLE + servo_angle_current_offset;
-  // Serial.println(calculated_angle);
-
-  // Set duty cycle to be write for servo rudder degree move
-  servo_duty = angleToDuty(calculated_angle);
-  bool write_result = ledcWrite(SERVO_RUDDER_pin, servo_duty);
-
-  // Set zigzag setpoint dan hitung zigzag_yaw
-  zigzag_setpoint = dataToSend.yaw / 100.0;
-  dataToSend.zigzag_yaw = (int16_t)(((dataToSend.yaw / 100.0) - zigzag_setpoint) * 100);  // tidak ada zigzag saat turning
-}
-
-void rudder_zigzag_10() {
- 
-  // Hitung zigzag_yaw: yaw_current - zigzag_setpoint (dalam derajat float)
-  float yaw_float = dataToSend.yaw / 100.0;  // Konversi uint16_t ke float
-  float zigzag_yaw_float = yaw_float - zigzag_setpoint;
-  dataToSend.zigzag_yaw = (int16_t)(zigzag_yaw_float * 100);  // Konversi ke int16_t (× 100)
-  // Serial.print(dataToSend.zigzag_yaw); Serial.print(",");
-  // Serial.print(zigzag_setpoint); Serial.print(",");
-  float calculated_angle;
-  bool write_result;
-  static float current_step = 0.0f;
-  static uint8_t iteration_counter = 0;  // Counter untuk menghitung iterasi
-  // Serial.print(current_step); 
-  // Serial.print(",");
-  // Serial.print(state);
-  // Serial.print(",");
-
-  switch (state)
-  {
-    
-    case belok_kanan_1a: //rudder belok kanan 10 derajat
-      if (g_reset_zigzag_right) {
-        current_step = 0.0f;
-        iteration_counter = 0;  // Reset counter juga
-        g_reset_zigzag_right = false;
-      }
-      
-     
-      // Increment counter
-      iteration_counter++;
-      Serial.print(iteration_counter);
-      Serial.print(",");
-      
-      // Hanya update step jika counter mencapai interval
-      if (iteration_counter >= rudder_step_interval) {
-        if (current_step < 10.0f) {
-          current_step += 1.0f;
-          if (current_step >= 10.0f) {
-            current_step = 10.0f;
-          }
-        }
-        iteration_counter = 0;  // Reset counter
-      }
-      
-      // SELALU LAKUKAN KALKULASI DAN PENGATURAN SERVO
-      // Set offset dengan step saat ini
-      servo_angle_current_offset = current_step;
-      calculated_angle = REFERENCE_ANGLE + servo_angle_current_offset;
-      // Serial.print(calculated_angle); Serial.print(",");
-    
-      // Set duty cycle to be write for servo rudder degree move
-      servo_duty = angleToDuty(calculated_angle);
-      write_result = ledcWrite(SERVO_RUDDER_pin, servo_duty);
-      // Serial.println(servo_duty); 
-      //Serial.print(",");  
-      
-      // HANYA TRANSISI KE STATE BERIKUTNYA JIKA SUDAH MENCAPAI TARGET
-      if (current_step >= 10.0f) {
-        state = belok_kanan_1b;
-      }
-    
-    break;
-
-    /*************************************************/
-    
-    case belok_kanan_1b:
-      // Serial.println("DEBUG_Zigzag: belok_kanan_1b");
-      // SELALU LAKUKAN KALKULASI DAN PENGATURAN SERVO
-      calculated_angle = REFERENCE_ANGLE + servo_angle_current_offset;
-      // Serial.print(calculated_angle);
-      // Serial.print(",");
-
-      // Set duty cycle to be write for servo rudder degree move
-      servo_duty = angleToDuty(calculated_angle);
-      write_result = ledcWrite(SERVO_RUDDER_pin, servo_duty);
-      // Serial.println(servo_duty);
-      
-      if (dataToSend.zigzag_yaw <= -1000) //menunggu heading zigzag lebih dari 10 derajat (× 100 = -1000)
-      {
-      state = belok_kiri_1a;
-      g_reset_zigzag_right = true;
-      } 
-     break;
-
-    /*************************************************/
-    
-    case belok_kiri_1a: //rudder belok kiri 10 derajat
-    // Serial.print("belok_kiri_1a"); Serial.print(",");
-
-      if (g_reset_zigzag_left) {
-        // current_step = 0.0f;
-        iteration_counter = 0;  // Reset counter juga
-        g_reset_zigzag_left = false;
-      }
-          
-      // Increment counter
-      iteration_counter++;
-      
-      // Hanya update step jika counter mencapai interval
-      if (iteration_counter >= rudder_step_interval) {
-        if (current_step > -10.0f) {  // Increment selama belum mencapai target 10
-          current_step -= 1.0f;
-          if (current_step <= -10.0f) {
-            current_step = -10.0f;
-          }
-        }
-        iteration_counter = 0;  // Reset counter
-      }
-      
-      // SELALU LAKUKAN KALKULASI DAN PENGATURAN SERVO
-      // Set offset dengan step saat ini
-      servo_angle_current_offset = current_step;
-      calculated_angle = REFERENCE_ANGLE + servo_angle_current_offset;
-    
-      // Set duty cycle to be write for servo rudder degree move
-      servo_duty = angleToDuty(calculated_angle);
-      write_result = ledcWrite(SERVO_RUDDER_pin, servo_duty);
-        
-      // HANYA TRANSISI KE STATE BERIKUTNYA JIKA SUDAH MENCAPAI TARGET
-      if (current_step <= -10.0f) {
-        state = belok_kiri_1b;
-      }
-
-    break;
-
-    /*************************************************/
-    
-    case belok_kiri_1b:
-      // SELALU LAKUKAN KALKULASI DAN PENGATURAN SERVO
-      calculated_angle = REFERENCE_ANGLE + servo_angle_current_offset;
-
-      // Set duty cycle to be write for servo rudder degree move
-      servo_duty = angleToDuty(calculated_angle);
-      write_result = ledcWrite(SERVO_RUDDER_pin, servo_duty);
-    
-      if (dataToSend.zigzag_yaw >= 1000) //menunggu heading zigzag lebih dari 10 derajat (× 100 = 1000)
-      {
-      state = belok_kanan_2a;
-      g_reset_zigzag_left = true;
-      } 
-    break;
-
-     /*************************************************/
-
-    case belok_kanan_2a: //rudder belok kanan 10 derajat
-    // Serial.println("DEBUG_Zigzag: belok_kanan_2a");
-    // static float current_step = 0.0f;
-    // static uint8_t iteration_counter = 0;
-    
-      // Check if reset was requested
-      if (g_reset_zigzag_right) {
-        // current_step = 0.0f;
-        iteration_counter = 0;  // Reset counter juga
-        g_reset_zigzag_right = false;
-      }
-
-
-
-      // Increment counter
-      iteration_counter++;
-
-      // Hanya update step jika counter mencapai interval
-      if (iteration_counter >= rudder_step_interval) {
-        if (current_step < 10.0f) {
-          current_step += 1.0f;
-          if (current_step >= 10.0f) {
-            current_step = 10.0f;
-          }
-        }
-        iteration_counter = 0;  // Reset counter
-      }
-
-      // SELALU LAKUKAN KALKULASI DAN PENGATURAN SERVO
-      // Set offset dengan step saat ini
-      servo_angle_current_offset = current_step;
-      calculated_angle = REFERENCE_ANGLE + servo_angle_current_offset;
-
-      // Set duty cycle to be write for servo rudder degree move
-      servo_duty = angleToDuty(calculated_angle);
-      write_result = ledcWrite(SERVO_RUDDER_pin, servo_duty);
-      
-      // HANYA TRANSISI KE STATE BERIKUTNYA JIKA SUDAH MENCAPAI TARGET
-      if (current_step >= 10.0f) {
-        state = belok_kanan_2b;
-      }
-    break;
-
-    /*************************************************/
-    
-    case belok_kanan_2b:
-    // Serial.println("DEBUG_Zigzag: belok_kanan_2b");
-      // SELALU LAKUKAN KALKULASI DAN PENGATURAN SERVO
-      calculated_angle = REFERENCE_ANGLE + servo_angle_current_offset;
-
-      // Set duty cycle to be write for servo rudder degree move
-      servo_duty = angleToDuty(calculated_angle);
-      write_result = ledcWrite(SERVO_RUDDER_pin, servo_duty);
-    
-      if (dataToSend.zigzag_yaw <= -1000) //menunggu heading zigzag lebih dari 10 derajat (× 100 = -1000)
-      {
-      state = belok_kiri_2a;
-      g_reset_zigzag_right = true;
-      }   
-    break;
-
-     /*************************************************/
-
-    
-    case belok_kiri_2a: //rudder belok kiri 10 derajat
-      // Serial.println("DEBUG_Zigzag: belok_kiri_2a");
-      // static float current_step = 0.0f;
-      // static uint8_t iteration_counter = 0;
-      
-      // Check if reset was requested
-      if (g_reset_zigzag_left) {
-        //current_step = 0.0f;
-        iteration_counter = 0;  // Reset counter juga
-        g_reset_zigzag_left = false;
-      }
-      
-
-      
-      // Increment counter
-      iteration_counter++;
-      
-      // Hanya update step jika counter mencapai interval
-      if (iteration_counter >= rudder_step_interval) {
-        if (current_step > -10.0f) {
-          current_step -= 1.0f;
-          if (current_step <= -10.0f) {
-            current_step = -10.0f;
-          }
-        }
-        iteration_counter = 0;  // Reset counter
-      }
-      
-      // SELALU LAKUKAN KALKULASI DAN PENGATURAN SERVO
-      // Set offset dengan step saat ini
-      servo_angle_current_offset = current_step;
-      calculated_angle = REFERENCE_ANGLE + servo_angle_current_offset;
-    
-      // Set duty cycle to be write for servo rudder degree move
-      servo_duty = angleToDuty(calculated_angle);
-      write_result = ledcWrite(SERVO_RUDDER_pin, servo_duty);
-        
-      // HANYA TRANSISI KE STATE BERIKUTNYA JIKA SUDAH MENCAPAI TARGET
-      if (current_step <= -10.0f) {
-        state = belok_kiri_2b;
-      } 
-    
-    break;
-
-    /*************************************************/
-
-    case belok_kiri_2b:
-      // Serial.println("DEBUG_Zigzag: belok_kiri_2b");
-      calculated_angle = REFERENCE_ANGLE + servo_angle_current_offset;
-
-      // Set duty cycle to be write for servo rudder degree move
-      servo_duty = angleToDuty(calculated_angle);
-      write_result = ledcWrite(SERVO_RUDDER_pin, servo_duty);
-    
-      if (dataToSend.zigzag_yaw >= 1000) //menunggu heading zigzag lebih dari 10 derajat (× 100 = 1000)
-      {
-      state = belok_kanan_3a;
-      g_reset_zigzag_left = true;
-      }  
-    break;
-
-     /*************************************************/
-     
-    case belok_kanan_3a:
-    // Serial.println("DEBUG_Zigzag: belok_kanan_3a");
-    // static float current_step = 0.0f;
-    // static uint8_t iteration_counter = 0;
-    
-      // Check if reset was requested
-      if (g_reset_zigzag_right) {
-        //current_step = 0.0f;
-        iteration_counter = 0;  // Reset counter juga
-        g_reset_zigzag_right = false;
-      }
-
-
-      // Increment counter
-      iteration_counter++;
-
-      // Hanya update step jika counter mencapai interval
-      if (iteration_counter >= rudder_step_interval) {
-        if (current_step < 10.0f) {
-          current_step += 1.0f;
-          if (current_step >= 10.0f) {
-            current_step = 10.0f;
-          }
-        }
-        iteration_counter = 0;  // Reset counter
-      }
-
-      // SELALU LAKUKAN KALKULASI DAN PENGATURAN SERVO
-      // Set offset dengan step saat ini
-      servo_angle_current_offset = current_step;
-      calculated_angle = REFERENCE_ANGLE + servo_angle_current_offset;
-
-      // Set duty cycle to be write for servo rudder degree move
-      servo_duty = angleToDuty(calculated_angle);
-      write_result = ledcWrite(SERVO_RUDDER_pin, servo_duty);
-      
-      // HANYA TRANSISI KE STATE BERIKUTNYA JIKA SUDAH MENCAPAI TARGET
-      if (current_step >= 10.0f) {
-        state = belok_kanan_3b;
-      }
-    
-    break;
-
-   /*************************************************/
-   
-    case belok_kanan_3b:
-    // Serial.println("DEBUG_Zigzag: belok_kanan_3b");
-      // SELALU LAKUKAN KALKULASI DAN PENGATURAN SERVO
-      calculated_angle = REFERENCE_ANGLE + servo_angle_current_offset;
-
-      // Set duty cycle to be write for servo rudder degree move
-      servo_duty = angleToDuty(calculated_angle);
-      write_result = ledcWrite(SERVO_RUDDER_pin, servo_duty);
-    
-      if (dataToSend.zigzag_yaw <= -1000) //menunggu heading zigzag lebih dari 10 derajat (× 100 = -1000)
-      {
-      state = lurus_akhir;
-      g_reset_zigzag_right = true;
-      }
-    break;
-
-     /*************************************************/
-
-    case lurus_akhir:
-     g_reset_zigzag_right = true;
-     g_reset_zigzag_left = true;
-
-     calculated_angle = REFERENCE_ANGLE;
-
-      // Set duty cycle to be write for servo rudder degree move
-      servo_duty = angleToDuty(calculated_angle);
-      write_result = ledcWrite(SERVO_RUDDER_pin, servo_duty);
-    break;
-     
-  }
-}
-
-void rudder_zigzag_20() {
- 
-  // Hitung zigzag_yaw: yaw_current - zigzag_setpoint (dalam derajat float)
-  float yaw_float = dataToSend.yaw / 100.0;  // Konversi uint16_t ke float
-  float zigzag_yaw_float = yaw_float - zigzag_setpoint;
-  dataToSend.zigzag_yaw = (int16_t)(zigzag_yaw_float * 100);  // Konversi ke int16_t (× 100)
-  // Serial.print(dataToSend.zigzag_yaw); Serial.print(",");
-  // Serial.print(zigzag_setpoint); Serial.print(",");
-  float calculated_angle;
-  bool write_result;
-  static float current_step = 0.0f;
-  static uint8_t iteration_counter = 0;  // Counter untuk menghitung iterasi
-  Serial.print(current_step); 
-  Serial.print(",");
-  Serial.print(state);
-  Serial.print(",");
-
-  switch (state)
-  {
-    
-    case belok_kanan_1a: //rudder belok kanan 20 derajat
-      if (g_reset_zigzag_right) {
-        current_step = 0.0f;
-        iteration_counter = 0;  // Reset counter juga
-        g_reset_zigzag_right = false;
-      }
-      
-     
-      // Increment counter
-      iteration_counter++;
-      Serial.print(iteration_counter);
-      Serial.print(",");
-      
-      // Hanya update step jika counter mencapai interval
-      if (iteration_counter >= rudder_step_interval) {
-        if (current_step < 20.0f) {
-          current_step += 2.0f;
-          if (current_step >= 20.0f) {
-            current_step = 20.0f;
-          }
-        }
-        iteration_counter = 0;  // Reset counter
-      }
-      
-      // SELALU LAKUKAN KALKULASI DAN PENGATURAN SERVO
-      // Set offset dengan step saat ini
-      servo_angle_current_offset = current_step;
-      calculated_angle = REFERENCE_ANGLE + servo_angle_current_offset;
-      // Serial.print(calculated_angle); Serial.print(",");
-    
-      // Set duty cycle to be write for servo rudder degree move
-      servo_duty = angleToDuty(calculated_angle);
-      write_result = ledcWrite(SERVO_RUDDER_pin, servo_duty);
-      // Serial.println(servo_duty); 
-      //Serial.print(",");  
-      
-      // HANYA TRANSISI KE STATE BERIKUTNYA JIKA SUDAH MENCAPAI TARGET
-      if (current_step >= 20.0f) {
-        state = belok_kanan_1b;
-      }
-    
-    break;
-
-    /*************************************************/
-    
-    case belok_kanan_1b:
-      // Serial.println("DEBUG_Zigzag: belok_kanan_1b");
-      // SELALU LAKUKAN KALKULASI DAN PENGATURAN SERVO
-      calculated_angle = REFERENCE_ANGLE + servo_angle_current_offset;
-      // Serial.print(calculated_angle);
-      // Serial.print(",");
-
-      // Set duty cycle to be write for servo rudder degree move
-      servo_duty = angleToDuty(calculated_angle);
-      write_result = ledcWrite(SERVO_RUDDER_pin, servo_duty);
-      // Serial.println(servo_duty);
-      
-      if (dataToSend.zigzag_yaw <= -2000) //menunggu heading zigzag lebih dari 20 derajat (× 100 = -2000)
-      {
-      state = belok_kiri_1a;
-      g_reset_zigzag_right = true;
-      } 
-     break;
-
-    /*************************************************/
-    
-    case belok_kiri_1a: //rudder belok kiri 20 derajat
-    // Serial.print("belok_kiri_1a"); Serial.print(",");
-
-      if (g_reset_zigzag_left) {
-        // current_step = 0.0f;
-        iteration_counter = 0;  // Reset counter juga
-        g_reset_zigzag_left = false;
-      }
-          
-      // Increment counter
-      iteration_counter++;
-      
-      // Hanya update step jika counter mencapai interval
-      if (iteration_counter >= rudder_step_interval) {
-        if (current_step > -20.0f) {  // Increment selama belum mencapai target 20
-          current_step -= 2.0f;
-          if (current_step <= -20.0f) {
-            current_step = -20.0f;
-          }
-        }
-        iteration_counter = 0;  // Reset counter
-      }
-      
-      // SELALU LAKUKAN KALKULASI DAN PENGATURAN SERVO
-      // Set offset dengan step saat ini
-      servo_angle_current_offset = current_step;
-      calculated_angle = REFERENCE_ANGLE + servo_angle_current_offset;
-    
-      // Set duty cycle to be write for servo rudder degree move
-      servo_duty = angleToDuty(calculated_angle);
-      write_result = ledcWrite(SERVO_RUDDER_pin, servo_duty);
-        
-      // HANYA TRANSISI KE STATE BERIKUTNYA JIKA SUDAH MENCAPAI TARGET
-      if (current_step <= -20.0f) {
-        state = belok_kiri_1b;
-      }
-
-    break;
-
-    /*************************************************/
-    
-    case belok_kiri_1b:
-      // SELALU LAKUKAN KALKULASI DAN PENGATURAN SERVO
-      calculated_angle = REFERENCE_ANGLE + servo_angle_current_offset;
-
-      // Set duty cycle to be write for servo rudder degree move
-      servo_duty = angleToDuty(calculated_angle);
-      write_result = ledcWrite(SERVO_RUDDER_pin, servo_duty);
-    
-      if (dataToSend.zigzag_yaw >= 2000) //menunggu heading zigzag lebih dari 20 derajat (× 100 = 2000)
-      {
-      state = belok_kanan_2a;
-      g_reset_zigzag_left = true;
-      } 
-    break;
-
-     /*************************************************/
-
-    case belok_kanan_2a: //rudder belok kanan 20 derajat
-    // Serial.println("DEBUG_Zigzag: belok_kanan_2a");
-    // static float current_step = 0.0f;
-    // static uint8_t iteration_counter = 0;
-    
-      // Check if reset was requested
-      if (g_reset_zigzag_right) {
-        // current_step = 0.0f;
-        iteration_counter = 0;  // Reset counter juga
-        g_reset_zigzag_right = false;
-      }
-
-
-
-      // Increment counter
-      iteration_counter++;
-
-      // Hanya update step jika counter mencapai interval
-      if (iteration_counter >= rudder_step_interval) {
-        if (current_step < 20.0f) {
-          current_step += 2.0f;
-          if (current_step >= 20.0f) {
-            current_step = 20.0f;
-          }
-        }
-        iteration_counter = 0;  // Reset counter
-      }
-
-      // SELALU LAKUKAN KALKULASI DAN PENGATURAN SERVO
-      // Set offset dengan step saat ini
-      servo_angle_current_offset = current_step;
-      calculated_angle = REFERENCE_ANGLE + servo_angle_current_offset;
-
-      // Set duty cycle to be write for servo rudder degree move
-      servo_duty = angleToDuty(calculated_angle);
-      write_result = ledcWrite(SERVO_RUDDER_pin, servo_duty);
-      
-      // HANYA TRANSISI KE STATE BERIKUTNYA JIKA SUDAH MENCAPAI TARGET
-      if (current_step >= 20.0f) {
-        state = belok_kanan_2b;
-      }
-    break;
-
-    /*************************************************/
-    
-    case belok_kanan_2b:
-    // Serial.println("DEBUG_Zigzag: belok_kanan_2b");
-      // SELALU LAKUKAN KALKULASI DAN PENGATURAN SERVO
-      calculated_angle = REFERENCE_ANGLE + servo_angle_current_offset;
-
-      // Set duty cycle to be write for servo rudder degree move
-      servo_duty = angleToDuty(calculated_angle);
-      write_result = ledcWrite(SERVO_RUDDER_pin, servo_duty);
-    
-      if (dataToSend.zigzag_yaw <= -2000) //menunggu heading zigzag lebih dari 20 derajat (× 100 = -2000)
-      {
-      state = belok_kiri_2a;
-      g_reset_zigzag_right = true;
-      }   
-    break;
-
-     /*************************************************/
-
-    
-    case belok_kiri_2a: //rudder belok kiri 20 derajat
-      // Serial.println("DEBUG_Zigzag: belok_kiri_2a");
-      // static float current_step = 0.0f;
-      // static uint8_t iteration_counter = 0;
-      
-      // Check if reset was requested
-      if (g_reset_zigzag_left) {
-        //current_step = 0.0f;
-        iteration_counter = 0;  // Reset counter juga
-        g_reset_zigzag_left = false;
-      }
-      
-
-      
-      // Increment counter
-      iteration_counter++;
-      
-      // Hanya update step jika counter mencapai interval
-      if (iteration_counter >= rudder_step_interval) {
-        if (current_step > -20.0f) {
-          current_step -= 2.0f;
-          if (current_step <= -20.0f) {
-            current_step = -20.0f;
-          }
-        }
-        iteration_counter = 0;  // Reset counter
-      }
-      
-      // SELALU LAKUKAN KALKULASI DAN PENGATURAN SERVO
-      // Set offset dengan step saat ini
-      servo_angle_current_offset = current_step;
-      calculated_angle = REFERENCE_ANGLE + servo_angle_current_offset;
-    
-      // Set duty cycle to be write for servo rudder degree move
-      servo_duty = angleToDuty(calculated_angle);
-      write_result = ledcWrite(SERVO_RUDDER_pin, servo_duty);
-        
-      // HANYA TRANSISI KE STATE BERIKUTNYA JIKA SUDAH MENCAPAI TARGET
-      if (current_step <= -20.0f) {
-        state = belok_kiri_2b;
-      } 
-    
-    break;
-
-    /*************************************************/
-
-    case belok_kiri_2b:
-      // Serial.println("DEBUG_Zigzag: belok_kiri_2b");
-      calculated_angle = REFERENCE_ANGLE + servo_angle_current_offset;
-
-      // Set duty cycle to be write for servo rudder degree move
-      servo_duty = angleToDuty(calculated_angle);
-      write_result = ledcWrite(SERVO_RUDDER_pin, servo_duty);
-    
-      if (dataToSend.zigzag_yaw >= 2000) //menunggu heading zigzag lebih dari 20 derajat (× 100 = 2000)
-      {
-      state = belok_kanan_3a;
-      g_reset_zigzag_left = true;
-      }  
-    break;
-
-     /*************************************************/
-     
-    case belok_kanan_3a:
-    // Serial.println("DEBUG_Zigzag: belok_kanan_3a");
-    // static float current_step = 0.0f;
-    // static uint8_t iteration_counter = 0;
-    
-      // Check if reset was requested
-      if (g_reset_zigzag_right) {
-        //current_step = 0.0f;
-        iteration_counter = 0;  // Reset counter juga
-        g_reset_zigzag_right = false;
-      }
-
-
-      // Increment counter
-      iteration_counter++;
-
-      // Hanya update step jika counter mencapai interval
-      if (iteration_counter >= rudder_step_interval) {
-        if (current_step < 20.0f) {
-          current_step += 2.0f;
-          if (current_step >= 20.0f) {
-            current_step = 20.0f;
-          }
-        }
-        iteration_counter = 0;  // Reset counter
-      }
-
-      // SELALU LAKUKAN KALKULASI DAN PENGATURAN SERVO
-      // Set offset dengan step saat ini
-      servo_angle_current_offset = current_step;
-      calculated_angle = REFERENCE_ANGLE + servo_angle_current_offset;
-
-      // Set duty cycle to be write for servo rudder degree move
-      servo_duty = angleToDuty(calculated_angle);
-      write_result = ledcWrite(SERVO_RUDDER_pin, servo_duty);
-      
-      // HANYA TRANSISI KE STATE BERIKUTNYA JIKA SUDAH MENCAPAI TARGET
-      if (current_step >= 20.0f) {
-        state = belok_kanan_3b;
-      }
-    
-    break;
-
-   /*************************************************/
-   
-    case belok_kanan_3b:
-    // Serial.println("DEBUG_Zigzag: belok_kanan_3b");
-      // SELALU LAKUKAN KALKULASI DAN PENGATURAN SERVO
-      calculated_angle = REFERENCE_ANGLE + servo_angle_current_offset;
-
-      // Set duty cycle to be write for servo rudder degree move
-      servo_duty = angleToDuty(calculated_angle);
-      write_result = ledcWrite(SERVO_RUDDER_pin, servo_duty);
-    
-      if (dataToSend.zigzag_yaw <= -2000) //menunggu heading zigzag lebih dari 20 derajat (× 100 = -2000)
-      {
-      state = lurus_akhir;
-      g_reset_zigzag_right = true;
-      }
-    break;
-
-     /*************************************************/
-
-    case lurus_akhir:
-     g_reset_zigzag_right = true;
-     g_reset_zigzag_left = true;
-
-     calculated_angle = REFERENCE_ANGLE;
-
-      // Set duty cycle to be write for servo rudder degree move
-      servo_duty = angleToDuty(calculated_angle);
-      write_result = ledcWrite(SERVO_RUDDER_pin, servo_duty);
-    break;
-     
-  }
-}
-
-/**
- * @brief Mode Neutral - Set servo rudder ke posisi neutral (90°)
- * 
- * @details
- * Function ini digunakan ketika input RC berada di dead zone atau konflik.
- * Servo rudder akan di-set ke posisi neutral (90°).
- * 
- * @note
- * Digunakan untuk handle kasus:
- * - modeturning di dead zone (1250-1750) && modezigzag di dead zone (1250-1750)
- * - modeturning >= 1750 && modezigzag >= 1750 (konflik)
- * - modeturning >= 1750 && modezigzag <= 1250 (konflik)
- * - modeturning <= 1250 && modezigzag >= 1750 (konflik)
- * - modeturning <= 1250 && modezigzag <= 1250 (konflik)
- */
-void rudder_neutral() {
-  // Reset semua flag turning/zigzag
-  g_reset_turning_left = true;
-  g_reset_turning_right = true;
-  g_reset_zigzag_left = true;
-  g_reset_zigzag_right = true;
-  state = belok_kanan_1a;  // Reset state ke awal
-  
-  // Set servo ke posisi neutral (90°)
+void rudder_hold_neutral() {
   servo_angle_current_offset = 0.0f;
-  float calculated_angle = REFERENCE_ANGLE;  // 90.0°
-  servo_duty = angleToDuty(calculated_angle);
-  bool write_result = ledcWrite(SERVO_RUDDER_pin, servo_duty);
-  
-  // Update zigzag setpoint dari yaw saat ini
-  zigzag_setpoint = dataToSend.yaw / 100.0;
-  dataToSend.zigzag_yaw = (int16_t)(((dataToSend.yaw / 100.0) - zigzag_setpoint) * 100);
+  servo_duty = angleToDuty(REFERENCE_ANGLE);
+  ledcWrite(SERVO_RUDDER_pin, servo_duty);
 }
 
-/**
- * @brief Check dan eksekusi mode kontrol berdasarkan input RC
- * 
- * @param modeautomanual Channel 6: Mode auto/manual (≥1750: Auto, <1750: Manual)
- * @param modezigzag Channel 2: Mode zigzag (≤1250: Zigzag 10°, ≥1750: Zigzag 20°)
- * @param modeturning Channel 1: Mode turning (≥1750: Left, ≤1250: Right)
- * 
- * @details
- * Function ini menentukan mode kontrol berdasarkan kombinasi input dari receiver RC:
- * 
- * Mode Manual (modeautomanual < 1750):
- *   - Kontrol rudder langsung dari channel 1
- *   - mode_auto = 0
- * 
- * Mode Auto (modeautomanual >= 1750):
- *   - Turning Left (modeturning >= 1750 && modezigzag di dead zone): mode_auto = 1
- *   - Turning Right (modeturning <= 1250 && modezigzag di dead zone): mode_auto = 2
- *   - Zigzag 10° (modeturning di dead zone && modezigzag <= 1250): mode_auto = 3
- *   - Zigzag 20° (modeturning di dead zone && modezigzag >= 1750): mode_auto = 4
- *   - Neutral (konflik atau dead zone): mode_auto = 5
- * 
- * @note
- * Jika modeturning dan modezigzag keduanya aktif (konflik), maka masuk ke neutral
- * Dead zone: 1250-1750 (range antara aktif)
- */
-void check_mode_auto_manual(uint16_t modeautomanual, uint16_t modezigzag, uint16_t modeturning) {
+void auto_track() {
+  // TODO: navigasi waypoint - implementasi nanti
+  rudder_hold_neutral();
+}
+
+void check_mode_auto_manual(uint16_t modeautomanual) {
   if (modeautomanual >= 1750) {
-    // ========== Mode Auto ==========
-    
-    // Check apakah modeturning aktif (>= 1750)
-    if (modeturning >= 1750) {
-      // Check apakah modezigzag juga aktif (konflik)
-      if (modezigzag <= 1250 || modezigzag >= 1750) {
-        // Konflik: modeturning aktif DAN modezigzag aktif → Neutral
-        rudder_neutral();
-        // Serial.println("Mode Neutral (Konflik: Turning Left + Zigzag)");
-        dataToSend.mode_auto = 5;
-      }
-      else {
-        // modeturning >= 1750 && modezigzag di dead zone (1250-1750) → Turning Left
-        rudder_turning_right();
-        // Serial.println("Mode Turning Left");
-        dataToSend.mode_auto = 1;
-      }
-    } 
-    // Check apakah modeturning aktif (<= 1250)
-    else if (modeturning <= 1250) {
-      // Check apakah modezigzag juga aktif (konflik)
-      if (modezigzag <= 1250 || modezigzag >= 1750) {
-        // Konflik: modeturning aktif DAN modezigzag aktif → Neutral
-        rudder_neutral();
-        // Serial.println("Mode Neutral (Konflik: Turning Right + Zigzag)");
-        dataToSend.mode_auto = 5;
-      }
-      else {
-        // modeturning <= 1250 && modezigzag di dead zone (1250-1750) → Turning Right
-        rudder_turning_left();
-        // Serial.println("Mode Turning Right");
-        dataToSend.mode_auto = 2;
-      }
-    }
-    // modeturning di dead zone (1250-1750)
-    else {
-      // Cek modezigzag
-      if (modezigzag <= 1250) {
-        // Mode: Zigzag 10°
-        rudder_zigzag_10();
-        // Serial.println("Mode Zigzag 10");
-        dataToSend.mode_auto = 3;
-      } 
-      else if (modezigzag >= 1750) {
-        // Mode: Zigzag 20°
-        rudder_zigzag_20();
-        // Serial.println("Mode Zigzag 20");
-        dataToSend.mode_auto = 4;
-      }
-      else {
-        // modeturning di dead zone (1250-1750) && modezigzag di dead zone (1250-1750)
-        // Set servo ke neutral
-        rudder_neutral();
-        // Serial.println("Mode Neutral (Dead Zone)");
-        dataToSend.mode_auto = 5;
-      }
-    }
-  }
-  else {
-    // ========== Mode Manual ==========
+    auto_track();
+    dataToSend.mode_auto = 1;
+  } else {
     rudder_manual();
-    //  Serial.println("Mode Auto Manual");
     dataToSend.mode_auto = 0;
   }
 }
@@ -1585,8 +617,6 @@ void setup() {
     
     // Configure ADC settings
     analogReadResolution(12);     
-    
-    dataToSend.zigzag_yaw = 0;
 
     bool attach_PWM_pin = ledcAttachChannel(SERVO_RUDDER_pin, SERVO_RUDDER_freq, SERVO_RUDDER_resolution, 0);
     if (attach_PWM_pin) {
@@ -1683,7 +713,7 @@ void setup() {
  * 2. Membaca data dari IMU (Serial2)
  * 3. Setiap 100ms (10 Hz):
  *    - Update data GPS (latitude, longitude, speed)
- *    - Update data IMU (roll, pitch, yaw)
+ *    - Update data IMU (yaw saja; roll/pitch tidak digunakan)
  *    - Map PPM values ke range 1000-2000
  *    - Check mode auto/manual dan eksekusi fungsi kontrol
  *    - Baca feedback servo dari ADC
@@ -1694,7 +724,7 @@ void setup() {
  * 
  * @note
  * - Update rate: 10 Hz (setiap 100ms)
- * - Semua data dikirim dalam format fixed-point (× 100)
+ * - Semua data dikirim dalam format fixed-point (Ã— 100)
  * - Struktur data harus sama dengan receiver
  */
 void loop() {
@@ -1736,12 +766,10 @@ void loop() {
         // }
         dataToSend.latitude = latestGpsData.latitude;
         dataToSend.longitude = latestGpsData.longitude;
-        // Konversi speedMps ke uint16_t (× 100)
+        // Konversi speedMps ke uint16_t (Ã— 100)
         dataToSend.speedMps = (uint16_t)(latestGpsData.speedMps * 100);
 
-        // Hitung roll, pitch, yaw sebagai float dulu
-        float roll = (float)JY901.stcAngle.Angle[0]/32768*180;
-        float pitch = (float)JY901.stcAngle.Angle[1]/32768*180;
+        // Hitung yaw dari IMU (roll/pitch tidak dibaca)
         float rawYaw = (float)JY901.stcAngle.Angle[2]/32768*180;
         
         // Modifikasi: jika yaw < 0, jadikan 360 + yaw
@@ -1752,9 +780,6 @@ void loop() {
           yaw = rawYaw;
         }
         
-        // Konversi ke int16_t/uint16_t (× 100)
-        dataToSend.roll = (int16_t)(roll * 100);
-        dataToSend.pitch = (int16_t)(pitch * 100);
         dataToSend.yaw = (uint16_t)(yaw * 100);
         
         for (uint8_t i = 0; i < CHANNEL_COUNT; i++) {
@@ -1762,19 +787,10 @@ void loop() {
             ppm_mapped[i] = map(ppm_values[i], PPM_MIN_CHANNEL_VALUE, PPM_MAX_CHANNEL_VALUE, 1000, 2000);
         }
         
-        /*
-        controlInput.rudder = ppm_mapped[0]; CH1 tuas kanan bergerak kanan kiri
-        controlInput.mode_zigzag = ppm_mapped[1]; // CH2 tuas kanan bergerak atas bawah
-        controlInput.propSpeed = ppm_mapped[2];   // CH3 CH2 tuas kiri bergerak atas bawah
-        controlInput.propDirection = ppm_mapped[4]; // CH5 Switch A bergerak atas bawah
-        controlInput.mode_auto_manual = ppm_mapped[5]; CH6 Switch B bergerak atas bawah
-        
-        */
         controlInput.mode_auto_manual = ppm_mapped[5];  // CH6
-        controlInput.mode_zigzag = ppm_mapped[1];        // CH2
-        controlInput.rudder = ppm_mapped[0];              // CH1
-        
-        check_mode_auto_manual (controlInput.mode_auto_manual, controlInput.mode_zigzag, controlInput.rudder);
+        controlInput.rudder = ppm_mapped[0];            // CH1
+
+        check_mode_auto_manual(controlInput.mode_auto_manual);
 
         
         // Read analog values of servo potensiometer output in millivolts
@@ -1801,7 +817,7 @@ void loop() {
         bool write_result_prop_dir = ledcWrite(PROP_DIRECTION_pin, prop_dir_duty); 
 
         // Buat payload ringkas untuk pengiriman/logging
-        // Konversi servo angle ke int16_t (× 100)
+        // Konversi servo angle ke int16_t (Ã— 100)
         dataToSend.Calc_deg_servo_1 = (int16_t)(Calc_deg_servo_1 * 100);
         dataToSend.Calc_deg_servo_2 = (int16_t)(Calc_deg_servo_2 * 100);
         (void)dataToSend; // hindari peringatan variabel tidak terpakai jika belum digunakan
@@ -1862,33 +878,24 @@ void loop() {
         uint32_t adc_millivolts_batt_1 = analogReadMilliVolts(ADC_PIN_BATT_1);
         // Konversi mV ke V, lalu kalikan dengan faktor skala 5 (voltage divider)
         float volt_batt_1 = (adc_millivolts_batt_1 / 1000.0) * 5.0;
-        // Konversi ke uint16_t (× 100) untuk pengiriman
+        // Konversi ke uint16_t (Ã— 100) untuk pengiriman
         dataToSend.battery_1 = (uint16_t)(volt_batt_1 * 100); // batere for ESP32-S3, Servo, HWT905TTL, Receiver RC, GNSS, Rotary Encoder
         
         // Baca ADC dalam miliVolt dari GPIO2 (ADC1_CH1)
         uint32_t adc_millivolts_batt_2 = analogReadMilliVolts(ADC_PIN_BATT_2);
         // Konversi mV ke V, lalu kalikan dengan faktor skala 5 (voltage divider)
         float volt_batt_2 = (adc_millivolts_batt_2 / 1000.0) * 5.0;
-        // Konversi ke uint16_t (× 100) untuk pengiriman
+        // Konversi ke uint16_t (Ã— 100) untuk pengiriman
         dataToSend.battery_2 = (uint16_t)(volt_batt_2 * 100); // batere for motor propeller
 
-        // ========== Serial Print Debugging (SETELAH semua proses kontrol selesai) ==========
-        // Print dilakukan SETELAH check_mode_auto_manual() selesai (yang sudah mengupdate zigzag_setpoint dan zigzag_yaw)
-        // dan SEBELUM mengirim data via ESP-NOW, sehingga nilai yang di-print adalah nilai final yang akan dikirim
-        //Print CSV: timestamp,lat,lon,speed,deg1,deg2
-        // Konversi fixed-point kembali ke float untuk display (÷ 100)
-        // 
+        // ========== Serial Print Debugging ==========
         Serial.print(dataToSend.timestamp, 3); Serial.println("");
         // Serial.print(dataToSend.latitude, 6); Serial.println(""); //Serial.print(",");
         // Serial.print(dataToSend.longitude, 6); Serial.print(",");
         // Serial.print(dataToSend.speedMps / 100.0, 2); Serial.print(",");
         Serial.print(dataToSend.Calc_deg_servo_1 / 100.0, 2); Serial.print(",");
         Serial.print(dataToSend.Calc_deg_servo_2 / 100.0, 2); Serial.print(",");
-        // Serial.print(dataToSend.roll / 100.0, 2); Serial.print(",");
-        // Serial.print(dataToSend.pitch / 100. 0, 2); Serial.print(",");
         Serial.print(dataToSend.yaw / 100.0, 2); Serial.print(",");
-        Serial.print(zigzag_setpoint, 2); Serial.print(",");
-        Serial.print(dataToSend.zigzag_yaw / 100.0, 2); Serial.print(","); //Serial.println(""); 
         // Serial.print(dataToSend.rpm_prop_1 / 100.0, 2); Serial.print(",");
         // Serial.print(dataToSend.rpm_prop_2 / 100.0, 2); Serial.print(",");
         // Serial.print(dataToSend.battery_1 / 100.0, 2); Serial.print(",");
