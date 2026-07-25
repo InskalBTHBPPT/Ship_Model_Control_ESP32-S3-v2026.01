@@ -5,7 +5,7 @@
  * @description
  * Firmware sisi kapal (Remote-Side) yang mengumpulkan data sensor dan
  * actuator, menjalankan kontrol rudder/propeller, lalu mengirim telemetry
- * 12-kolom telemetry ke User-Side via ESP-NOW.
+ * 18-kolom telemetry ke User-Side via ESP-NOW.
  *
  * Clone dari ESP_Now_Send_Ver2025_revJan2026.
  *
@@ -278,9 +278,15 @@ struct DatatoSend {
   double longitude;       // dari latestGpsData.longitude
   uint16_t speedMps;      // dari latestGpsData.speedMps (Ã— 100, range 0-655.35 m/s)
   int16_t Calc_deg_servo_1; // derajat hasil kalkulasi feedback servo 1 (Ã— 100)
-  int16_t Calc_deg_servo_2; // derajat hasil kalkulasi feedback servo 2 (Ã— 100)
-  uint16_t yaw;           // derajat yaw (Ã— 100, 0-360Â°)
-  uint16_t rpm_prop_1;    // rpm motor propeller 1 (Ã— 100)
+  int16_t Calc_deg_servo_2; // derajat hasil kalkulasi feedback servo 2 (x 100)
+  uint16_t yaw;           // derajat yaw (x 100, 0-360 deg)
+  int16_t accel_x;        // akselerometer X (g x 100)
+  int16_t accel_y;        // akselerometer Y (g x 100)
+  int16_t accel_z;        // akselerometer Z (g x 100)
+  int16_t gyro_x;         // gyroscope X (deg/s x 100)
+  int16_t gyro_y;         // gyroscope Y (deg/s x 100)
+  int16_t gyro_z;         // gyroscope Z (deg/s x 100)
+  uint16_t rpm_prop_1;    // rpm motor propeller 1 (x 100)
   uint16_t rpm_prop_2;    // rpm motor propeller 2 (Ã— 100)
   uint16_t battery_1;     // batere for ESP32-S3, Servo, HWT905TTL, Receiver RC, GNSS, Rotary Encoder (Ã— 100)
   uint16_t battery_2;     // batere for motor propeller (Ã— 100)
@@ -713,7 +719,7 @@ void setup() {
  * 2. Membaca data dari IMU (Serial2)
  * 3. Setiap 100ms (10 Hz):
  *    - Update data GPS (latitude, longitude, speed)
- *    - Update data IMU (yaw saja; roll/pitch tidak digunakan)
+ *    - Update data IMU (yaw, accel, gyro)
  *    - Map PPM values ke range 1000-2000
  *    - Check mode auto/manual dan eksekusi fungsi kontrol
  *    - Baca feedback servo dari ADC
@@ -769,7 +775,7 @@ void loop() {
         // Konversi speedMps ke uint16_t (Ã— 100)
         dataToSend.speedMps = (uint16_t)(latestGpsData.speedMps * 100);
 
-        // Hitung yaw dari IMU (roll/pitch tidak dibaca)
+        // IMU JY901: yaw, accel (g), gyro (deg/s)
         float rawYaw = (float)JY901.stcAngle.Angle[2]/32768*180;
         
         // Modifikasi: jika yaw < 0, jadikan 360 + yaw
@@ -781,6 +787,14 @@ void loop() {
         }
         
         dataToSend.yaw = (uint16_t)(yaw * 100);
+
+        // Accel (g) dan gyro (deg/s) dari IMU JY901 — fixed-point x100
+        dataToSend.accel_x = (int16_t)((JY901.stcAcc.a[0] / 32768.0f * 16.0f) * 100.0f);
+        dataToSend.accel_y = (int16_t)((JY901.stcAcc.a[1] / 32768.0f * 16.0f) * 100.0f);
+        dataToSend.accel_z = (int16_t)((JY901.stcAcc.a[2] / 32768.0f * 16.0f) * 100.0f);
+        dataToSend.gyro_x = (int16_t)((JY901.stcGyro.w[0] / 32768.0f * 2000.0f) * 100.0f);
+        dataToSend.gyro_y = (int16_t)((JY901.stcGyro.w[1] / 32768.0f * 2000.0f) * 100.0f);
+        dataToSend.gyro_z = (int16_t)((JY901.stcGyro.w[2] / 32768.0f * 2000.0f) * 100.0f);
         
         for (uint8_t i = 0; i < CHANNEL_COUNT; i++) {
             // Convert raw PPM FS-iA6B values (600-1600) to standard servo range (1000-2000)
