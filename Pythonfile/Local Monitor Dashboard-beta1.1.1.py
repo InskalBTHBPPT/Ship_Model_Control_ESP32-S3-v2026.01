@@ -48,6 +48,7 @@ def _csv_row_value(row: dict, *keys: str, default: str = "0") -> str:
         if key in row and row[key] is not None and str(row[key]).strip() != "":
             return str(row[key]).strip()
     return default
+
 import folium
 import serial
 from serial.tools import list_ports
@@ -80,6 +81,21 @@ from PySide6.QtWidgets import (
 )
 import pyqtgraph as pg
 from time import time, strftime
+
+
+def _make_live_stat_cell(parent: QWidget, title: str, value_label: QLabel) -> QWidget:
+    """Satu sel indikator live: judul di atas, nilai di bawah."""
+    cell = QWidget(parent)
+    layout = QVBoxLayout(cell)
+    layout.setContentsMargins(4, 2, 4, 2)
+    layout.setSpacing(2)
+    title_lbl = QLabel(title, cell)
+    title_lbl.setStyleSheet("color: #9ca3af; font-size: 10pt;")
+    title_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    value_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    layout.addWidget(title_lbl)
+    layout.addWidget(value_label)
+    return cell
 
 
 class ClickableMapPage(QWebEnginePage):
@@ -1454,19 +1470,24 @@ class MainWindow(QMainWindow):
         indicator_panel.setLayout(QVBoxLayout())
         indicator_panel.layout().setContentsMargins(12, 12, 12, 12)
 
-        # Live indicators grid (nav + motor, tanpa accel/gyro)
+        # Live indicators — baris bebas (VBox + HBox per baris)
         indicator = QWidget(self)
-        indicator.setLayout(QGridLayout())
+        indicator.setLayout(QVBoxLayout())
         indicator.layout().setContentsMargins(0, 0, 0, 0)
-        indicator.layout().setHorizontalSpacing(10)
-        indicator.layout().setVerticalSpacing(8)
+        indicator.layout().setSpacing(8)
 
         value_style = "color: #e5e7eb; font-weight: bold; font-size: 12pt; text-align: center;"
 
+        self.mode_label = QLabel("Manual", self)
+        self.mode_label.setStyleSheet("color: #10b981; font-weight: bold; font-size: 13pt; text-align: center;")
+
         self.speed_label = QLabel("0.00 m/s", self)
         self.speed_label.setStyleSheet(value_style)
-        self.mode_label = QLabel("Manual", self)
-        self.mode_label.setStyleSheet("color: #10b981; font-weight: bold; font-size: 12pt; text-align: center;")
+
+        self.track_wp_label = QLabel("—", self)
+        self.track_wp_label.setStyleSheet(value_style)
+        self.dist_wp_label = QLabel("— m", self)
+        self.dist_wp_label.setStyleSheet(value_style)
 
         self.yaw_label = QLabel("0.0°", self)
         self.yaw_label.setStyleSheet(value_style)
@@ -1477,10 +1498,10 @@ class MainWindow(QMainWindow):
 
         self.rudder_cmd_label = QLabel("0.0°", self)
         self.rudder_cmd_label.setStyleSheet(value_style)
-        self.track_wp_label = QLabel("—", self)
-        self.track_wp_label.setStyleSheet(value_style)
-        self.dist_wp_label = QLabel("— m", self)
-        self.dist_wp_label.setStyleSheet(value_style)
+        self.rud1_label = QLabel("0.0°", self)
+        self.rud1_label.setStyleSheet(value_style)
+        self.rud2_label = QLabel("0.0°", self)
+        self.rud2_label.setStyleSheet(value_style)
 
         self.rpm1_label = QLabel("0 RPM", self)
         self.rpm1_label.setStyleSheet(value_style)
@@ -1492,52 +1513,52 @@ class MainWindow(QMainWindow):
         self.bat2_label = QLabel("12.00 V", self)
         self.bat2_label.setStyleSheet("color: #10b981; font-weight: bold; font-size: 12pt; text-align: center;")
 
-        self.rud1_label = QLabel("0.0°", self)
-        self.rud1_label.setStyleSheet(value_style)
-        self.rud2_label = QLabel("0.0°", self)
-        self.rud2_label.setStyleSheet(value_style)
+        def _add_indicator_row(cells: list[QWidget]) -> None:
+            row = QWidget(self)
+            row_layout = QHBoxLayout(row)
+            row_layout.setContentsMargins(0, 0, 0, 0)
+            row_layout.setSpacing(6)
+            for cell in cells:
+                row_layout.addWidget(cell, 1)
+            indicator.layout().addWidget(row)
 
-        # Baris 0–1: kecepatan & mode
-        indicator.layout().addWidget(QLabel("GPS Speed (m/s)"), 0, 0)
-        indicator.layout().addWidget(QLabel("Mode"), 0, 1)
-        indicator.layout().addWidget(self.speed_label, 1, 0)
-        indicator.layout().addWidget(self.mode_label, 1, 1)
+        # Baris 1: Mode
+        _add_indicator_row([_make_live_stat_cell(self, "Mode", self.mode_label)])
 
-        # Baris 2–3: yaw aktual & setpoint
-        indicator.layout().addWidget(QLabel("Yaw (°)"), 2, 0)
-        indicator.layout().addWidget(QLabel("Heading Setpoint (°)"), 2, 1)
-        indicator.layout().addWidget(self.yaw_label, 3, 0)
-        indicator.layout().addWidget(self.hdg_sp_label, 3, 1)
+        # Baris 2: GPS Speed
+        _add_indicator_row([_make_live_stat_cell(self, "GPS Speed (m/s)", self.speed_label)])
 
-        # Baris 4–5: error heading & perintah rudder
-        indicator.layout().addWidget(QLabel("Heading Error (°)"), 4, 0)
-        indicator.layout().addWidget(QLabel("Rudder Cmd (°)"), 4, 1)
-        indicator.layout().addWidget(self.hdg_err_label, 5, 0)
-        indicator.layout().addWidget(self.rudder_cmd_label, 5, 1)
+        # Baris 3: Track WP + Distance WP
+        _add_indicator_row([
+            _make_live_stat_cell(self, "Track WP", self.track_wp_label),
+            _make_live_stat_cell(self, "Distance WP (m)", self.dist_wp_label),
+        ])
 
-        # Baris 6–7: waypoint aktif & jarak
-        indicator.layout().addWidget(QLabel("Track WP"), 6, 0)
-        indicator.layout().addWidget(QLabel("Distance WP (m)"), 6, 1)
-        indicator.layout().addWidget(self.track_wp_label, 7, 0)
-        indicator.layout().addWidget(self.dist_wp_label, 7, 1)
+        # Baris 4: Yaw + Heading Setpoint + Heading Error
+        _add_indicator_row([
+            _make_live_stat_cell(self, "Yaw (°)", self.yaw_label),
+            _make_live_stat_cell(self, "Heading Setpoint (°)", self.hdg_sp_label),
+            _make_live_stat_cell(self, "Heading Error (°)", self.hdg_err_label),
+        ])
 
-        # Baris 8–9: RPM propeller
-        indicator.layout().addWidget(QLabel("RPM Propeller 1"), 8, 0)
-        indicator.layout().addWidget(QLabel("RPM Propeller 2"), 8, 1)
-        indicator.layout().addWidget(self.rpm1_label, 9, 0)
-        indicator.layout().addWidget(self.rpm2_label, 9, 1)
+        # Baris 5: Rudder Cmd + Rudder 1 + Rudder 2
+        _add_indicator_row([
+            _make_live_stat_cell(self, "Rudder Cmd (°)", self.rudder_cmd_label),
+            _make_live_stat_cell(self, "Rudder 1 (°)", self.rud1_label),
+            _make_live_stat_cell(self, "Rudder 2 (°)", self.rud2_label),
+        ])
 
-        # Baris 10–11: battery
-        indicator.layout().addWidget(QLabel("Battery Control"), 10, 0)
-        indicator.layout().addWidget(QLabel("Battery Motor"), 10, 1)
-        indicator.layout().addWidget(self.bat1_label, 11, 0)
-        indicator.layout().addWidget(self.bat2_label, 11, 1)
+        # Baris 6: RPM
+        _add_indicator_row([
+            _make_live_stat_cell(self, "RPM Propeller 1", self.rpm1_label),
+            _make_live_stat_cell(self, "RPM Propeller 2", self.rpm2_label),
+        ])
 
-        # Baris 12–13: feedback sensor rudder
-        indicator.layout().addWidget(QLabel("Rudder 1 Sensor (°)"), 12, 0)
-        indicator.layout().addWidget(QLabel("Rudder 2 Sensor (°)"), 12, 1)
-        indicator.layout().addWidget(self.rud1_label, 13, 0)
-        indicator.layout().addWidget(self.rud2_label, 13, 1)
+        # Baris 7: Battery
+        _add_indicator_row([
+            _make_live_stat_cell(self, "Battery Control", self.bat1_label),
+            _make_live_stat_cell(self, "Battery Motor", self.bat2_label),
+        ])
 
         indicator_panel.layout().addWidget(indicator)
         indicator_panel.layout().addStretch(1)
