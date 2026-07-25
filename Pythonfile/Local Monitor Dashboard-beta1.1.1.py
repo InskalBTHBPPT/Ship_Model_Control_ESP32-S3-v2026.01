@@ -30,6 +30,53 @@ from datetime import datetime
 
 TELEMETRY_COL_COUNT = 23
 
+TELEMETRY_LOG_HEADER = (
+    "timestamp (s),latitude (°),longitude (°),speedMps (m/s),Calc_deg_servo_1 (°),Calc_deg_servo_2 (°),"
+    "yaw (°),heading_setpoint (°),heading_error (°),rudder_cmd (°),track_wp_index,distance_to_wp (m),"
+    "accel_x (g),accel_y (g),accel_z (g),gyro_x (deg/s),gyro_y (deg/s),gyro_z (deg/s),"
+    "rpm_prop_1 (rpm),rpm_prop_2 (rpm),battery_1 (V),battery_2 (V),mode_auto\n"
+)
+
+
+def _build_telemetry_log_line(
+    timestamp: float,
+    lat: float,
+    lon: float,
+    speed: float,
+    rud1_sensor: float,
+    rud2_sensor: float,
+    heading: float,
+    heading_setpoint: float,
+    heading_error: float,
+    rudder_cmd: float,
+    track_wp_index: int,
+    distance_to_wp: float,
+    accel_x: float,
+    accel_y: float,
+    accel_z: float,
+    gyro_x: float,
+    gyro_y: float,
+    gyro_z: float,
+    rpm1: float,
+    rpm2: float,
+    bat1: float,
+    bat2: float,
+    mode_auto: int,
+) -> str:
+    """Baris CSV log — nilai tampilan (sama seperti panel Live)."""
+    return (
+        f"{timestamp:.3f},{lat:.6f},{lon:.6f},"
+        f"{speed:.2f},"
+        f"{rud1_sensor:.2f},{rud2_sensor:.2f},"
+        f"{heading:.2f},{heading_setpoint:.2f},{heading_error:.2f},{rudder_cmd:.2f},"
+        f"{track_wp_index},{distance_to_wp:.1f},"
+        f"{accel_x:.2f},{accel_y:.2f},{accel_z:.2f},"
+        f"{gyro_x:.2f},{gyro_y:.2f},{gyro_z:.2f},"
+        f"{rpm1:.0f},{rpm2:.0f},"
+        f"{bat1:.2f},{bat2:.2f},"
+        f"{mode_auto}\n"
+    )
+
 
 def _telemetry_scale(parts: list[str], idx: int, divisor: float = 100.0) -> float:
     return float(parts[idx]) / divisor
@@ -48,6 +95,88 @@ def _csv_row_value(row: dict, *keys: str, default: str = "0") -> str:
         if key in row and row[key] is not None and str(row[key]).strip() != "":
             return str(row[key]).strip()
     return default
+
+
+def _detect_analyze_csv_format(fields: set[str]) -> str:
+    if "heading_setpoint (raw)" in fields:
+        return "raw_v23"
+    if "speedMps (m/s)" in fields:
+        return "display_v23"
+    if "heading_setpoint (°)" in fields and "rudder_cmd (°)" in fields:
+        return "display_v23"
+    return "legacy"
+
+
+def _parse_analyze_csv_row(row: dict, fmt: str) -> dict | None:
+    """Normalisasi satu baris CSV Analyze ke dict nilai tampilan."""
+    try:
+        timestamp = float(_csv_row_value(row, "timestamp (s)", "timestamp"))
+        lat = float(_csv_row_value(row, "latitude (°)", "latitude"))
+        lon = float(_csv_row_value(row, "longitude (°)", "longitude"))
+        if fmt == "raw_v23":
+            speed = float(_csv_row_value(row, "speedMps (raw)", "speedMps")) / 100.0
+            rud1 = float(_csv_row_value(row, "Calc_deg_servo_1 (raw)", "Calc_deg_servo_1")) / 100.0
+            rud2 = float(_csv_row_value(row, "Calc_deg_servo_2 (raw)", "Calc_deg_servo_2")) / 100.0
+            yaw = float(_csv_row_value(row, "yaw (raw)", "yaw")) / 100.0
+            heading_setpoint = float(_csv_row_value(row, "heading_setpoint (raw)", "heading_setpoint")) / 100.0
+            heading_error = float(_csv_row_value(row, "heading_error (raw)", "heading_error")) / 100.0
+            rudder_cmd = float(_csv_row_value(row, "rudder_cmd (raw)", "rudder_cmd")) / 100.0
+            track_wp_index = int(float(_csv_row_value(row, "track_wp_index", default="0")))
+            distance_to_wp = float(_csv_row_value(row, "distance_to_wp (raw)", "distance_to_wp")) / 10.0
+            rpm1 = float(_csv_row_value(row, "rpm_prop_1 (raw)", "rpm_prop_1")) / 100.0
+            rpm2 = float(_csv_row_value(row, "rpm_prop_2 (raw)", "rpm_prop_2")) / 100.0
+            bat1 = float(_csv_row_value(row, "battery_1 (raw)", "battery_1")) / 100.0
+            bat2 = float(_csv_row_value(row, "battery_2 (raw)", "battery_2")) / 100.0
+        elif fmt == "display_v23":
+            speed = float(_csv_row_value(row, "speedMps (m/s)", "speedMps"))
+            rud1 = float(_csv_row_value(row, "Calc_deg_servo_1 (°)", "Calc_deg_servo_1"))
+            rud2 = float(_csv_row_value(row, "Calc_deg_servo_2 (°)", "Calc_deg_servo_2"))
+            yaw = float(_csv_row_value(row, "yaw (°)", "yaw"))
+            heading_setpoint = float(_csv_row_value(row, "heading_setpoint (°)", "heading_setpoint"))
+            heading_error = float(_csv_row_value(row, "heading_error (°)", "heading_error"))
+            rudder_cmd = float(_csv_row_value(row, "rudder_cmd (°)", "rudder_cmd"))
+            track_wp_index = int(float(_csv_row_value(row, "track_wp_index", default="0")))
+            distance_to_wp = float(_csv_row_value(row, "distance_to_wp (m)", "distance_to_wp"))
+            rpm1 = float(_csv_row_value(row, "rpm_prop_1 (rpm)", "rpm_prop_1"))
+            rpm2 = float(_csv_row_value(row, "rpm_prop_2 (rpm)", "rpm_prop_2"))
+            bat1 = float(_csv_row_value(row, "battery_1 (V)", "battery_1"))
+            bat2 = float(_csv_row_value(row, "battery_2 (V)", "battery_2"))
+        else:
+            speed = float(_csv_row_value(row, "speedMps"))
+            rud1 = float(_csv_row_value(row, "Calc_deg_servo_1 (°)", "Calc_deg_servo_1"))
+            rud2 = float(_csv_row_value(row, "Calc_deg_servo_2 (°)", "Calc_deg_servo_2"))
+            yaw = float(_csv_row_value(row, "yaw (°)", "yaw"))
+            heading_setpoint = float(_csv_row_value(row, "zigzag_yaw (°)", "zigzag_yaw"))
+            heading_error = 0.0
+            rudder_cmd = 0.0
+            track_wp_index = 0
+            distance_to_wp = 0.0
+            rpm1 = float(_csv_row_value(row, "rpm_prop_1 (rpm)", "rpm_prop_1"))
+            rpm2 = float(_csv_row_value(row, "rpm_prop_2 (rpm)", "rpm_prop_2"))
+            bat1 = float(_csv_row_value(row, "battery_1 (V)", "battery_1"))
+            bat2 = float(_csv_row_value(row, "battery_2 (V)", "battery_2"))
+        mode_auto = int(float(_csv_row_value(row, "mode_auto", default="0")))
+        return {
+            "timestamp": timestamp,
+            "lat": lat,
+            "lon": lon,
+            "speed": speed,
+            "rud1_sensor": rud1,
+            "rud2_sensor": rud2,
+            "yaw": yaw,
+            "heading_setpoint": heading_setpoint,
+            "heading_error": heading_error,
+            "rudder_cmd": rudder_cmd,
+            "track_wp_index": track_wp_index,
+            "distance_to_wp": distance_to_wp,
+            "rpm1": rpm1,
+            "rpm2": rpm2,
+            "bat1": bat1,
+            "bat2": bat2,
+            "mode_auto": mode_auto,
+        }
+    except (ValueError, TypeError):
+        return None
 
 import folium
 import serial
@@ -1767,251 +1896,166 @@ class MainWindow(QMainWindow):
         live_tab.layout().addWidget(left_panel, 3)
         live_tab.layout().addWidget(right_panel, 1)
         
-        # Tab kedua "Analize Data" dibagi dua panel (rasio 3:1) seperti tab pertama
+        # Tab Analyze — map | 3 plot (sama Live) + panel indikator di kanan
         analyze_tab = QWidget(self)
         analyze_tab.setLayout(QHBoxLayout())
         analyze_tab.layout().setContentsMargins(0, 0, 0, 0)
-        
+
         analyze_left_panel = QWidget(self)
         analyze_left_panel.setLayout(QVBoxLayout())
         analyze_left_panel.layout().setContentsMargins(0, 0, 0, 0)
         analyze_left_panel.layout().setSpacing(12)
-        
-        analyze_left_panel_top = QWidget(self)
-        analyze_left_panel_top.setLayout(QHBoxLayout())
-        analyze_left_panel_top.layout().setContentsMargins(0, 0, 0, 0)
-        analyze_left_panel_top.layout().setSpacing(0)
-        
-        # Sub-panel A kiri (struktur sama dengan left_panel_A di tab pertama)
-        analyze_left_panel_A = QWidget(self)
-        analyze_left_panel_A.setLayout(QVBoxLayout())
-        analyze_left_panel_A.layout().setContentsMargins(12, 12, 12, 12)
-        
-        analyze_left_panel_A_top = QGroupBox("Map Viewer (Analyze)", self)
-        analyze_left_panel_A_top.setLayout(QVBoxLayout())
+
+        analyze_content_splitter = QSplitter(Qt.Orientation.Horizontal, self)
+        analyze_content_splitter.setChildrenCollapsible(False)
+        analyze_content_splitter.setHandleWidth(6)
+        analyze_content_splitter.setStyleSheet(
+            "QSplitter::handle { background: #4b5563; margin: 0 1px; }"
+            "QSplitter::handle:hover { background: #6b7280; }"
+        )
+
+        analyze_map_panel = QWidget(self)
+        analyze_map_panel.setLayout(QVBoxLayout())
+        analyze_map_panel.layout().setContentsMargins(12, 12, 12, 12)
+        analyze_map_group = QGroupBox("Map Viewer (Analyze)", self)
+        analyze_map_group.setLayout(QVBoxLayout())
         self.analyze_map_webview = MapWebView((self.base_lat, self.base_lon))
-        analyze_left_panel_A_top.layout().addWidget(self.analyze_map_webview)
-        
-        analyze_left_panel_A_bottom = QGroupBox("RPM Propeller Time Series (Recorded)", self)
-        analyze_left_panel_A_bottom.setLayout(QVBoxLayout())
-        self.analyze_rpm_plot_widget = pg.PlotWidget()
-        self.analyze_rpm_plot_widget.setLabel('left', 'RPM', color='#e5e7eb', **{'font-size': '8pt'})
-        self.analyze_rpm_plot_widget.setLabel('bottom', 'Time (s)', color='#e5e7eb', **{'font-size': '8pt'})
-        self.analyze_rpm_plot_widget.setBackground('#111827')
-        self.analyze_rpm_plot_widget.setTitle('RPM Propeller (Recorded)', color='#e5e7eb', size='12pt')
-        self.analyze_rpm_plot_widget.addLegend(offset=(10, 10))
-        self.analyze_rpm_plot_widget.showGrid(x=False, y=False)
-        self.analyze_rpm_plot_widget.getAxis('left').setPen(pg.mkPen(color='#e5e7eb', width=1))
-        self.analyze_rpm_plot_widget.getAxis('bottom').setPen(pg.mkPen(color='#e5e7eb', width=1))
-        self.analyze_rpm_plot_widget.getAxis('left').setTextPen(pg.mkPen(color='#e5e7eb'))
-        self.analyze_rpm_plot_widget.getAxis('bottom').setTextPen(pg.mkPen(color='#e5e7eb'))
-        self.analyze_rpm1_curve = self.analyze_rpm_plot_widget.plot(name='RPM Propeller 1', pen=pg.mkPen(color='#3b82f6', width=2))
-        self.analyze_rpm2_curve = self.analyze_rpm_plot_widget.plot(name='RPM Propeller 2', pen=pg.mkPen(color='#ef4444', width=2))
-        self.analyze_rpm_target = pg.TargetItem(
-            size=18,
-            pen=pg.mkPen(color='#facc15', width=1.5),
-            movable=False,
-            symbol='x'
-        )
-        self.analyze_rpm_target.setZValue(2)
-        self.analyze_rpm_plot_widget.addItem(self.analyze_rpm_target)
-        self.analyze_rpm_target.hide()
-        self.analyze_rpm_label = pg.TextItem(
-            text='',
-            color='#f9fafb',
-            anchor=(0, 1)
-        )
-        self.analyze_rpm_label.setZValue(2)
-        self.analyze_rpm_plot_widget.addItem(self.analyze_rpm_label)
-        self.analyze_rpm_label.hide()
-        self.analyze_rpm_hover_proxy = pg.SignalProxy(
-            self.analyze_rpm_plot_widget.scene().sigMouseMoved,
-            rateLimit=60,
-            slot=self._on_analyze_rpm_mouse_moved
-        )
-        analyze_left_panel_A_bottom.layout().addWidget(self.analyze_rpm_plot_widget)
-        
-        analyze_left_panel_A.layout().addWidget(analyze_left_panel_A_top, 2)
-        analyze_left_panel_A.layout().addWidget(analyze_left_panel_A_bottom, 1)
-        
-        # Sub-panel B kanan (struktur sama dengan left_panel_B di tab pertama)
-        analyze_left_panel_B = QWidget(self)
-        analyze_left_panel_B.setLayout(QVBoxLayout())
-        analyze_left_panel_B.layout().setContentsMargins(12, 12, 12, 12)
-        
-        analyze_left_panel_B_top = QGroupBox("Roll & Pitch Time Series (Recorded)", self)
-        analyze_left_panel_B_top.setLayout(QVBoxLayout())
-        self.analyze_attitude_plot_widget = pg.PlotWidget()
-        self.analyze_attitude_plot_widget.setLabel('left', 'Angle (°)', color='#e5e7eb', **{'font-size': '8pt'})
-        self.analyze_attitude_plot_widget.setLabel('bottom', 'Time (s)', color='#e5e7eb', **{'font-size': '8pt'})
-        self.analyze_attitude_plot_widget.setTitle('Roll & Pitch (Recorded)', color='#e5e7eb', size='11pt')
-        self.analyze_attitude_plot_widget.setBackground('#111827')
-        self.analyze_attitude_plot_widget.addLegend(offset=(10, 10))
-        self.analyze_attitude_plot_widget.showGrid(x=False, y=False)
-        self.analyze_attitude_plot_widget.getAxis('left').setPen(pg.mkPen(color='#e5e7eb', width=1))
-        self.analyze_attitude_plot_widget.getAxis('bottom').setPen(pg.mkPen(color='#e5e7eb', width=1))
-        self.analyze_attitude_plot_widget.getAxis('left').setTextPen(pg.mkPen(color='#e5e7eb'))
-        self.analyze_attitude_plot_widget.getAxis('bottom').setTextPen(pg.mkPen(color='#e5e7eb'))
-        self.analyze_roll_curve = self.analyze_attitude_plot_widget.plot(name='Roll', pen=pg.mkPen(color='#f59e0b', width=2))
-        self.analyze_pitch_curve = self.analyze_attitude_plot_widget.plot(name='Pitch', pen=pg.mkPen(color='#8b5cf6', width=2))
-        self.analyze_attitude_target = pg.TargetItem(
-            size=16,
-            pen=pg.mkPen(color='#f97316', width=1.5),
-            movable=False,
-            symbol='x'
-        )
-        self.analyze_attitude_target.setZValue(2)
-        self.analyze_attitude_plot_widget.addItem(self.analyze_attitude_target)
-        self.analyze_attitude_target.hide()
-        self.analyze_pitch_target = pg.TargetItem(
-            size=14,
-            pen=pg.mkPen(color='#06b6d4', width=1.5),
-            movable=False,
-            symbol='o'
-        )
-        self.analyze_pitch_target.setZValue(2)
-        self.analyze_attitude_plot_widget.addItem(self.analyze_pitch_target)
-        self.analyze_pitch_target.hide()
-        self.analyze_attitude_label = pg.TextItem(
-            text='',
-            color='#f9fafb',
-            anchor=(0, 1)
-        )
-        self.analyze_attitude_label.setZValue(2)
-        self.analyze_attitude_plot_widget.addItem(self.analyze_attitude_label)
-        self.analyze_attitude_label.hide()
-        analyze_left_panel_B_top.layout().addWidget(self.analyze_attitude_plot_widget)
-        
-        analyze_left_panel_B_middle = QGroupBox("Yaw & Zigzag Yaw Time Series (Recorded)", self)
-        analyze_left_panel_B_middle.setLayout(QVBoxLayout())
+        analyze_map_group.layout().addWidget(self.analyze_map_webview)
+        analyze_map_panel.layout().addWidget(analyze_map_group)
+
+        analyze_plots_panel = QWidget(self)
+        analyze_plots_panel.setLayout(QVBoxLayout())
+        analyze_plots_panel.layout().setContentsMargins(12, 12, 12, 12)
+        analyze_plots_panel.layout().setSpacing(0)
+
         self.analyze_yaw_plot_widget = pg.PlotWidget()
-        self.analyze_yaw_plot_widget.setLabel('left', 'Yaw (°)', color='#10b981', **{'font-size': '8pt'})
-        self.analyze_yaw_plot_widget.setLabel('bottom', 'Time (s)', color='#e5e7eb', **{'font-size': '8pt'})
-        self.analyze_yaw_plot_widget.setTitle('Yaw & Zigzag (Recorded)', color='#e5e7eb', size='11pt')
-        self.analyze_yaw_plot_widget.setBackground('#111827')
+        self.analyze_yaw_plot_widget.setLabel('left', 'Heading (°)', color='#e5e7eb', **{'font-size': '11pt'})
+        self.analyze_yaw_plot_widget.setLabel('bottom', 'Time (s)', color='#e5e7eb', **{'font-size': '11pt'})
+        self.analyze_yaw_plot_widget.setTitle('Yaw & Heading Setpoint (Recorded)', color='#e5e7eb', size='11pt')
+        self.analyze_yaw_plot_widget.setBackground('#1f2937')
         self.analyze_yaw_plot_widget.addLegend(offset=(10, 10))
         self.analyze_yaw_plot_widget.showGrid(x=False, y=False)
         self.analyze_yaw_plot_widget.getAxis('left').setPen(pg.mkPen(color='#10b981', width=2))
         self.analyze_yaw_plot_widget.getAxis('bottom').setPen(pg.mkPen(color='#e5e7eb', width=1))
         self.analyze_yaw_plot_widget.getAxis('left').setTextPen(pg.mkPen(color='#e5e7eb'))
         self.analyze_yaw_plot_widget.getAxis('bottom').setTextPen(pg.mkPen(color='#e5e7eb'))
-        self.analyze_yaw_viewbox2 = pg.ViewBox()
-        self.analyze_yaw_plot_widget.scene().addItem(self.analyze_yaw_viewbox2)
-        self.analyze_yaw_plot_widget.getAxis('right').linkToView(self.analyze_yaw_viewbox2)
-        self.analyze_yaw_viewbox2.setXLink(self.analyze_yaw_plot_widget)
-        self.analyze_yaw_plot_widget.showAxis('right')
-        self.analyze_yaw_plot_widget.getAxis('right').setLabel('Zigzag Yaw (°)', color='#06b6d4', **{'font-size': '8pt'})
-        self.analyze_yaw_plot_widget.getAxis('right').setPen(pg.mkPen(color='#06b6d4', width=2))
-        self.analyze_yaw_plot_widget.getAxis('right').setTextPen(pg.mkPen(color='#e5e7eb'))
-        def _update_analyze_yaw_views():
-            self.analyze_yaw_viewbox2.setGeometry(self.analyze_yaw_plot_widget.getViewBox().sceneBoundingRect())
-            self.analyze_yaw_viewbox2.linkedViewChanged(
-                self.analyze_yaw_plot_widget.getViewBox(),
-                self.analyze_yaw_viewbox2.XAxis
-            )
-        _update_analyze_yaw_views()
-        self.analyze_yaw_plot_widget.getViewBox().sigResized.connect(_update_analyze_yaw_views)
-        self.analyze_yaw_curve = self.analyze_yaw_plot_widget.plot(name='Yaw', pen=pg.mkPen(color='#10b981', width=2))
-        self.analyze_zigzag_yaw_curve = pg.PlotDataItem(name='Zigzag', pen=pg.mkPen(color='#06b6d4', width=2))
-        self.analyze_yaw_viewbox2.addItem(self.analyze_zigzag_yaw_curve)
+        self.analyze_yaw_curve = self.analyze_yaw_plot_widget.plot(
+            name='Yaw', pen=pg.mkPen(color='#10b981', width=2))
+        self.analyze_heading_sp_curve = self.analyze_yaw_plot_widget.plot(
+            name='Heading Setpoint', pen=pg.mkPen(color='#06b6d4', width=2))
         self.analyze_yaw_target = pg.TargetItem(
-            size=16,
-            pen=pg.mkPen(color='#10b981', width=1.5),
-            movable=False,
-            symbol='x'
-        )
+            size=16, pen=pg.mkPen(color='#10b981', width=1.5), movable=False, symbol='x')
         self.analyze_yaw_target.setZValue(2)
         self.analyze_yaw_plot_widget.addItem(self.analyze_yaw_target)
         self.analyze_yaw_target.hide()
-        self.analyze_zigzag_target = pg.TargetItem(
-            size=14,
-            pen=pg.mkPen(color='#06b6d4', width=1.5),
-            movable=False,
-            symbol='o'
-        )
-        self.analyze_zigzag_target.setZValue(2)
-        self.analyze_yaw_viewbox2.addItem(self.analyze_zigzag_target)
-        self.analyze_zigzag_target.hide()
-        self.analyze_yaw_label = pg.TextItem(
-            text='',
-            color='#f9fafb',
-            anchor=(0, 1)
-        )
+        self.analyze_heading_sp_target = pg.TargetItem(
+            size=14, pen=pg.mkPen(color='#06b6d4', width=1.5), movable=False, symbol='o')
+        self.analyze_heading_sp_target.setZValue(2)
+        self.analyze_yaw_plot_widget.addItem(self.analyze_heading_sp_target)
+        self.analyze_heading_sp_target.hide()
+        self.analyze_yaw_label = pg.TextItem(text='', color='#f9fafb', anchor=(0, 1))
         self.analyze_yaw_label.setZValue(2)
         self.analyze_yaw_plot_widget.addItem(self.analyze_yaw_label)
         self.analyze_yaw_label.hide()
-        analyze_left_panel_B_middle.layout().addWidget(self.analyze_yaw_plot_widget)
-        
-        analyze_left_panel_B_bottom = QGroupBox("Rudder 1 & 2 Time Series (Recorded)", self)
-        analyze_left_panel_B_bottom.setLayout(QVBoxLayout())
-        self.analyze_rudder_plot_widget = pg.PlotWidget()
-        self.analyze_rudder_plot_widget.setLabel('left', 'Angle (°)', color='#e5e7eb', **{'font-size': '8pt'})
-        self.analyze_rudder_plot_widget.setLabel('bottom', 'Time (s)', color='#e5e7eb', **{'font-size': '8pt'})
-        self.analyze_rudder_plot_widget.setTitle('Rudder (Recorded)', color='#e5e7eb', size='11pt')
-        self.analyze_rudder_plot_widget.setBackground('#111827')
-        self.analyze_rudder_plot_widget.addLegend(offset=(10, 10))
-        self.analyze_rudder_plot_widget.showGrid(x=False, y=False)
-        self.analyze_rudder_plot_widget.getAxis('left').setPen(pg.mkPen(color='#e5e7eb', width=1))
-        self.analyze_rudder_plot_widget.getAxis('bottom').setPen(pg.mkPen(color='#e5e7eb', width=1))
-        self.analyze_rudder_plot_widget.getAxis('left').setTextPen(pg.mkPen(color='#e5e7eb'))
-        self.analyze_rudder_plot_widget.getAxis('bottom').setTextPen(pg.mkPen(color='#e5e7eb'))
-        self.analyze_rud1_curve = self.analyze_rudder_plot_widget.plot(name='Rudder 1', pen=pg.mkPen(color='#ec4899', width=2))
-        self.analyze_rud2_curve = self.analyze_rudder_plot_widget.plot(name='Rudder 2', pen=pg.mkPen(color='#14b8a6', width=2))
-        self.analyze_rudder_target = pg.TargetItem(
-            size=16,
-            pen=pg.mkPen(color='#f472b6', width=1.5),
-            movable=False,
-            symbol='x'
-        )
-        self.analyze_rudder_target.setZValue(2)
-        self.analyze_rudder_plot_widget.addItem(self.analyze_rudder_target)
-        self.analyze_rudder_target.hide()
-        self.analyze_rudder_label = pg.TextItem(
-            text='',
-            color='#f9fafb',
-            anchor=(0, 1)
-        )
-        self.analyze_rudder_label.setZValue(2)
-        self.analyze_rudder_plot_widget.addItem(self.analyze_rudder_label)
-        self.analyze_rudder_label.hide()
-        analyze_left_panel_B_bottom.layout().addWidget(self.analyze_rudder_plot_widget)
-        
-        # Data containers for Analyze tab plots
-        self.analyze_rpm_time_data: list[float] = []
+
+        self.analyze_rudder1_plot_widget = pg.PlotWidget()
+        self.analyze_rudder1_plot_widget.setLabel('left', 'Angle (°)', color='#e5e7eb', **{'font-size': '11pt'})
+        self.analyze_rudder1_plot_widget.setLabel('bottom', 'Time (s)', color='#e5e7eb', **{'font-size': '11pt'})
+        self.analyze_rudder1_plot_widget.setTitle('Rudder 1: Cmd + Sensor (Recorded)', color='#e5e7eb', size='11pt')
+        self.analyze_rudder1_plot_widget.setBackground('#1f2937')
+        self.analyze_rudder1_plot_widget.addLegend(offset=(10, 10))
+        self.analyze_rudder1_plot_widget.showGrid(x=False, y=False)
+        self.analyze_rudder1_plot_widget.getAxis('left').setPen(pg.mkPen(color='#e5e7eb', width=1))
+        self.analyze_rudder1_plot_widget.getAxis('bottom').setPen(pg.mkPen(color='#e5e7eb', width=1))
+        self.analyze_rudder1_plot_widget.getAxis('left').setTextPen(pg.mkPen(color='#e5e7eb'))
+        self.analyze_rudder1_plot_widget.getAxis('bottom').setTextPen(pg.mkPen(color='#e5e7eb'))
+        self.analyze_rudder1_cmd_curve = self.analyze_rudder1_plot_widget.plot(
+            name='Rudder Cmd', pen=pg.mkPen(color='#3b82f6', width=2))
+        self.analyze_rudder1_sensor_curve = self.analyze_rudder1_plot_widget.plot(
+            name='Rudder 1 Sensor', pen=pg.mkPen(color='#ec4899', width=2))
+        self.analyze_rudder1_cmd_target = pg.TargetItem(
+            size=16, pen=pg.mkPen(color='#3b82f6', width=1.5), movable=False, symbol='x')
+        self.analyze_rudder1_cmd_target.setZValue(2)
+        self.analyze_rudder1_plot_widget.addItem(self.analyze_rudder1_cmd_target)
+        self.analyze_rudder1_cmd_target.hide()
+        self.analyze_rudder1_sensor_target = pg.TargetItem(
+            size=14, pen=pg.mkPen(color='#ec4899', width=1.5), movable=False, symbol='o')
+        self.analyze_rudder1_sensor_target.setZValue(2)
+        self.analyze_rudder1_plot_widget.addItem(self.analyze_rudder1_sensor_target)
+        self.analyze_rudder1_sensor_target.hide()
+        self.analyze_rudder1_label = pg.TextItem(text='', color='#f9fafb', anchor=(0, 1))
+        self.analyze_rudder1_label.setZValue(2)
+        self.analyze_rudder1_plot_widget.addItem(self.analyze_rudder1_label)
+        self.analyze_rudder1_label.hide()
+
+        self.analyze_rudder2_plot_widget = pg.PlotWidget()
+        self.analyze_rudder2_plot_widget.setLabel('left', 'Angle (°)', color='#e5e7eb', **{'font-size': '11pt'})
+        self.analyze_rudder2_plot_widget.setLabel('bottom', 'Time (s)', color='#e5e7eb', **{'font-size': '11pt'})
+        self.analyze_rudder2_plot_widget.setTitle('Rudder 2: Cmd + Sensor (Recorded)', color='#e5e7eb', size='11pt')
+        self.analyze_rudder2_plot_widget.setBackground('#1f2937')
+        self.analyze_rudder2_plot_widget.addLegend(offset=(10, 10))
+        self.analyze_rudder2_plot_widget.showGrid(x=False, y=False)
+        self.analyze_rudder2_plot_widget.getAxis('left').setPen(pg.mkPen(color='#e5e7eb', width=1))
+        self.analyze_rudder2_plot_widget.getAxis('bottom').setPen(pg.mkPen(color='#e5e7eb', width=1))
+        self.analyze_rudder2_plot_widget.getAxis('left').setTextPen(pg.mkPen(color='#e5e7eb'))
+        self.analyze_rudder2_plot_widget.getAxis('bottom').setTextPen(pg.mkPen(color='#e5e7eb'))
+        self.analyze_rudder2_cmd_curve = self.analyze_rudder2_plot_widget.plot(
+            name='Rudder Cmd', pen=pg.mkPen(color='#3b82f6', width=2))
+        self.analyze_rudder2_sensor_curve = self.analyze_rudder2_plot_widget.plot(
+            name='Rudder 2 Sensor', pen=pg.mkPen(color='#14b8a6', width=2))
+        self.analyze_rudder2_cmd_target = pg.TargetItem(
+            size=16, pen=pg.mkPen(color='#3b82f6', width=1.5), movable=False, symbol='x')
+        self.analyze_rudder2_cmd_target.setZValue(2)
+        self.analyze_rudder2_plot_widget.addItem(self.analyze_rudder2_cmd_target)
+        self.analyze_rudder2_cmd_target.hide()
+        self.analyze_rudder2_sensor_target = pg.TargetItem(
+            size=14, pen=pg.mkPen(color='#14b8a6', width=1.5), movable=False, symbol='o')
+        self.analyze_rudder2_sensor_target.setZValue(2)
+        self.analyze_rudder2_plot_widget.addItem(self.analyze_rudder2_sensor_target)
+        self.analyze_rudder2_sensor_target.hide()
+        self.analyze_rudder2_label = pg.TextItem(text='', color='#f9fafb', anchor=(0, 1))
+        self.analyze_rudder2_label.setZValue(2)
+        self.analyze_rudder2_plot_widget.addItem(self.analyze_rudder2_label)
+        self.analyze_rudder2_label.hide()
+
+        analyze_plots_panel.layout().addWidget(self.analyze_yaw_plot_widget, 1)
+        analyze_plots_panel.layout().addWidget(self.analyze_rudder1_plot_widget, 1)
+        analyze_plots_panel.layout().addWidget(self.analyze_rudder2_plot_widget, 1)
+
+        analyze_content_splitter.addWidget(analyze_map_panel)
+        analyze_content_splitter.addWidget(analyze_plots_panel)
+        analyze_content_splitter.setStretchFactor(0, 1)
+        analyze_content_splitter.setStretchFactor(1, 1)
+        analyze_content_splitter.setSizes([500, 500])
+
+        # Data containers Analyze (nilai tampilan dari CSV)
+        self.analyze_time_data: list[float] = []
+        self.analyze_lat_data: list[float] = []
+        self.analyze_lon_data: list[float] = []
+        self.analyze_speed_data: list[float] = []
+        self.analyze_rud1_sensor_data: list[float] = []
+        self.analyze_rud2_sensor_data: list[float] = []
+        self.analyze_yaw_data: list[float] = []
+        self.analyze_heading_sp_data: list[float] = []
+        self.analyze_heading_error_data: list[float] = []
+        self.analyze_rudder_cmd_data: list[float] = []
+        self.analyze_track_wp_data: list[int] = []
+        self.analyze_dist_wp_data: list[float] = []
         self.analyze_rpm1_data: list[float] = []
         self.analyze_rpm2_data: list[float] = []
-        self.analyze_attitude_time_data: list[float] = []
-        self.analyze_roll_data: list[float] = []
-        self.analyze_pitch_data: list[float] = []
-        self.analyze_yaw_time_data: list[float] = []
-        self.analyze_yaw_data: list[float] = []
-        self.analyze_zigzag_yaw_data: list[float] = []
-        self.analyze_map_time_data: list[float] = []
-        self.analyze_rudder_time_data: list[float] = []
-        self.analyze_rud1_data: list[float] = []
-        self.analyze_rud2_data: list[float] = []
+        self.analyze_bat1_data: list[float] = []
+        self.analyze_bat2_data: list[float] = []
+        self.analyze_mode_auto_data: list[int] = []
         self.analyze_map_coords: list[tuple[float, float]] = []
         self.analyze_heading_values: list[float] = []
-        
-        analyze_left_panel_B.layout().addWidget(analyze_left_panel_B_top, 1)
-        analyze_left_panel_B.layout().addWidget(analyze_left_panel_B_middle, 1)
-        analyze_left_panel_B.layout().addWidget(analyze_left_panel_B_bottom, 1)
-        
-        analyze_left_panel_top.layout().addWidget(analyze_left_panel_A, 1)
-        analyze_left_panel_top.layout().addWidget(analyze_left_panel_B, 1)
-        
+
         analyze_left_panel_bottom = QGroupBox("Timeline Control", self)
         analyze_left_panel_bottom.setLayout(QVBoxLayout())
         analyze_left_panel_bottom.layout().setContentsMargins(12, 12, 12, 12)
         analyze_left_panel_bottom.layout().setSpacing(8)
-        analyze_left_panel_bottom.setStyleSheet(
-            """
-            QGroupBox::title { color: #ffffff; }
-            """
-        )
-        
-        self.analyze_time_slider_scale = 1000  # gunakan ms agar slider tetap integer
-        self.analyze_time_slider_scale = 1000  # gunakan ms agar slider tetap integer
+        analyze_left_panel_bottom.setStyleSheet("QGroupBox::title { color: #ffffff; }")
+
+        self.analyze_time_slider_scale = 1000
         self.analyze_time_slider_step = 100
         self.analyze_time_slider = QSlider(Qt.Horizontal, self)
         self.analyze_time_slider.setRange(0, 500 * self.analyze_time_slider_scale)
@@ -2020,30 +2064,25 @@ class MainWindow(QMainWindow):
         self.analyze_time_slider.setValue(0)
         self.analyze_time_slider.valueChanged.connect(self._on_analyze_time_slider_changed)
         analyze_left_panel_bottom.layout().addWidget(self.analyze_time_slider)
-        
+
         self.analyze_time_value_label = QLabel("Timestamp: 0 s", self)
         self.analyze_time_value_label.setStyleSheet("color: #e5e7eb; font-weight: 600;")
         analyze_left_panel_bottom.layout().addWidget(self.analyze_time_value_label)
         self._update_analyze_slider_display(0)
-        self._hide_analyze_rpm_marker()
-        self._hide_analyze_attitude_marker()
-        self._hide_analyze_rudder_marker()
-        
-        analyze_left_panel.layout().addWidget(analyze_left_panel_top, 9)
+
+        analyze_left_panel.layout().addWidget(analyze_content_splitter, 9)
         analyze_left_panel.layout().addWidget(analyze_left_panel_bottom, 1)
-        
+
         analyze_right_panel = QWidget(self)
         analyze_right_panel.setLayout(QVBoxLayout())
         analyze_right_panel.layout().setContentsMargins(12, 12, 12, 12)
-        
-        # analyze_right_placeholder = QGroupBox("Panel Kontrol/Filter", self)
+
         analyze_right_placeholder = QGroupBox("", self)
         analyze_right_placeholder.setLayout(QVBoxLayout())
         self.load_csv_btn = QPushButton("Load Recorded CSV", self)
         self.load_csv_btn.clicked.connect(self.load_analyze_csv)
         analyze_right_placeholder.layout().addWidget(self.load_csv_btn)
-        
-        # Checkbox untuk kontrol tampilan peta (horizontal layout)
+
         map_checkbox_container = QGroupBox("Map Control", self)
         map_checkbox_layout = QHBoxLayout()
         map_checkbox_layout.setContentsMargins(12, 15, 12, 15)
@@ -2051,23 +2090,98 @@ class MainWindow(QMainWindow):
         map_checkbox_container.setLayout(map_checkbox_layout)
 
         self.analyze_show_blue_line_cb = QCheckBox("Trail Line", self)
-        self.analyze_show_blue_line_cb.setChecked(True)  # Default: ya
+        self.analyze_show_blue_line_cb.setChecked(True)
         self.analyze_show_blue_line_cb.stateChanged.connect(self.toggle_analyze_map_blue_line)
-        
+
         self.analyze_show_red_line_cb = QCheckBox("Heading Line", self)
-        self.analyze_show_red_line_cb.setChecked(False)  # Default: tidak
+        self.analyze_show_red_line_cb.setChecked(False)
         self.analyze_show_red_line_cb.stateChanged.connect(self.toggle_analyze_map_red_line)
 
         map_checkbox_layout.addWidget(self.analyze_show_blue_line_cb)
         map_checkbox_layout.addWidget(self.analyze_show_red_line_cb)
         map_checkbox_layout.addStretch(1)
-        
         analyze_right_placeholder.layout().addWidget(map_checkbox_container)
-        analyze_right_placeholder.layout().addStretch(1)
-        
+
+        analyze_indicator_panel = QGroupBox("Recorded Values", self)
+        analyze_indicator_panel.setLayout(QVBoxLayout())
+        analyze_indicator_panel.layout().setContentsMargins(12, 12, 12, 12)
+
+        analyze_indicator = QWidget(self)
+        analyze_indicator.setLayout(QVBoxLayout())
+        analyze_indicator.layout().setContentsMargins(0, 0, 0, 0)
+        analyze_indicator.layout().setSpacing(8)
+
+        analyze_value_style = "color: #e5e7eb; font-weight: bold; font-size: 12pt; text-align: center;"
+
+        self.analyze_mode_label = QLabel("Manual", self)
+        self.analyze_mode_label.setStyleSheet("color: #10b981; font-weight: bold; font-size: 13pt; text-align: center;")
+        self.analyze_speed_label = QLabel("0.00 m/s", self)
+        self.analyze_speed_label.setStyleSheet(analyze_value_style)
+        self.analyze_track_wp_label = QLabel("—", self)
+        self.analyze_track_wp_label.setStyleSheet(analyze_value_style)
+        self.analyze_dist_wp_label = QLabel("— m", self)
+        self.analyze_dist_wp_label.setStyleSheet(analyze_value_style)
+        self.analyze_yaw_label_ind = QLabel("0.0°", self)
+        self.analyze_yaw_label_ind.setStyleSheet(analyze_value_style)
+        self.analyze_hdg_sp_label = QLabel("0.0°", self)
+        self.analyze_hdg_sp_label.setStyleSheet(analyze_value_style)
+        self.analyze_hdg_err_label = QLabel("0.0°", self)
+        self.analyze_hdg_err_label.setStyleSheet(analyze_value_style)
+        self.analyze_rudder_cmd_label = QLabel("0.0°", self)
+        self.analyze_rudder_cmd_label.setStyleSheet(analyze_value_style)
+        self.analyze_rud1_label = QLabel("0.0°", self)
+        self.analyze_rud1_label.setStyleSheet(analyze_value_style)
+        self.analyze_rud2_label = QLabel("0.0°", self)
+        self.analyze_rud2_label.setStyleSheet(analyze_value_style)
+        self.analyze_rpm1_label = QLabel("0 RPM", self)
+        self.analyze_rpm1_label.setStyleSheet(analyze_value_style)
+        self.analyze_rpm2_label = QLabel("0 RPM", self)
+        self.analyze_rpm2_label.setStyleSheet(analyze_value_style)
+        self.analyze_bat1_label = QLabel("12.00 V", self)
+        self.analyze_bat1_label.setStyleSheet("color: #10b981; font-weight: bold; font-size: 12pt; text-align: center;")
+        self.analyze_bat2_label = QLabel("12.00 V", self)
+        self.analyze_bat2_label.setStyleSheet("color: #10b981; font-weight: bold; font-size: 12pt; text-align: center;")
+
+        def _add_analyze_indicator_row(cells: list[QWidget]) -> None:
+            row = QWidget(self)
+            row_layout = QHBoxLayout(row)
+            row_layout.setContentsMargins(0, 0, 0, 0)
+            row_layout.setSpacing(6)
+            for cell in cells:
+                row_layout.addWidget(cell, 1)
+            analyze_indicator.layout().addWidget(row)
+
+        _add_analyze_indicator_row([_make_live_stat_cell(self, "Mode", self.analyze_mode_label)])
+        _add_analyze_indicator_row([_make_live_stat_cell(self, "GPS Speed (m/s)", self.analyze_speed_label)])
+        _add_analyze_indicator_row([
+            _make_live_stat_cell(self, "Track WP", self.analyze_track_wp_label),
+            _make_live_stat_cell(self, "Distance WP (m)", self.analyze_dist_wp_label),
+        ])
+        _add_analyze_indicator_row([
+            _make_live_stat_cell(self, "Yaw (°)", self.analyze_yaw_label_ind),
+            _make_live_stat_cell(self, "Heading Setpoint (°)", self.analyze_hdg_sp_label),
+            _make_live_stat_cell(self, "Heading Error (°)", self.analyze_hdg_err_label),
+        ])
+        _add_analyze_indicator_row([
+            _make_live_stat_cell(self, "Rudder Cmd (°)", self.analyze_rudder_cmd_label),
+            _make_live_stat_cell(self, "Rudder 1 (°)", self.analyze_rud1_label),
+            _make_live_stat_cell(self, "Rudder 2 (°)", self.analyze_rud2_label),
+        ])
+        _add_analyze_indicator_row([
+            _make_live_stat_cell(self, "RPM Propeller 1", self.analyze_rpm1_label),
+            _make_live_stat_cell(self, "RPM Propeller 2", self.analyze_rpm2_label),
+        ])
+        _add_analyze_indicator_row([
+            _make_live_stat_cell(self, "Battery Control", self.analyze_bat1_label),
+            _make_live_stat_cell(self, "Battery Motor", self.analyze_bat2_label),
+        ])
+
+        analyze_indicator_panel.layout().addWidget(analyze_indicator)
+        analyze_right_placeholder.layout().addWidget(analyze_indicator_panel, 1)
+
         analyze_right_panel.layout().addWidget(analyze_right_placeholder)
-        
-        analyze_tab.layout().addWidget(analyze_left_panel, 4)
+
+        analyze_tab.layout().addWidget(analyze_left_panel, 3)
         analyze_tab.layout().addWidget(analyze_right_panel, 1)
         
         # Tambahkan tab ke tab widget utama
@@ -2168,6 +2282,13 @@ class MainWindow(QMainWindow):
             QPushButton:hover { background-color: #2563eb; }
             QPushButton:checked { background-color: #ef4444; }
             QPushButton:disabled { background-color: #6b7280; color: #d1d5db; }
+            """
+        )
+        analyze_indicator_panel.setStyleSheet(
+            """
+            QGroupBox { background: #1f2937; border: 1px solid #374151; border-radius: 10px; }
+            QGroupBox::title { color: #e5e7eb; }
+            QLabel { color: #e5e7eb; }
             """
         )
         # Apply dark style to Map Points right panel table
@@ -2643,51 +2764,115 @@ class MainWindow(QMainWindow):
         print("[PLOTS] All plots cleared")
     
     def clear_analyze_plots(self):
-        """
-        Clear semua data plot pada tab Analyze.
-        """
-        self.analyze_rpm_time_data.clear()
+        """Clear semua data plot dan panel pada tab Analyze."""
+        self.analyze_time_data.clear()
+        self.analyze_lat_data.clear()
+        self.analyze_lon_data.clear()
+        self.analyze_speed_data.clear()
+        self.analyze_rud1_sensor_data.clear()
+        self.analyze_rud2_sensor_data.clear()
+        self.analyze_yaw_data.clear()
+        self.analyze_heading_sp_data.clear()
+        self.analyze_heading_error_data.clear()
+        self.analyze_rudder_cmd_data.clear()
+        self.analyze_track_wp_data.clear()
+        self.analyze_dist_wp_data.clear()
         self.analyze_rpm1_data.clear()
         self.analyze_rpm2_data.clear()
-        self.analyze_rpm1_curve.setData([], [])
-        self.analyze_rpm2_curve.setData([], [])
-        
-        self.analyze_attitude_time_data.clear()
-        self.analyze_roll_data.clear()
-        self.analyze_pitch_data.clear()
-        self.analyze_roll_curve.setData([], [])
-        self.analyze_pitch_curve.setData([], [])
-        
-        self.analyze_yaw_time_data.clear()
-        self.analyze_yaw_data.clear()
-        self.analyze_zigzag_yaw_data.clear()
-        self.analyze_yaw_curve.setData([], [])
-        self.analyze_zigzag_yaw_curve.setData([], [])
-        self._hide_analyze_yaw_marker()
-        
-        self.analyze_rudder_time_data.clear()
-        self.analyze_rud1_data.clear()
-        self.analyze_rud2_data.clear()
-        self.analyze_rud1_curve.setData([], [])
-        self.analyze_rud2_curve.setData([], [])
-        
-        # Clear map overlays
-        self.analyze_map_time_data.clear()
+        self.analyze_bat1_data.clear()
+        self.analyze_bat2_data.clear()
+        self.analyze_mode_auto_data.clear()
         self.analyze_map_coords.clear()
         self.analyze_heading_values.clear()
+
+        self.analyze_yaw_curve.setData([], [])
+        self.analyze_heading_sp_curve.setData([], [])
+        self.analyze_rudder1_cmd_curve.setData([], [])
+        self.analyze_rudder1_sensor_curve.setData([], [])
+        self.analyze_rudder2_cmd_curve.setData([], [])
+        self.analyze_rudder2_sensor_curve.setData([], [])
+        self._hide_analyze_yaw_marker()
+        self._hide_analyze_rudder1_marker()
+        self._hide_analyze_rudder2_marker()
+
         self.analyze_map_webview.clear_markers()
         self.analyze_map_webview.trail_coords = []
         self.analyze_map_webview.marker_count = 0
-        
+
         if hasattr(self, "analyze_time_slider"):
-            max_default = 500 * (getattr(self, "analyze_time_slider_scale", 1))
+            max_default = 500 * getattr(self, "analyze_time_slider_scale", 1)
             self.analyze_time_slider.setRange(0, max_default)
             self.analyze_time_slider.setValue(0)
             self._update_analyze_slider_display(0)
-            self._hide_analyze_rpm_marker()
-            self._hide_analyze_attitude_marker()
-            self._hide_analyze_yaw_marker()
-            self._hide_analyze_rudder_marker()
+
+    def _analyze_index_at_timestamp(self, timestamp: float) -> int:
+        if not self.analyze_time_data:
+            return -1
+        idx = bisect_left(self.analyze_time_data, timestamp)
+        if idx >= len(self.analyze_time_data):
+            idx = len(self.analyze_time_data) - 1
+        elif idx > 0 and idx < len(self.analyze_time_data):
+            prev_time = self.analyze_time_data[idx - 1]
+            curr_time = self.analyze_time_data[idx]
+            if abs(timestamp - prev_time) <= abs(curr_time - timestamp):
+                idx -= 1
+        return max(0, idx)
+
+    def _update_analyze_indicators(self, idx: int) -> None:
+        if idx < 0 or idx >= len(self.analyze_time_data):
+            return
+        try:
+            self.analyze_speed_label.setText(f"{self.analyze_speed_data[idx]:.2f} m/s")
+            self.analyze_track_wp_label.setText(_format_track_wp_index(self.analyze_track_wp_data[idx]))
+            if self.analyze_track_wp_data[idx] == 0:
+                self.analyze_dist_wp_label.setText("— m")
+            else:
+                self.analyze_dist_wp_label.setText(f"{self.analyze_dist_wp_data[idx]:.1f} m")
+            self.analyze_yaw_label_ind.setText(f"{self.analyze_yaw_data[idx]:.1f}°")
+            self.analyze_hdg_sp_label.setText(f"{self.analyze_heading_sp_data[idx]:.1f}°")
+            self.analyze_hdg_err_label.setText(f"{self.analyze_heading_error_data[idx]:.1f}°")
+            self.analyze_rudder_cmd_label.setText(f"{self.analyze_rudder_cmd_data[idx]:.1f}°")
+            self.analyze_rud1_label.setText(f"{self.analyze_rud1_sensor_data[idx]:.1f}°")
+            self.analyze_rud2_label.setText(f"{self.analyze_rud2_sensor_data[idx]:.1f}°")
+            self.analyze_rpm1_label.setText(f"{int(self.analyze_rpm1_data[idx])} RPM")
+            self.analyze_rpm2_label.setText(f"{int(self.analyze_rpm2_data[idx])} RPM")
+        except Exception:
+            pass
+
+        def _bat_color(voltage: float) -> str:
+            if voltage < 10.5:
+                return '#ef4444'
+            if voltage < 11.5:
+                return '#f59e0b'
+            return '#10b981'
+
+        mode_descriptions = {0: "Manual", 1: "Auto Alg 1", 2: "Auto Alg 2"}
+        mode_colors = {0: "#6b7280", 1: "#10b981", 2: "#3b82f6"}
+        try:
+            mode_int = int(self.analyze_mode_auto_data[idx])
+            mode_text = mode_descriptions.get(mode_int, f"Unknown ({mode_int})")
+            mode_color = mode_colors.get(mode_int, "#6b7280")
+            self.analyze_mode_label.setText(mode_text)
+            self.analyze_mode_label.setStyleSheet(
+                f"color: {mode_color}; font-weight: bold; font-size: 13pt; text-align: center;")
+            v1 = float(self.analyze_bat1_data[idx])
+            v2 = float(self.analyze_bat2_data[idx])
+            self.analyze_bat1_label.setText(f"{v1:.2f} V")
+            self.analyze_bat2_label.setText(f"{v2:.2f} V")
+            self.analyze_bat1_label.setStyleSheet(
+                f"color: {_bat_color(v1)}; font-weight: bold; font-size: 12pt; text-align: center;")
+            self.analyze_bat2_label.setStyleSheet(
+                f"color: {_bat_color(v2)}; font-weight: bold; font-size: 12pt; text-align: center;")
+        except Exception:
+            pass
+
+    def _update_analyze_at_timestamp(self, timestamp: float) -> None:
+        self._update_analyze_yaw_marker(timestamp)
+        self._update_analyze_rudder1_marker(timestamp)
+        self._update_analyze_rudder2_marker(timestamp)
+        self._update_analyze_map_marker(timestamp)
+        idx = self._analyze_index_at_timestamp(timestamp)
+        self._update_analyze_indicators(idx)
 
     def _update_analyze_slider_display(self, value: int | None = None):
         """
@@ -2704,9 +2889,7 @@ class MainWindow(QMainWindow):
             self.analyze_time_value_label.setText(f"Timestamp: {seconds:.3f} s")
     
     def _on_analyze_time_slider_changed(self, value: int):
-        """
-        Pastikan slider hanya berada di kelipatan step dari nilai minimum.
-        """
+        """Snap slider ke step dan update plot, peta, panel indikator."""
         if not hasattr(self, "analyze_time_slider"):
             return
         snapped_value = self._snap_analyze_slider_value(value)
@@ -2717,16 +2900,9 @@ class MainWindow(QMainWindow):
         self._update_analyze_slider_display(snapped_value)
         scale = getattr(self, "analyze_time_slider_scale", 1)
         seconds = snapped_value / scale if scale else float(snapped_value)
-        self._update_analyze_rpm_marker(seconds)
-        self._update_analyze_attitude_marker(seconds)
-        self._update_analyze_yaw_marker(seconds)
-        self._update_analyze_rudder_marker(seconds)
-        self._update_analyze_map_marker(seconds)
-    
+        self._update_analyze_at_timestamp(seconds)
+
     def _snap_analyze_slider_value(self, value: int) -> int:
-        """
-        Hitung nilai slider terdekat dengan kelipatan step berbasis minimum.
-        """
         if not hasattr(self, "analyze_time_slider"):
             return value
         step = getattr(self, "analyze_time_slider_step", 1)
@@ -2737,31 +2913,8 @@ class MainWindow(QMainWindow):
         snapped_relative = round(relative / step) * step
         return slider_min + snapped_relative
 
-    def _on_analyze_rpm_mouse_moved(self, event):
-        """
-        Tampilkan crosshair dan label nilai saat kursor bergerak di atas plot Analyze RPM.
-        """
-        if not hasattr(self, "analyze_rpm_plot_widget"):
-            return
-        if isinstance(event, tuple):
-            event = event[0]
-        scene_bounds = self.analyze_rpm_plot_widget.sceneBoundingRect()
-        if event is None or not scene_bounds.contains(event):
-            self.analyze_rpm_label.hide()
-            self.analyze_rpm_target.hide()
-            return
-        mouse_point = self.analyze_rpm_plot_widget.plotItem.vb.mapSceneToView(event)
-        x_val = mouse_point.x()
-        y_val = mouse_point.y()
-        rpm1 = self._interpolate_analyze_series_value(self.analyze_rpm_time_data, self.analyze_rpm1_data, x_val)
-        rpm2 = self._interpolate_analyze_series_value(self.analyze_rpm_time_data, self.analyze_rpm2_data, x_val)
-        self._display_analyze_rpm_marker(x_val, rpm1, rpm2, mouse_point.y())
-
     @staticmethod
     def _interpolate_analyze_series_value(time_data: list[float], value_data: list[float], x_value: float) -> float | None:
-        """
-        Ambil nilai pada kurva Analyze RPM terdekat dengan posisi kursor menggunakan interpolasi linear.
-        """
         if not time_data or not value_data:
             return None
         index = bisect_left(time_data, x_value)
@@ -2778,210 +2931,144 @@ class MainWindow(QMainWindow):
         ratio = (x_value - x0) / (x1 - x0)
         return y0 + ratio * (y1 - y0)
 
-    def _update_analyze_rpm_marker(self, timestamp: float | None = None):
-        """
-        Update posisi TargetItem Analyze RPM berdasarkan timestamp (misal dari slider).
-        """
-        if not hasattr(self, "analyze_rpm_plot_widget"):
-            return
-        if timestamp is None:
-            if not hasattr(self, "analyze_time_slider"):
-                return
-            scale = getattr(self, "analyze_time_slider_scale", 1)
-            value = self.analyze_time_slider.value()
-            timestamp = value / scale if scale else float(value)
-        if not self.analyze_rpm_time_data:
-            self._hide_analyze_rpm_marker()
-            return
-        rpm1 = self._interpolate_analyze_series_value(self.analyze_rpm_time_data, self.analyze_rpm1_data, timestamp)
-        rpm2 = self._interpolate_analyze_series_value(self.analyze_rpm_time_data, self.analyze_rpm2_data, timestamp)
-        self._display_analyze_rpm_marker(timestamp, rpm1, rpm2, rpm1)
-
-    def _display_analyze_rpm_marker(self, x_val: float, rpm1: float | None, rpm2: float | None, y_val: float | None):
-        """
-        Tampilkan marker + label Analyze RPM menggunakan nilai yang diberikan.
-        """
-        if not hasattr(self, "analyze_rpm_label") or not hasattr(self, "analyze_rpm_target"):
-            return
-        if rpm1 is None and rpm2 is None:
-            self._hide_analyze_rpm_marker()
-            return
-        label_lines = [f"t={x_val:.3f} s"]
-        if rpm1 is not None:
-            label_lines.append(f"RPM1: {rpm1:.0f}")
-        if rpm2 is not None:
-            label_lines.append(f"RPM2: {rpm2:.0f}")
-        label_text = "\n".join(label_lines)
-        if y_val is None:
-            y_val = rpm1 if rpm1 is not None else rpm2
-        if y_val is None:
-            self._hide_analyze_rpm_marker()
-            return
-        self.analyze_rpm_label.setText(label_text)
-        self.analyze_rpm_label.setPos(x_val, y_val)
-        self.analyze_rpm_label.show()
-        self.analyze_rpm_target.setPos(x_val, y_val)
-        self.analyze_rpm_target.show()
-
-    def _hide_analyze_rpm_marker(self):
-        """
-        Sembunyikan marker & label Analyze RPM.
-        """
-        if hasattr(self, "analyze_rpm_label"):
-            self.analyze_rpm_label.hide()
-        if hasattr(self, "analyze_rpm_target"):
-            self.analyze_rpm_target.hide()
-
-    def _update_analyze_attitude_marker(self, timestamp: float | None = None):
-        """
-        Update posisi marker Roll/Pitch sesuai timestamp (slider Analyze).
-        """
-        if not hasattr(self, "analyze_attitude_plot_widget"):
-            return
-        if timestamp is None:
-            if not hasattr(self, "analyze_time_slider"):
-                return
-            scale = getattr(self, "analyze_time_slider_scale", 1)
-            value = self.analyze_time_slider.value()
-            timestamp = value / scale if scale else float(value)
-        if not self.analyze_attitude_time_data:
-            self._hide_analyze_attitude_marker()
-            return
-        roll = self._interpolate_analyze_series_value(self.analyze_attitude_time_data, self.analyze_roll_data, timestamp)
-        pitch = self._interpolate_analyze_series_value(self.analyze_attitude_time_data, self.analyze_pitch_data, timestamp)
-        y_val = roll if roll is not None else pitch
-        self._display_analyze_attitude_marker(timestamp, roll, pitch, y_val)
-
-    def _display_analyze_attitude_marker(self, x_val: float, roll: float | None, pitch: float | None, y_val: float | None):
-        """
-        Tampilkan marker/label Roll & Pitch.
-        """
-        if not hasattr(self, "analyze_attitude_label") or not hasattr(self, "analyze_attitude_target"):
-            return
-        if roll is None and pitch is None:
-            self._hide_analyze_attitude_marker()
-            return
-        if y_val is None:
-            y_val = roll if roll is not None else pitch
-        if y_val is None:
-            self._hide_analyze_attitude_marker()
-            return
-        label_lines = [f"t={x_val:.3f} s"]
-        if roll is not None:
-            label_lines.append(f"Roll: {roll:.2f}°")
-        if pitch is not None:
-            label_lines.append(f"Pitch: {pitch:.2f}°")
-        self.analyze_attitude_label.setText("\n".join(label_lines))
-        self.analyze_attitude_label.setPos(x_val, y_val)
-        self.analyze_attitude_label.show()
-        self.analyze_attitude_target.setPos(x_val, y_val)
-        self.analyze_attitude_target.show()
-        if hasattr(self, "analyze_pitch_target"):
-            if pitch is not None:
-                self.analyze_pitch_target.setPos(x_val, pitch)
-                self.analyze_pitch_target.show()
-            else:
-                self.analyze_pitch_target.hide()
-
-    def _hide_analyze_attitude_marker(self):
-        """
-        Sembunyikan marker/label Roll & Pitch.
-        """
-        if hasattr(self, "analyze_attitude_label"):
-            self.analyze_attitude_label.hide()
-        if hasattr(self, "analyze_attitude_target"):
-            self.analyze_attitude_target.hide()
-        if hasattr(self, "analyze_pitch_target"):
-            self.analyze_pitch_target.hide()
-
     def _update_analyze_yaw_marker(self, timestamp: float | None = None):
-        """
-        Update posisi marker Yaw & Zigzag sesuai timestamp slider Analyze.
-        """
         if not hasattr(self, "analyze_yaw_plot_widget"):
             return
         if timestamp is None:
-            if not hasattr(self, "analyze_time_slider"):
-                return
             scale = getattr(self, "analyze_time_slider_scale", 1)
-            value = self.analyze_time_slider.value()
-            timestamp = value / scale if scale else float(value)
-        if not self.analyze_yaw_time_data:
+            timestamp = self.analyze_time_slider.value() / scale if scale else 0.0
+        if not self.analyze_time_data:
             self._hide_analyze_yaw_marker()
             return
-        yaw_val = self._interpolate_analyze_series_value(self.analyze_yaw_time_data, self.analyze_yaw_data, timestamp)
-        zigzag_val = self._interpolate_analyze_series_value(self.analyze_yaw_time_data, self.analyze_zigzag_yaw_data, timestamp)
-        self._display_analyze_yaw_marker(timestamp, yaw_val, zigzag_val)
-
-    def _display_analyze_yaw_marker(self, x_val: float, yaw_val: float | None, zigzag_val: float | None):
-        """
-        Tampilkan marker/label Yaw & Zigzag di tab Analyze.
-        """
-        has_label = hasattr(self, "analyze_yaw_label") and hasattr(self, "analyze_yaw_target")
-        if not has_label:
-            return
-        if yaw_val is None and zigzag_val is None:
+        yaw_val = self._interpolate_analyze_series_value(self.analyze_time_data, self.analyze_yaw_data, timestamp)
+        hdg_sp = self._interpolate_analyze_series_value(self.analyze_time_data, self.analyze_heading_sp_data, timestamp)
+        if yaw_val is None and hdg_sp is None:
             self._hide_analyze_yaw_marker()
             return
+        label_lines = [f"t={timestamp:.3f} s"]
         if yaw_val is not None:
-            label_lines = [f"t={x_val:.3f} s", f"Yaw: {yaw_val:.2f}°"]
-            if zigzag_val is not None:
-                label_lines.append(f"Zigzag: {zigzag_val:.2f}°")
+            label_lines.append(f"Yaw: {yaw_val:.2f}°")
+        if hdg_sp is not None:
+            label_lines.append(f"Setpoint: {hdg_sp:.2f}°")
+        y_val = yaw_val if yaw_val is not None else hdg_sp
+        if y_val is not None:
             self.analyze_yaw_label.setText("\n".join(label_lines))
-            self.analyze_yaw_label.setPos(x_val, yaw_val)
+            self.analyze_yaw_label.setPos(timestamp, y_val)
             self.analyze_yaw_label.show()
-            self.analyze_yaw_target.setPos(x_val, yaw_val)
+        if yaw_val is not None:
+            self.analyze_yaw_target.setPos(timestamp, yaw_val)
             self.analyze_yaw_target.show()
         else:
-            self.analyze_yaw_label.hide()
             self.analyze_yaw_target.hide()
-        if hasattr(self, "analyze_zigzag_target"):
-            if zigzag_val is not None:
-                self.analyze_zigzag_target.setPos(x_val, zigzag_val)
-                self.analyze_zigzag_target.show()
-            else:
-                self.analyze_zigzag_target.hide()
+        if hdg_sp is not None:
+            self.analyze_heading_sp_target.setPos(timestamp, hdg_sp)
+            self.analyze_heading_sp_target.show()
+        else:
+            self.analyze_heading_sp_target.hide()
 
     def _hide_analyze_yaw_marker(self):
-        """
-        Sembunyikan marker/label Yaw & Zigzag.
-        """
         if hasattr(self, "analyze_yaw_label"):
             self.analyze_yaw_label.hide()
         if hasattr(self, "analyze_yaw_target"):
             self.analyze_yaw_target.hide()
-        if hasattr(self, "analyze_zigzag_target"):
-            self.analyze_zigzag_target.hide()
-    
-    def _update_analyze_map_marker(self, timestamp: float | None = None):
-        """
-        Update posisi marker/heading di peta Analyze sesuai timestamp slider.
-        """
-        if not hasattr(self, "analyze_map_webview"):
-            return
-        if not self.analyze_map_coords:
+        if hasattr(self, "analyze_heading_sp_target"):
+            self.analyze_heading_sp_target.hide()
+
+    def _update_analyze_rudder1_marker(self, timestamp: float | None = None):
+        if not hasattr(self, "analyze_rudder1_plot_widget"):
             return
         if timestamp is None:
-            if not hasattr(self, "analyze_time_slider"):
-                return
             scale = getattr(self, "analyze_time_slider_scale", 1)
-            value = self.analyze_time_slider.value()
-            timestamp = value / scale if scale else float(value)
-        time_series = self.analyze_map_time_data or self.analyze_rpm_time_data
-        if not time_series:
+            timestamp = self.analyze_time_slider.value() / scale if scale else 0.0
+        if not self.analyze_time_data:
+            self._hide_analyze_rudder1_marker()
             return
-        idx = bisect_left(time_series, timestamp)
-        if idx >= len(time_series):
-            idx = len(time_series) - 1
-        elif idx > 0 and idx < len(time_series):
-            prev_time = time_series[idx - 1]
-            curr_time = time_series[idx]
-            if abs(timestamp - prev_time) <= abs(curr_time - timestamp):
-                idx -= 1
-        if idx < 0:
-            idx = 0
-        if idx >= len(self.analyze_map_coords):
-            idx = len(self.analyze_map_coords) - 1
+        cmd = self._interpolate_analyze_series_value(self.analyze_time_data, self.analyze_rudder_cmd_data, timestamp)
+        sensor = self._interpolate_analyze_series_value(self.analyze_time_data, self.analyze_rud1_sensor_data, timestamp)
+        if cmd is None and sensor is None:
+            self._hide_analyze_rudder1_marker()
+            return
+        label_lines = [f"t={timestamp:.3f} s"]
+        if cmd is not None:
+            label_lines.append(f"Cmd: {cmd:.2f}°")
+        if sensor is not None:
+            label_lines.append(f"Sensor: {sensor:.2f}°")
+        y_val = cmd if cmd is not None else sensor
+        if y_val is not None:
+            self.analyze_rudder1_label.setText("\n".join(label_lines))
+            self.analyze_rudder1_label.setPos(timestamp, y_val)
+            self.analyze_rudder1_label.show()
+        if cmd is not None:
+            self.analyze_rudder1_cmd_target.setPos(timestamp, cmd)
+            self.analyze_rudder1_cmd_target.show()
+        else:
+            self.analyze_rudder1_cmd_target.hide()
+        if sensor is not None:
+            self.analyze_rudder1_sensor_target.setPos(timestamp, sensor)
+            self.analyze_rudder1_sensor_target.show()
+        else:
+            self.analyze_rudder1_sensor_target.hide()
+
+    def _hide_analyze_rudder1_marker(self):
+        if hasattr(self, "analyze_rudder1_label"):
+            self.analyze_rudder1_label.hide()
+        if hasattr(self, "analyze_rudder1_cmd_target"):
+            self.analyze_rudder1_cmd_target.hide()
+        if hasattr(self, "analyze_rudder1_sensor_target"):
+            self.analyze_rudder1_sensor_target.hide()
+
+    def _update_analyze_rudder2_marker(self, timestamp: float | None = None):
+        if not hasattr(self, "analyze_rudder2_plot_widget"):
+            return
+        if timestamp is None:
+            scale = getattr(self, "analyze_time_slider_scale", 1)
+            timestamp = self.analyze_time_slider.value() / scale if scale else 0.0
+        if not self.analyze_time_data:
+            self._hide_analyze_rudder2_marker()
+            return
+        cmd = self._interpolate_analyze_series_value(self.analyze_time_data, self.analyze_rudder_cmd_data, timestamp)
+        sensor = self._interpolate_analyze_series_value(self.analyze_time_data, self.analyze_rud2_sensor_data, timestamp)
+        if cmd is None and sensor is None:
+            self._hide_analyze_rudder2_marker()
+            return
+        label_lines = [f"t={timestamp:.3f} s"]
+        if cmd is not None:
+            label_lines.append(f"Cmd: {cmd:.2f}°")
+        if sensor is not None:
+            label_lines.append(f"Sensor: {sensor:.2f}°")
+        y_val = cmd if cmd is not None else sensor
+        if y_val is not None:
+            self.analyze_rudder2_label.setText("\n".join(label_lines))
+            self.analyze_rudder2_label.setPos(timestamp, y_val)
+            self.analyze_rudder2_label.show()
+        if cmd is not None:
+            self.analyze_rudder2_cmd_target.setPos(timestamp, cmd)
+            self.analyze_rudder2_cmd_target.show()
+        else:
+            self.analyze_rudder2_cmd_target.hide()
+        if sensor is not None:
+            self.analyze_rudder2_sensor_target.setPos(timestamp, sensor)
+            self.analyze_rudder2_sensor_target.show()
+        else:
+            self.analyze_rudder2_sensor_target.hide()
+
+    def _hide_analyze_rudder2_marker(self):
+        if hasattr(self, "analyze_rudder2_label"):
+            self.analyze_rudder2_label.hide()
+        if hasattr(self, "analyze_rudder2_cmd_target"):
+            self.analyze_rudder2_cmd_target.hide()
+        if hasattr(self, "analyze_rudder2_sensor_target"):
+            self.analyze_rudder2_sensor_target.hide()
+
+    def _update_analyze_map_marker(self, timestamp: float | None = None):
+        if not hasattr(self, "analyze_map_webview") or not self.analyze_map_coords:
+            return
+        if timestamp is None:
+            scale = getattr(self, "analyze_time_slider_scale", 1)
+            timestamp = self.analyze_time_slider.value() / scale if scale else 0.0
+        idx = self._analyze_index_at_timestamp(timestamp)
+        if idx < 0 or idx >= len(self.analyze_map_coords):
+            return
         coords = self.analyze_map_coords[idx]
         heading = self.analyze_heading_values[idx] if idx < len(self.analyze_heading_values) else None
         try:
@@ -2989,60 +3076,6 @@ class MainWindow(QMainWindow):
             self.analyze_map_webview.update_slider_heading_line(coords, heading)
         except Exception:
             pass
-
-    def _update_analyze_rudder_marker(self, timestamp: float | None = None):
-        """
-        Update posisi marker Rudder 1/2 sesuai timestamp (slider Analyze).
-        """
-        if not hasattr(self, "analyze_rudder_plot_widget"):
-            return
-        if timestamp is None:
-            if not hasattr(self, "analyze_time_slider"):
-                return
-            scale = getattr(self, "analyze_time_slider_scale", 1)
-            value = self.analyze_time_slider.value()
-            timestamp = value / scale if scale else float(value)
-        if not self.analyze_rudder_time_data:
-            self._hide_analyze_rudder_marker()
-            return
-        rud1 = self._interpolate_analyze_series_value(self.analyze_rudder_time_data, self.analyze_rud1_data, timestamp)
-        rud2 = self._interpolate_analyze_series_value(self.analyze_rudder_time_data, self.analyze_rud2_data, timestamp)
-        y_val = rud1 if rud1 is not None else rud2
-        self._display_analyze_rudder_marker(timestamp, rud1, rud2, y_val)
-
-    def _display_analyze_rudder_marker(self, x_val: float, rud1: float | None, rud2: float | None, y_val: float | None):
-        """
-        Tampilkan marker/label Rudder 1 & 2.
-        """
-        if not hasattr(self, "analyze_rudder_label") or not hasattr(self, "analyze_rudder_target"):
-            return
-        if rud1 is None and rud2 is None:
-            self._hide_analyze_rudder_marker()
-            return
-        if y_val is None:
-            y_val = rud1 if rud1 is not None else rud2
-        if y_val is None:
-            self._hide_analyze_rudder_marker()
-            return
-        label_lines = [f"t={x_val:.3f} s"]
-        if rud1 is not None:
-            label_lines.append(f"Rudder1: {rud1:.2f}°")
-        if rud2 is not None:
-            label_lines.append(f"Rudder2: {rud2:.2f}°")
-        self.analyze_rudder_label.setText("\n".join(label_lines))
-        self.analyze_rudder_label.setPos(x_val, y_val)
-        self.analyze_rudder_label.show()
-        self.analyze_rudder_target.setPos(x_val, y_val)
-        self.analyze_rudder_target.show()
-
-    def _hide_analyze_rudder_marker(self):
-        """
-        Sembunyikan marker/label Rudder 1 & 2.
-        """
-        if hasattr(self, "analyze_rudder_label"):
-            self.analyze_rudder_label.hide()
-        if hasattr(self, "analyze_rudder_target"):
-            self.analyze_rudder_target.hide()
 
     def refresh_ports(self):
         """
@@ -3316,27 +3349,6 @@ class MainWindow(QMainWindow):
             return value_deg
         return value_deg - correction_deg
 
-    def _apply_rudder_raw_field_correction(
-        self, raw_str: str, enabled: bool, correction_deg: float,
-    ) -> str:
-        if not enabled:
-            return raw_str
-        corrected_deg = float(raw_str) / 100.0 - correction_deg
-        return str(int(round(corrected_deg * 100.0)))
-
-    def _format_telemetry_log_line(self, parts: list[str]) -> str:
-        """Bangun baris log CSV; koreksi rudder opsional pada kolom raw."""
-        log_parts = list(parts)
-        if len(log_parts) < TELEMETRY_COL_COUNT:
-            return ",".join(parts)
-        log_parts[4] = self._apply_rudder_raw_field_correction(
-            log_parts[4], self.rudder1_correction_enabled, self.rudder1_correction_value)
-        log_parts[5] = self._apply_rudder_raw_field_correction(
-            log_parts[5], self.rudder2_correction_enabled, self.rudder2_correction_value)
-        log_parts[9] = self._apply_rudder_raw_field_correction(
-            log_parts[9], self.rudder_cmd_correction_enabled, self.rudder_cmd_correction_value)
-        return ",".join(log_parts)
-
     def _open_live_setup_dialog(self) -> None:
         dialog = LiveRudderSetupDialog(self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
@@ -3422,6 +3434,12 @@ class MainWindow(QMainWindow):
                     )
                     track_wp_index = int(parts[10])
                     distance_to_wp = _telemetry_scale(parts, 11, 10.0)
+                    accel_x = _telemetry_scale(parts, 12)
+                    accel_y = _telemetry_scale(parts, 13)
+                    accel_z = _telemetry_scale(parts, 14)
+                    gyro_x = _telemetry_scale(parts, 15)
+                    gyro_y = _telemetry_scale(parts, 16)
+                    gyro_z = _telemetry_scale(parts, 17)
                     rpm1 = _telemetry_scale(parts, 18)
                     rpm2 = _telemetry_scale(parts, 19)
                     bat1 = _telemetry_scale(parts, 20)
@@ -3460,7 +3478,17 @@ class MainWindow(QMainWindow):
                 # Append raw CSV line to log buffer if logging enabled
                 if self.log_file is not None:
                     try:
-                        self.log_buffer.append(self._format_telemetry_log_line(parts) + "\n")
+                        self.log_buffer.append(
+                            _build_telemetry_log_line(
+                                timestamp, lat, lon, speed,
+                                rud1_sensor, rud2_sensor,
+                                heading, heading_setpoint, heading_error, rudder_cmd,
+                                track_wp_index, distance_to_wp,
+                                accel_x, accel_y, accel_z,
+                                gyro_x, gyro_y, gyro_z,
+                                rpm1, rpm2, bat1, bat2, mode_auto,
+                            )
+                        )
                     except Exception:
                         pass
         except Exception as e:
@@ -3494,14 +3522,7 @@ class MainWindow(QMainWindow):
             try:
                 self.log_file_path = path
                 self.log_file = open(self.log_file_path, 'w', buffering=1, encoding='utf-8')
-                # write header
-                header = (
-                    "timestamp (s),latitude (°),longitude (°),speedMps (raw),Calc_deg_servo_1 (raw),Calc_deg_servo_2 (raw),"
-                    "yaw (raw),heading_setpoint (raw),heading_error (raw),rudder_cmd (raw),track_wp_index,distance_to_wp (raw),"
-                    "accel_x (raw),accel_y (raw),accel_z (raw),gyro_x (raw),gyro_y (raw),gyro_z (raw),"
-                    "rpm_prop_1 (raw),rpm_prop_2 (raw),battery_1 (raw),battery_2 (raw),mode_auto\n"
-                )
-                self.log_file.write(header)
+                self.log_file.write(TELEMETRY_LOG_HEADER)
                 self.log_buffer.clear()
                 self.log_timer.start()
                 self.log_btn.setText("Stop Log")
@@ -3565,10 +3586,7 @@ class MainWindow(QMainWindow):
             pass
     
     def load_analyze_csv(self):
-        """
-        Load file CSV hasil rekaman tab pertama, tampilkan di terminal,
-        dan isi grafik pada tab Analyze.
-        """
+        """Load CSV rekaman (display v23, raw v23, atau legacy) ke tab Analyze."""
         path, _ = QFileDialog.getOpenFileName(self, "Load Recorded CSV", "", "CSV Files (*.csv)")
         if not path:
             return
@@ -3578,85 +3596,68 @@ class MainWindow(QMainWindow):
         except Exception as e:
             QMessageBox.critical(self, "Load CSV Error", f"Gagal membaca file:\n{e}")
             return
-        
-        # Print ulang isi file dengan format CSV original
-        # print(f"[ANALYZE] Loading CSV: {path}")
-        # for line in csv_text.splitlines():
-        #     print(line)
-        
-        # Parse dan isi grafik + peta Analyze
+
         try:
             reader = csv.DictReader(io.StringIO(csv_text))
             if not reader.fieldnames:
                 raise ValueError("Header CSV tidak ditemukan")
-            
+
             self.clear_analyze_plots()
-
-            fields = set(reader.fieldnames or [])
-            is_v23 = "heading_setpoint (raw)" in fields
-
+            fmt = _detect_analyze_csv_format(set(reader.fieldnames or []))
             row_count = 0
+            loaded = 0
+
             for row in reader:
                 row_count += 1
-                try:
-                    timestamp = float(_csv_row_value(row, "timestamp (s)", "timestamp"))
-                    lat = float(_csv_row_value(row, "latitude (°)", "latitude"))
-                    lon = float(_csv_row_value(row, "longitude (°)", "longitude"))
-                    if is_v23:
-                        rpm1 = float(_csv_row_value(row, "rpm_prop_1 (raw)", "rpm_prop_1")) / 100.0
-                        rpm2 = float(_csv_row_value(row, "rpm_prop_2 (raw)", "rpm_prop_2")) / 100.0
-                        rud1 = float(_csv_row_value(row, "Calc_deg_servo_1 (raw)", "Calc_deg_servo_1")) / 100.0
-                        rud2 = float(_csv_row_value(row, "Calc_deg_servo_2 (raw)", "Calc_deg_servo_2")) / 100.0
-                        yaw = float(_csv_row_value(row, "yaw (raw)", "yaw")) / 100.0
-                        zigzag_yaw = float(_csv_row_value(row, "heading_setpoint (raw)", "heading_setpoint")) / 100.0
-                        roll = 0.0
-                        pitch = 0.0
-                    else:
-                        roll = float(_csv_row_value(row, "roll (°)", "roll"))
-                        pitch = float(_csv_row_value(row, "pitch (°)", "pitch"))
-                        yaw = float(_csv_row_value(row, "yaw (°)", "yaw"))
-                        zigzag_yaw = float(_csv_row_value(row, "zigzag_yaw (°)", "zigzag_yaw"))
-                        rpm1 = float(_csv_row_value(row, "rpm_prop_1 (rpm)", "rpm_prop_1"))
-                        rpm2 = float(_csv_row_value(row, "rpm_prop_2 (rpm)", "rpm_prop_2"))
-                        rud1 = float(_csv_row_value(row, "Calc_deg_servo_1 (°)", "Calc_deg_servo_1"))
-                        rud2 = float(_csv_row_value(row, "Calc_deg_servo_2 (°)", "Calc_deg_servo_2"))
-                except ValueError:
+                parsed = _parse_analyze_csv_row(row, fmt)
+                if parsed is None:
                     continue
-                
+
+                lat = parsed["lat"]
+                lon = parsed["lon"]
                 if lat == 0.0 and lon == 0.0:
                     lat = self.base_lat
                     lon = self.base_lon
                 if not (-90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0):
                     continue
-                
-                self.analyze_rpm_time_data.append(timestamp)
-                self.analyze_rpm1_data.append(rpm1)
-                self.analyze_rpm2_data.append(rpm2)
-                
-                self.analyze_attitude_time_data.append(timestamp)
-                self.analyze_roll_data.append(roll)
-                self.analyze_pitch_data.append(pitch)
-                
-                self.analyze_yaw_time_data.append(timestamp)
-                self.analyze_yaw_data.append(yaw)
-                self.analyze_zigzag_yaw_data.append(zigzag_yaw)
-                
-                self.analyze_rudder_time_data.append(timestamp)
-                self.analyze_rud1_data.append(rud1)
-                self.analyze_rud2_data.append(rud2)
-                
-                self.analyze_map_time_data.append(timestamp)
+
+                ts = parsed["timestamp"]
+                self.analyze_time_data.append(ts)
+                self.analyze_lat_data.append(lat)
+                self.analyze_lon_data.append(lon)
+                self.analyze_speed_data.append(parsed["speed"])
+                self.analyze_rud1_sensor_data.append(parsed["rud1_sensor"])
+                self.analyze_rud2_sensor_data.append(parsed["rud2_sensor"])
+                self.analyze_yaw_data.append(parsed["yaw"])
+                self.analyze_heading_sp_data.append(parsed["heading_setpoint"])
+                self.analyze_heading_error_data.append(parsed["heading_error"])
+                self.analyze_rudder_cmd_data.append(parsed["rudder_cmd"])
+                self.analyze_track_wp_data.append(parsed["track_wp_index"])
+                self.analyze_dist_wp_data.append(parsed["distance_to_wp"])
+                self.analyze_rpm1_data.append(parsed["rpm1"])
+                self.analyze_rpm2_data.append(parsed["rpm2"])
+                self.analyze_bat1_data.append(parsed["bat1"])
+                self.analyze_bat2_data.append(parsed["bat2"])
+                self.analyze_mode_auto_data.append(parsed["mode_auto"])
                 self.analyze_map_coords.append((lat, lon))
-                self.analyze_heading_values.append(yaw)
-            
-            if row_count == 0 or not self.analyze_rpm_time_data:
+                self.analyze_heading_values.append(parsed["yaw"])
+                loaded += 1
+
+            if loaded == 0:
                 print("[ANALYZE] CSV tidak memiliki baris data siap pakai.")
                 return
-            
+
+            self.analyze_yaw_curve.setData(self.analyze_time_data, self.analyze_yaw_data)
+            self.analyze_heading_sp_curve.setData(self.analyze_time_data, self.analyze_heading_sp_data)
+            self.analyze_rudder1_cmd_curve.setData(self.analyze_time_data, self.analyze_rudder_cmd_data)
+            self.analyze_rudder1_sensor_curve.setData(self.analyze_time_data, self.analyze_rud1_sensor_data)
+            self.analyze_rudder2_cmd_curve.setData(self.analyze_time_data, self.analyze_rudder_cmd_data)
+            self.analyze_rudder2_sensor_curve.setData(self.analyze_time_data, self.analyze_rud2_sensor_data)
+
             if hasattr(self, "analyze_time_slider"):
                 scale = getattr(self, "analyze_time_slider_scale", 1)
-                slider_min = int(self.analyze_rpm_time_data[0] * scale)
-                slider_max = int(self.analyze_rpm_time_data[-1] * scale)
+                slider_min = int(self.analyze_time_data[0] * scale)
+                slider_max = int(self.analyze_time_data[-1] * scale)
                 if slider_min == slider_max:
                     slider_max = slider_min + 1
                 self.analyze_time_slider.blockSignals(True)
@@ -3664,37 +3665,18 @@ class MainWindow(QMainWindow):
                 self.analyze_time_slider.setValue(slider_min)
                 self.analyze_time_slider.blockSignals(False)
                 self._update_analyze_slider_display(slider_min)
-                first_timestamp = self.analyze_rpm_time_data[0]
-                self._update_analyze_rpm_marker(first_timestamp)
-                self._update_analyze_attitude_marker(first_timestamp)
-                self._update_analyze_yaw_marker(first_timestamp)
-                self._update_analyze_rudder_marker(first_timestamp)
-                self._update_analyze_map_marker(first_timestamp)
-            
-            self.analyze_rpm1_curve.setData(self.analyze_rpm_time_data, self.analyze_rpm1_data)
-            self.analyze_rpm2_curve.setData(self.analyze_rpm_time_data, self.analyze_rpm2_data)
-            
-            self.analyze_roll_curve.setData(self.analyze_attitude_time_data, self.analyze_roll_data)
-            self.analyze_pitch_curve.setData(self.analyze_attitude_time_data, self.analyze_pitch_data)
-            
-            self.analyze_yaw_curve.setData(self.analyze_yaw_time_data, self.analyze_yaw_data)
-            self.analyze_zigzag_yaw_curve.setData(self.analyze_yaw_time_data, self.analyze_zigzag_yaw_data)
-            
-            self.analyze_rud1_curve.setData(self.analyze_rudder_time_data, self.analyze_rud1_data)
-            self.analyze_rud2_curve.setData(self.analyze_rudder_time_data, self.analyze_rud2_data)
-            
+                first_timestamp = self.analyze_time_data[0]
+                self._update_analyze_at_timestamp(first_timestamp)
+
             if self.analyze_map_coords:
                 first_coord = self.analyze_map_coords[0]
                 first_heading = self.analyze_heading_values[0]
-                # Recreate trail starting point
                 self.analyze_map_webview.trail_coords = [first_coord]
                 self.analyze_map_webview.marker_count = 0
-                
-                # Plot semua elemen terlebih dahulu
                 self.analyze_map_webview.add_initial_marker(first_coord, first_heading)
                 if first_heading is not None:
                     self.analyze_map_webview.add_heading_line_segment(first_coord, first_heading)
-                
+
                 last_coord = first_coord
                 last_heading = first_heading
                 for coord, heading in zip(self.analyze_map_coords[1:], self.analyze_heading_values[1:]):
@@ -3703,19 +3685,18 @@ class MainWindow(QMainWindow):
                         self.analyze_map_webview.add_heading_line_segment(coord, heading)
                     last_coord = coord
                     last_heading = heading
-                
-                # Apply visibility (hide trail markers by default, heading/blue per checkbox)
+
                 self._hide_analyze_markers()
                 if not self.analyze_show_blue_line_cb.isChecked():
                     self._hide_analyze_blue_line()
                 if not self.analyze_show_red_line_cb.isChecked():
                     self._hide_analyze_red_line()
-                
+
                 self.analyze_map_webview.folium_map.location = last_coord
                 map_name = self.analyze_map_webview.folium_map.get_name()
                 self.analyze_map_webview.page().runJavaScript(f'{map_name}.setView({list(last_coord)})')
-            
-            print(f"[ANALYZE] Loaded {row_count} rows into graphs and map.")
+
+            print(f"[ANALYZE] Loaded {loaded}/{row_count} rows (format={fmt}) into graphs and map.")
         except Exception as e:
             QMessageBox.critical(self, "Load CSV Error", f"Gagal mem-parsing file:\n{e}")
     
