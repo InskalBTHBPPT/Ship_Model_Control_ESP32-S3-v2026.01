@@ -878,7 +878,9 @@ class MapPointsWebView(MapWebView):
         self._on_change_callback = None
         # Maksimum jumlah marker yang diperbolehkan
         self.max_markers = 10
-        
+        # Home untuk polyline rute (Home → WP1 → WP2 …); di-set dari MainWindow
+        self._route_home_coords: tuple[float, float] | None = None
+
         # Setup click callback
         def on_map_click(lat: float, lon: float):
             """Handler untuk klik peta - akan dipanggil dari JavaScript."""
@@ -974,6 +976,53 @@ class MapPointsWebView(MapWebView):
         label info jumlah waypoint di group Send Way Points.
         """
         self._on_change_callback = callback
+
+    def set_route_home_coords(self, coords: tuple[float, float] | None) -> None:
+        """Set koordinat Home untuk polyline rute biru (Home → waypoint)."""
+        self._route_home_coords = coords
+        self._refresh_click_marker_line()
+
+    def _route_polyline_coords(self) -> list[list[float]]:
+        """Titik polyline: Home (jika ada) lalu semua waypoint klik."""
+        pts: list[list[float]] = []
+        if self._route_home_coords is not None:
+            pts.append([self._route_home_coords[0], self._route_home_coords[1]])
+        for c in self.click_marker_coords:
+            pts.append([c[0], c[1]])
+        return pts
+
+    def _refresh_click_marker_line(self) -> None:
+        """Perbarui garis biru waypoint termasuk segmen Home → WP1."""
+        map_name = self.folium_map.get_name()
+        all_coords = self._route_polyline_coords()
+        if not all_coords:
+            js_code = f"""
+            (function() {{
+                if (window.clickMarkerLine) {{
+                    {map_name}.removeLayer(window.clickMarkerLine);
+                    window.clickMarkerLine = null;
+                }}
+            }})();
+            """
+        else:
+            js_code = f"""
+            (function() {{
+                var allCoords = {all_coords};
+                if (!window.clickMarkerLine) {{
+                    window.clickMarkerLine = L.polyline(allCoords, {{
+                        color: '#3b82f6',
+                        weight: 3,
+                        opacity: 0.8,
+                        lineCap: 'round',
+                        lineJoin: 'round'
+                    }}).addTo({map_name});
+                }} else {{
+                    window.clickMarkerLine.setLatLngs(allCoords);
+                }}
+                window.clickMarkerLine.bringToFront();
+            }})();
+            """
+        self.page().runJavaScript(js_code)
 
     def _notify_change(self):
         """Panggil callback perubahan jika sudah di-set."""
@@ -1076,16 +1125,17 @@ class MapPointsWebView(MapWebView):
             }}
             
             // Redraw semua marker yang tersisa
-            var allCoords = {[list(c) for c in self.click_marker_coords]};
+            var wpCoords = {[list(c) for c in self.click_marker_coords]};
+            var lineCoords = {self._route_polyline_coords()};
             
-            if (allCoords.length > 0) {{
+            if (wpCoords.length > 0) {{
                 // Recreate marker group dan polyline
                 if (!window.clickMarkers) {{
                     window.clickMarkers = L.layerGroup().addTo({map_name});
                 }}
                 
                 // Add markers untuk setiap koordinat yang tersisa
-                allCoords.forEach(function(coord, idx) {{
+                wpCoords.forEach(function(coord, idx) {{
                     var markerNum = idx + 1;
                     var popupContent = '📍 Point ' + markerNum + '\\\\nLat: ' + coord[0].toFixed(6) + '\\\\nLon: ' + coord[1].toFixed(6);
                     
@@ -1104,8 +1154,17 @@ class MapPointsWebView(MapWebView):
                         .bindTooltip('Point ' + markerNum);
                 }});
                 
-                // Recreate polyline dengan koordinat yang tersisa
-                window.clickMarkerLine = L.polyline(allCoords, {{
+                // Recreate polyline (Home → waypoint jika Home sudah di-set)
+                window.clickMarkerLine = L.polyline(lineCoords, {{
+                    color: '#3b82f6',
+                    weight: 3,
+                    opacity: 0.8,
+                    lineCap: 'round',
+                    lineJoin: 'round'
+                }}).addTo({map_name});
+                window.clickMarkerLine.bringToFront();
+            }} else if (lineCoords.length > 0) {{
+                window.clickMarkerLine = L.polyline(lineCoords, {{
                     color: '#3b82f6',
                     weight: 3,
                     opacity: 0.8,
@@ -1115,7 +1174,7 @@ class MapPointsWebView(MapWebView):
                 window.clickMarkerLine.bringToFront();
             }}
             
-            console.log('✅ Marker ' + ({marker_index} + 1) + ' deleted. Remaining markers: ' + allCoords.length);
+            console.log('✅ Marker ' + ({marker_index} + 1) + ' deleted. Remaining markers: ' + wpCoords.length);
         }})();
         """
         self.page().runJavaScript(js_code)
@@ -1323,13 +1382,13 @@ class MapPointsWebView(MapWebView):
             // Open popup secara otomatis
             newMarker.openPopup();
             
-            // Update polyline dengan semua koordinat marker
-            var allCoords = {[list(c) for c in self.click_marker_coords]};
-            window.clickMarkerLine.setLatLngs(allCoords);
+            // Update polyline: Home → WP1 → WP2 …
+            var lineCoords = {self._route_polyline_coords()};
+            window.clickMarkerLine.setLatLngs(lineCoords);
             window.clickMarkerLine.bringToFront();
             
             console.log('✅ Click marker {self.click_marker_count} added at {list(coords)}');
-            console.log('✅ Line updated with {len(self.click_marker_coords)} points');
+            console.log('✅ Line updated with {len(self._route_polyline_coords())} route points');
         }})();
         """
         self.page().runJavaScript(js_code)
@@ -3119,7 +3178,8 @@ class MainWindow(QMainWindow):
         # Update tabel baris 1 (Home)
         self.update_home_point_table()
         
-        # Draw marker Home di peta
+        # Draw marker Home di peta + segmen garis Home → WP1
+        self.map_points_webview.set_route_home_coords(self.home_point_coords)
         self.map_points_webview.add_home_marker(self.home_point_coords)
 
         # Update label info Send Way Points (Home + WP count)
@@ -3177,7 +3237,8 @@ class MainWindow(QMainWindow):
         # Update tabel
         self.update_home_point_table()
         
-        # Hapus marker Home dari peta
+        # Hapus marker Home dari peta dan segmen garis dari Home
+        self.map_points_webview.set_route_home_coords(None)
         self.map_points_webview.remove_home_marker()
 
         # Update label info Send Way Points (Home + WP count)
