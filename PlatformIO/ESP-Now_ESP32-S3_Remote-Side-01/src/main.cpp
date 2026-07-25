@@ -19,7 +19,8 @@
  *
  * Fitur kontrol:
  * - Mode Manual: Kontrol rudder langsung dari RC (CH1)
- * - Mode Auto: auto_track() (stub - hold rudder netral)
+ * - Mode Auto alg 1: waypoint + PD rudder (AUTO_TRACK_ALG=1)
+ * - Mode Auto alg 2: stub kosong (AUTO_TRACK_ALG=2)
  *
  * @author Chandra P - Ship Model Control System
  * @version 1.0 (Remote-Side-01)
@@ -60,6 +61,15 @@ uint8_t user_side_Address[] = {0x94, 0xa9, 0x90, 0x30, 0xab, 0xc0};
 // =====================================================================
 #define WP_MAX_COUNT 10
 #define WP_MSG_TYPE  0xA1
+
+// =====================================================================
+// Pemilihan algoritma auto track (hardcode — ubah sebelum upload)
+// =====================================================================
+#define AUTO_TRACK_ALG 1       // 1 = waypoint haversine + PD, 2 = stub kosong
+#define WP_ARRIVE_M    3.0f    // jarak (m) untuk advance ke waypoint berikutnya
+#define AUTO_TRACK_KP  1.0f    // heading error (deg) -> rudder offset (deg)
+#define AUTO_TRACK_KD  0.05f   // damping dari gyro_z (deg/s)
+#define RUDDER_CMD_MAX 40.0f   // max offset rudder (deg)
 
 typedef struct waypoints_payload {
   uint8_t  msg_type;
@@ -362,7 +372,7 @@ struct DatatoSend {
   uint16_t rpm_prop_2;    // rpm motor propeller 2 (Ã— 100)
   uint16_t battery_1;     // batere for ESP32-S3, Servo, HWT905TTL, Receiver RC, GNSS, Rotary Encoder (Ã— 100)
   uint16_t battery_2;     // batere for motor propeller (Ã— 100)
-  uint8_t mode_auto;      // 0: manual, 1: auto track
+  uint8_t mode_auto;      // 0: manual, 1: auto alg1 (PD track), 2: auto alg2 (stub)
 };
 
 DatatoSend dataToSend;
@@ -654,85 +664,134 @@ static float distanceM(double lat1, double lon1, double lat2, double lon2) {
   return (float)(R * c);
 }
 
-/**
- * @brief Mode Manual - Kontrol rudder langsung dari receiver RC (CH1)
- */
-void rudder_manual() {
-  servo_angle_current_offset = mapFloat(controlInput.rudder, 1000, 1992, -40.0f, 40.0f);
-  servo_angle_current_offset = constrain(servo_angle_current_offset, -40.0f, 40.0f);
+struct TrackTarget {
+  bool     valid;
+  double   lat;
+  double   lon;
+  uint8_t  wp_index_field;  // 1..N waypoint, 255=home
+};
 
-  float calculated_angle = REFERENCE_ANGLE + servo_angle_current_offset;
-  servo_duty = angleToDuty(calculated_angle);
-  ledcWrite(SERVO_RUDDER_pin, servo_duty);
-
+static void set_nav_idle_telemetry() {
   dataToSend.heading_setpoint = dataToSend.yaw;
   dataToSend.heading_error = 0;
-  dataToSend.rudder_cmd = (int16_t)(servo_angle_current_offset * 100.0f);
   dataToSend.track_wp_index = 0;
   dataToSend.distance_to_wp = 0;
 }
 
-void rudder_hold_neutral() {
-  servo_angle_current_offset = 0.0f;
-  servo_duty = angleToDuty(REFERENCE_ANGLE);
+static void apply_rudder_cmd_offset(float offset_deg) {
+  servo_angle_current_offset = constrain(offset_deg, -RUDDER_CMD_MAX, RUDDER_CMD_MAX);
+  const float calculated_angle = REFERENCE_ANGLE + servo_angle_current_offset;
+  servo_duty = angleToDuty(calculated_angle);
   ledcWrite(SERVO_RUDDER_pin, servo_duty);
-  dataToSend.rudder_cmd = 0;
+  dataToSend.rudder_cmd = (int16_t)(servo_angle_current_offset * 100.0f);
 }
 
-void auto_track() {
-  const float yaw_deg = dataToSend.yaw / 100.0f;
+static bool resolve_active_waypoint_target(TrackTarget &out) {
+  out.valid = false;
+  out.lat = 0.0;
+  out.lon = 0.0;
+  out.wp_index_field = 0;
 
   if (!g_hasWaypoints) {
-    rudder_hold_neutral();
-    dataToSend.heading_setpoint = dataToSend.yaw;
-    dataToSend.heading_error = 0;
-    dataToSend.track_wp_index = 0;
-    dataToSend.distance_to_wp = 0;
-    return;
+    return false;
   }
-
-  double tgt_lat = 0.0;
-  double tgt_lon = 0.0;
-  uint8_t wp_index_field = 0;
 
   if (g_lastWaypoints.wp_count > 0) {
     uint8_t idx = g_active_wp_index;
     if (idx >= g_lastWaypoints.wp_count) {
       idx = g_lastWaypoints.wp_count - 1;
     }
-    tgt_lat = g_lastWaypoints.wp_lat[idx];
-    tgt_lon = g_lastWaypoints.wp_lon[idx];
-    wp_index_field = idx + 1;
-  } else if (g_lastWaypoints.home_valid) {
-    tgt_lat = g_lastWaypoints.home_lat;
-    tgt_lon = g_lastWaypoints.home_lon;
-    wp_index_field = 255;
-  } else {
+    out.lat = g_lastWaypoints.wp_lat[idx];
+    out.lon = g_lastWaypoints.wp_lon[idx];
+    out.wp_index_field = idx + 1;
+    out.valid = true;
+    return true;
+  }
+
+  if (g_lastWaypoints.home_valid) {
+    out.lat = g_lastWaypoints.home_lat;
+    out.lon = g_lastWaypoints.home_lon;
+    out.wp_index_field = 255;
+    out.valid = true;
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * @brief Mode Manual - Kontrol rudder langsung dari receiver RC (CH1)
+ */
+void rudder_manual() {
+  servo_angle_current_offset = mapFloat(controlInput.rudder, 1000, 1992, -40.0f, 40.0f);
+  apply_rudder_cmd_offset(servo_angle_current_offset);
+  set_nav_idle_telemetry();
+}
+
+void rudder_hold_neutral() {
+  apply_rudder_cmd_offset(0.0f);
+}
+
+void auto_track_1() {
+  const float yaw_deg = dataToSend.yaw / 100.0f;
+
+  if (!gps.location.isValid()) {
     rudder_hold_neutral();
-    dataToSend.heading_setpoint = dataToSend.yaw;
-    dataToSend.heading_error = 0;
-    dataToSend.track_wp_index = 0;
-    dataToSend.distance_to_wp = 0;
+    set_nav_idle_telemetry();
     return;
   }
 
-  const float bearing = bearingDeg(dataToSend.latitude, dataToSend.longitude, tgt_lat, tgt_lon);
-  const float dist_m = distanceM(dataToSend.latitude, dataToSend.longitude, tgt_lat, tgt_lon);
+  TrackTarget target;
+  if (!resolve_active_waypoint_target(target)) {
+    rudder_hold_neutral();
+    set_nav_idle_telemetry();
+    return;
+  }
+
+  float dist_m = distanceM(
+      dataToSend.latitude, dataToSend.longitude, target.lat, target.lon);
+
+  if (g_lastWaypoints.wp_count > 0 && dist_m < WP_ARRIVE_M) {
+    if (g_active_wp_index + 1 < g_lastWaypoints.wp_count) {
+      g_active_wp_index++;
+      resolve_active_waypoint_target(target);
+      dist_m = distanceM(
+          dataToSend.latitude, dataToSend.longitude, target.lat, target.lon);
+    }
+  }
+
+  const float bearing = bearingDeg(
+      dataToSend.latitude, dataToSend.longitude, target.lat, target.lon);
   const float err = wrapHeadingError(bearing, yaw_deg);
 
-  // TODO: PID rudder_cmd dari heading_error (+ gyro) — sementara hold netral
-  rudder_hold_neutral();
+  const float gyro_z_dps = dataToSend.gyro_z / 100.0f;
+  const float rudder_offset = AUTO_TRACK_KP * err - AUTO_TRACK_KD * gyro_z_dps;
+  apply_rudder_cmd_offset(rudder_offset);
 
   dataToSend.heading_setpoint = (uint16_t)(bearing * 100.0f);
   dataToSend.heading_error = (int16_t)(err * 100.0f);
-  dataToSend.track_wp_index = wp_index_field;
+  dataToSend.track_wp_index = target.wp_index_field;
   dataToSend.distance_to_wp = (uint16_t)(dist_m * 10.0f);
+}
+
+void auto_track_2() {
+  // Stub kosong — rudder netral, telemetry navigasi nol
+  rudder_hold_neutral();
+  dataToSend.heading_setpoint = 0;
+  dataToSend.heading_error = 0;
+  dataToSend.track_wp_index = 0;
+  dataToSend.distance_to_wp = 0;
 }
 
 void check_mode_auto_manual(uint16_t modeautomanual) {
   if (modeautomanual >= 1750) {
-    auto_track();
-    dataToSend.mode_auto = 1;
+    if (AUTO_TRACK_ALG == 1) {
+      auto_track_1();
+      dataToSend.mode_auto = 1;
+    } else {
+      auto_track_2();
+      dataToSend.mode_auto = 2;
+    }
   } else {
     rudder_manual();
     dataToSend.mode_auto = 0;
