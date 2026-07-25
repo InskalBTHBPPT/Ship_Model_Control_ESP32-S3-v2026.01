@@ -29,7 +29,7 @@
  * - Update rate: 10 Hz (setiap 100ms)
  * - Data dikirim dalam format fixed-point (Ã— 100) untuk efisiensi
  * - Struktur data harus sama dengan ESP-Now_ESP32-S3_User-Side (PENDING: penyesuaian)
- * - PENDING: penerimaan waypoint dari User-Side (belum di-port)
+ * - Penerimaan waypoint dari User-Side (dashboard -> User-Side -> ESP-NOW)
  */
 
 #include <Arduino.h>
@@ -48,10 +48,32 @@
  * @brief MAC Address ESP32-S3 User-Side (peer ESP-NOW)
  *
  * @note UBAH MAC ADDRESS INI sesuai MAC User-Side Anda.
- * Penerimaan waypoint dari User-Side: PENDING (belum diimplementasi).
  */
 // uint8_t user_side_Address[] = {0x10, 0x20, 0xba, 0x4c, 0x53, 0xfc};
 uint8_t user_side_Address[] = {0x94, 0xa9, 0x90, 0x30, 0xab, 0xc0};
+
+// =====================================================================
+// Waypoints (diterima dari User-Side). HARUS identik dengan User-Side.
+// Layout 180 byte (< 250 byte limit ESP-NOW):
+//   msg_type, home_valid, wp_count, reserved, home_lat/lon, wp_lat/lon[10]
+// =====================================================================
+#define WP_MAX_COUNT 10
+#define WP_MSG_TYPE  0xA1
+
+typedef struct waypoints_payload {
+  uint8_t  msg_type;
+  uint8_t  home_valid;
+  uint8_t  wp_count;
+  uint8_t  reserved;
+  double   home_lat;
+  double   home_lon;
+  double   wp_lat[WP_MAX_COUNT];
+  double   wp_lon[WP_MAX_COUNT];
+} waypoints_payload;
+
+// Waypoint terakhir; auto_track() akan memakai ini saat diimplementasi.
+static waypoints_payload g_lastWaypoints;
+static bool              g_hasWaypoints = false;
 
 esp_now_peer_info_t peerInfo;  ///< Peer info untuk ESP-NOW communication
 
@@ -68,6 +90,48 @@ esp_now_peer_info_t peerInfo;  ///< Peer info untuk ESP-NOW communication
 void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
   // Serial.print("\r\nLast Packet Send Status:\t");
   // Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
+}
+
+static void printWaypoints(const waypoints_payload &wp) {
+  Serial.print("[WP] msg_type=0x");
+  Serial.print(wp.msg_type, HEX);
+  Serial.print(" home_valid=");
+  Serial.print(wp.home_valid);
+  Serial.print(" count=");
+  Serial.println(wp.wp_count);
+
+  if (wp.home_valid) {
+    Serial.print("[WP] Home: ");
+    Serial.print(wp.home_lat, 6); Serial.print(", ");
+    Serial.println(wp.home_lon, 6);
+  } else {
+    Serial.println("[WP] Home: <none>");
+  }
+
+  uint8_t n = wp.wp_count;
+  if (n > WP_MAX_COUNT) n = WP_MAX_COUNT;
+  for (uint8_t i = 0; i < n; i++) {
+    Serial.print("[WP] #");
+    Serial.print(i + 1);
+    Serial.print(": ");
+    Serial.print(wp.wp_lat[i], 6); Serial.print(", ");
+    Serial.println(wp.wp_lon[i], 6);
+  }
+}
+
+void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len) {
+  if (len == (int)sizeof(waypoints_payload) && incomingData[0] == WP_MSG_TYPE) {
+    memcpy(&g_lastWaypoints, incomingData, sizeof(g_lastWaypoints));
+    g_hasWaypoints = true;
+    Serial.print("[WP] Bytes received from User-Side: ");
+    Serial.println(len);
+    printWaypoints(g_lastWaypoints);
+    Serial.println();
+    return;
+  }
+
+  Serial.print("[WARN] Unknown ESP-NOW payload length: ");
+  Serial.println(len);
 }
 
 // ============================================================================
@@ -571,7 +635,8 @@ void rudder_hold_neutral() {
 }
 
 void auto_track() {
-  // TODO: navigasi waypoint - implementasi nanti
+  // TODO: navigasi waypoint - implementasi nanti (baca g_lastWaypoints / g_hasWaypoints)
+  (void)g_hasWaypoints;
   rudder_hold_neutral();
 }
 
@@ -708,6 +773,8 @@ void setup() {
       Serial.println("Failed to add peer");
       return;
     }
+
+    esp_now_register_recv_cb(esp_now_recv_cb_t(OnDataRecv));
 }
 
 /**
