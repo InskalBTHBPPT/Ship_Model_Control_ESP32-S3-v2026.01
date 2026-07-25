@@ -1536,67 +1536,27 @@ class MainWindow(QMainWindow):
         indicator_panel.layout().addWidget(indicator)
         indicator_panel.layout().addStretch(1)
 
-        # Left: Map panel divided into left_panel_A and left_panel_B (horizontal split)
+        # Left: Map (full height) | 3 plot vertikal (Yaw, Rudder1, Rudder2)
         left_panel = QWidget(self)
         left_panel.setLayout(QHBoxLayout())
         left_panel.layout().setContentsMargins(0, 0, 0, 0)
-        
-        # Left Panel A (left side) - divided into top and bottom (vertical split)
-        left_panel_A = QWidget(self)
-        left_panel_A.setLayout(QVBoxLayout())
-        left_panel_A.layout().setContentsMargins(0, 0, 0, 0)
-        
-        # Left Panel A - Top: Map WebView
-        left_panel_A_top = QWidget(self)
-        left_panel_A_top.setLayout(QVBoxLayout())
-        left_panel_A_top.layout().setContentsMargins(0, 0, 0, 0)
+        left_panel.layout().setSpacing(0)
+
+        left_panel_map = QWidget(self)
+        left_panel_map.setLayout(QVBoxLayout())
+        left_panel_map.layout().setContentsMargins(0, 0, 0, 0)
         self.map_webview = MapWebView((self.base_lat, self.base_lon))
-        left_panel_A_top.layout().addWidget(self.map_webview)
-        
-        # Left Panel A - Bottom
-        left_panel_A_bottom = QWidget(self)
-        left_panel_A_bottom.setLayout(QVBoxLayout())
-        left_panel_A_bottom.layout().setContentsMargins(0, 0, 0, 0)
-        
-        # Rudder 1 plot (Cmd + Sensor) — slot bawah map
-        self.rudder1_plot_widget = pg.PlotWidget()
-        self.rudder1_plot_widget.setLabel('left', 'Angle (°)', color='#e5e7eb', **{'font-size': '11pt'})
-        self.rudder1_plot_widget.setLabel('bottom', 'Time (s)', color='#e5e7eb', **{'font-size': '11pt'})
-        self.rudder1_plot_widget.setTitle('Rudder 1: Cmd + Sensor', color='#e5e7eb', size='11pt')
-        self.rudder1_plot_widget.setBackground('#1f2937')
-        self.rudder1_plot_widget.addLegend(offset=(10, 10))
-        self.rudder1_plot_widget.showGrid(x=False, y=False)
-        self.rudder1_plot_widget.getAxis('left').setPen(pg.mkPen(color='#e5e7eb', width=1))
-        self.rudder1_plot_widget.getAxis('bottom').setPen(pg.mkPen(color='#e5e7eb', width=1))
-        self.rudder1_plot_widget.getAxis('left').setTextPen(pg.mkPen(color='#e5e7eb'))
-        self.rudder1_plot_widget.getAxis('bottom').setTextPen(pg.mkPen(color='#e5e7eb'))
+        left_panel_map.layout().addWidget(self.map_webview)
+
+        left_panel_plots = QWidget(self)
+        left_panel_plots.setLayout(QVBoxLayout())
+        left_panel_plots.layout().setContentsMargins(0, 0, 0, 0)
+        left_panel_plots.layout().setSpacing(0)
 
         self.start_time = time()
         self.max_points = 50
 
-        self.rudder1_time_data = []
-        self.rudder1_cmd_data = []
-        self.rudder1_sensor_data = []
-        self.rudder1_cmd_curve = self.rudder1_plot_widget.plot(
-            name='Rudder Cmd', pen=pg.mkPen(color='#3b82f6', width=2))
-        self.rudder1_sensor_curve = self.rudder1_plot_widget.plot(
-            name='Rudder 1 Sensor', pen=pg.mkPen(color='#ec4899', width=2))
-
-        left_panel_A_bottom.layout().addWidget(self.rudder1_plot_widget)
-        
-        # Add A_top and A_bottom to left_panel_A with equal height
-        left_panel_A.layout().addWidget(left_panel_A_top, 2)
-        left_panel_A.layout().addWidget(left_panel_A_bottom, 1)
-        
-        # Left Panel B — Yaw/Setpoint + Rudder 2 (tanpa Roll/Pitch)
-        left_panel_B = QWidget(self)
-        left_panel_B.setLayout(QVBoxLayout())
-        left_panel_B.layout().setContentsMargins(0, 0, 0, 0)
-
-        left_panel_B_middle = QWidget(self)
-        left_panel_B_middle.setLayout(QVBoxLayout())
-        left_panel_B_middle.layout().setContentsMargins(0, 0, 0, 0)
-
+        # Plot 1 (atas): Yaw + Heading Setpoint
         self.yaw_plot_widget = pg.PlotWidget()
         self.yaw_plot_widget.setLabel('left', 'Heading (°)', color='#e5e7eb', **{'font-size': '11pt'})
         self.yaw_plot_widget.setLabel('bottom', 'Time (s)', color='#e5e7eb', **{'font-size': '11pt'})
@@ -1608,7 +1568,6 @@ class MainWindow(QMainWindow):
         self.yaw_plot_widget.getAxis('bottom').setPen(pg.mkPen(color='#e5e7eb', width=1))
         self.yaw_plot_widget.getAxis('left').setTextPen(pg.mkPen(color='#e5e7eb'))
         self.yaw_plot_widget.getAxis('bottom').setTextPen(pg.mkPen(color='#e5e7eb'))
-
         self.yaw_time_data = []
         self.yaw_data = []
         self.heading_sp_data = []
@@ -1616,12 +1575,27 @@ class MainWindow(QMainWindow):
         self.heading_sp_curve = self.yaw_plot_widget.plot(
             name='Heading Setpoint', pen=pg.mkPen(color='#06b6d4', width=2))
 
-        left_panel_B_middle.layout().addWidget(self.yaw_plot_widget)
+        # Plot 2 (tengah): Rudder 1 Cmd + Sensor
+        self.rudder1_plot_widget = pg.PlotWidget()
+        self.rudder1_plot_widget.setLabel('left', 'Angle (°)', color='#e5e7eb', **{'font-size': '11pt'})
+        self.rudder1_plot_widget.setLabel('bottom', 'Time (s)', color='#e5e7eb', **{'font-size': '11pt'})
+        self.rudder1_plot_widget.setTitle('Rudder 1: Cmd + Sensor', color='#e5e7eb', size='11pt')
+        self.rudder1_plot_widget.setBackground('#1f2937')
+        self.rudder1_plot_widget.addLegend(offset=(10, 10))
+        self.rudder1_plot_widget.showGrid(x=False, y=False)
+        self.rudder1_plot_widget.getAxis('left').setPen(pg.mkPen(color='#e5e7eb', width=1))
+        self.rudder1_plot_widget.getAxis('bottom').setPen(pg.mkPen(color='#e5e7eb', width=1))
+        self.rudder1_plot_widget.getAxis('left').setTextPen(pg.mkPen(color='#e5e7eb'))
+        self.rudder1_plot_widget.getAxis('bottom').setTextPen(pg.mkPen(color='#e5e7eb'))
+        self.rudder1_time_data = []
+        self.rudder1_cmd_data = []
+        self.rudder1_sensor_data = []
+        self.rudder1_cmd_curve = self.rudder1_plot_widget.plot(
+            name='Rudder Cmd', pen=pg.mkPen(color='#3b82f6', width=2))
+        self.rudder1_sensor_curve = self.rudder1_plot_widget.plot(
+            name='Rudder 1 Sensor', pen=pg.mkPen(color='#ec4899', width=2))
 
-        left_panel_B_bottom = QWidget(self)
-        left_panel_B_bottom.setLayout(QVBoxLayout())
-        left_panel_B_bottom.layout().setContentsMargins(0, 0, 0, 0)
-
+        # Plot 3 (bawah): Rudder 2 Cmd + Sensor
         self.rudder2_plot_widget = pg.PlotWidget()
         self.rudder2_plot_widget.setLabel('left', 'Angle (°)', color='#e5e7eb', **{'font-size': '11pt'})
         self.rudder2_plot_widget.setLabel('bottom', 'Time (s)', color='#e5e7eb', **{'font-size': '11pt'})
@@ -1633,7 +1607,6 @@ class MainWindow(QMainWindow):
         self.rudder2_plot_widget.getAxis('bottom').setPen(pg.mkPen(color='#e5e7eb', width=1))
         self.rudder2_plot_widget.getAxis('left').setTextPen(pg.mkPen(color='#e5e7eb'))
         self.rudder2_plot_widget.getAxis('bottom').setTextPen(pg.mkPen(color='#e5e7eb'))
-
         self.rudder2_time_data = []
         self.rudder2_cmd_data = []
         self.rudder2_sensor_data = []
@@ -1642,14 +1615,12 @@ class MainWindow(QMainWindow):
         self.rudder2_sensor_curve = self.rudder2_plot_widget.plot(
             name='Rudder 2 Sensor', pen=pg.mkPen(color='#14b8a6', width=2))
 
-        left_panel_B_bottom.layout().addWidget(self.rudder2_plot_widget)
+        left_panel_plots.layout().addWidget(self.yaw_plot_widget, 1)
+        left_panel_plots.layout().addWidget(self.rudder1_plot_widget, 1)
+        left_panel_plots.layout().addWidget(self.rudder2_plot_widget, 1)
 
-        left_panel_B.layout().addWidget(left_panel_B_middle, 1)
-        left_panel_B.layout().addWidget(left_panel_B_bottom, 1)
-        
-        # Add left_panel_A and left_panel_B to left_panel with equal width
-        left_panel.layout().addWidget(left_panel_A, 1)
-        left_panel.layout().addWidget(left_panel_B, 1)
+        left_panel.layout().addWidget(left_panel_map, 2)
+        left_panel.layout().addWidget(left_panel_plots, 1)
 
         # Assemble right panel with stretch ratio 1:2 (controls : reserved)
         right_panel.layout().addWidget(controls_panel, 1)
