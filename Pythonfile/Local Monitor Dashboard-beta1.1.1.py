@@ -1754,9 +1754,9 @@ class MainWindow(QMainWindow):
 
         left_panel.addWidget(left_panel_map)
         left_panel.addWidget(left_panel_plots)
-        left_panel.setStretchFactor(0, 2)
+        left_panel.setStretchFactor(0, 1)
         left_panel.setStretchFactor(1, 1)
-        left_panel.setSizes([680, 340])
+        left_panel.setSizes([500, 500])
         self.live_map_plots_splitter = left_panel
 
         # Assemble right panel with stretch ratio 1:2 (controls : reserved)
