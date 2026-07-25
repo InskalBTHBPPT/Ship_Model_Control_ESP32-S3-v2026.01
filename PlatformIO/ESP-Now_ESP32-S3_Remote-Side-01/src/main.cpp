@@ -5,7 +5,7 @@
  * @description
  * Firmware sisi kapal (Remote-Side) yang mengumpulkan data sensor dan
  * actuator, menjalankan kontrol rudder/propeller, lalu mengirim telemetry
- * 18-kolom telemetry ke User-Side via ESP-NOW.
+ * 23-kolom telemetry ke User-Side via ESP-NOW.
  *
  * Clone dari ESP_Now_Send_Ver2025_revJan2026.
  *
@@ -39,6 +39,7 @@
 #include <JY901.h>
 #include <esp_now.h>
 #include <WiFi.h>
+#include <math.h>
 
 // ============================================================================
 // ESP-NOW Configuration
@@ -74,6 +75,7 @@ typedef struct waypoints_payload {
 // Waypoint terakhir; auto_track() akan memakai ini saat diimplementasi.
 static waypoints_payload g_lastWaypoints;
 static bool              g_hasWaypoints = false;
+static uint8_t           g_active_wp_index = 0;  // index waypoint aktif (0..wp_count-1)
 
 esp_now_peer_info_t peerInfo;  ///< Peer info untuk ESP-NOW communication
 
@@ -123,6 +125,7 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len) {
   if (len == (int)sizeof(waypoints_payload) && incomingData[0] == WP_MSG_TYPE) {
     memcpy(&g_lastWaypoints, incomingData, sizeof(g_lastWaypoints));
     g_hasWaypoints = true;
+    g_active_wp_index = 0;
     Serial.print("[WP] Bytes received from User-Side: ");
     Serial.println(len);
     printWaypoints(g_lastWaypoints);
@@ -344,6 +347,11 @@ struct DatatoSend {
   int16_t Calc_deg_servo_1; // derajat hasil kalkulasi feedback servo 1 (Ã— 100)
   int16_t Calc_deg_servo_2; // derajat hasil kalkulasi feedback servo 2 (x 100)
   uint16_t yaw;           // derajat yaw (x 100, 0-360 deg)
+  uint16_t heading_setpoint;  // bearing ke waypoint aktif (deg x 100, 0-360)
+  int16_t  heading_error;     // setpoint - yaw, wrap +-180 (deg x 100)
+  int16_t  rudder_cmd;        // perintah rudder offset dari netral (deg x 100, +-40)
+  uint8_t  track_wp_index;    // waypoint aktif: 0=tidak auto, 1..N=WP#, 255=home
+  uint16_t distance_to_wp;    // jarak ke waypoint aktif (meter x 10)
   int16_t accel_x;        // akselerometer X (g x 100)
   int16_t accel_y;        // akselerometer Y (g x 100)
   int16_t accel_z;        // akselerometer Z (g x 100)
@@ -616,6 +624,36 @@ uint32_t microsecondsToDuty(uint16_t microseconds) {
   return duty;
 }
 
+static float wrapHeadingError(float setpointDeg, float currentDeg) {
+  float err = setpointDeg - currentDeg;
+  while (err > 180.0f) err -= 360.0f;
+  while (err < -180.0f) err += 360.0f;
+  return err;
+}
+
+static float bearingDeg(double lat1, double lon1, double lat2, double lon2) {
+  const double dLon = (lon2 - lon1) * (M_PI / 180.0);
+  const double lat1r = lat1 * (M_PI / 180.0);
+  const double lat2r = lat2 * (M_PI / 180.0);
+  const double y = sin(dLon) * cos(lat2r);
+  const double x = cos(lat1r) * sin(lat2r) - sin(lat1r) * cos(lat2r) * cos(dLon);
+  float brng = (float)(atan2(y, x) * (180.0 / M_PI));
+  brng = fmodf(brng + 360.0f, 360.0f);
+  return brng;
+}
+
+static float distanceM(double lat1, double lon1, double lat2, double lon2) {
+  const double R = 6371000.0;
+  const double lat1r = lat1 * (M_PI / 180.0);
+  const double lat2r = lat2 * (M_PI / 180.0);
+  const double dLat = lat2r - lat1r;
+  const double dLon = (lon2 - lon1) * (M_PI / 180.0);
+  const double a = sin(dLat / 2.0) * sin(dLat / 2.0)
+                 + cos(lat1r) * cos(lat2r) * sin(dLon / 2.0) * sin(dLon / 2.0);
+  const double c = 2.0 * atan2(sqrt(a), sqrt(1.0 - a));
+  return (float)(R * c);
+}
+
 /**
  * @brief Mode Manual - Kontrol rudder langsung dari receiver RC (CH1)
  */
@@ -626,18 +664,69 @@ void rudder_manual() {
   float calculated_angle = REFERENCE_ANGLE + servo_angle_current_offset;
   servo_duty = angleToDuty(calculated_angle);
   ledcWrite(SERVO_RUDDER_pin, servo_duty);
+
+  dataToSend.heading_setpoint = dataToSend.yaw;
+  dataToSend.heading_error = 0;
+  dataToSend.rudder_cmd = (int16_t)(servo_angle_current_offset * 100.0f);
+  dataToSend.track_wp_index = 0;
+  dataToSend.distance_to_wp = 0;
 }
 
 void rudder_hold_neutral() {
   servo_angle_current_offset = 0.0f;
   servo_duty = angleToDuty(REFERENCE_ANGLE);
   ledcWrite(SERVO_RUDDER_pin, servo_duty);
+  dataToSend.rudder_cmd = 0;
 }
 
 void auto_track() {
-  // TODO: navigasi waypoint - implementasi nanti (baca g_lastWaypoints / g_hasWaypoints)
-  (void)g_hasWaypoints;
+  const float yaw_deg = dataToSend.yaw / 100.0f;
+
+  if (!g_hasWaypoints) {
+    rudder_hold_neutral();
+    dataToSend.heading_setpoint = dataToSend.yaw;
+    dataToSend.heading_error = 0;
+    dataToSend.track_wp_index = 0;
+    dataToSend.distance_to_wp = 0;
+    return;
+  }
+
+  double tgt_lat = 0.0;
+  double tgt_lon = 0.0;
+  uint8_t wp_index_field = 0;
+
+  if (g_lastWaypoints.wp_count > 0) {
+    uint8_t idx = g_active_wp_index;
+    if (idx >= g_lastWaypoints.wp_count) {
+      idx = g_lastWaypoints.wp_count - 1;
+    }
+    tgt_lat = g_lastWaypoints.wp_lat[idx];
+    tgt_lon = g_lastWaypoints.wp_lon[idx];
+    wp_index_field = idx + 1;
+  } else if (g_lastWaypoints.home_valid) {
+    tgt_lat = g_lastWaypoints.home_lat;
+    tgt_lon = g_lastWaypoints.home_lon;
+    wp_index_field = 255;
+  } else {
+    rudder_hold_neutral();
+    dataToSend.heading_setpoint = dataToSend.yaw;
+    dataToSend.heading_error = 0;
+    dataToSend.track_wp_index = 0;
+    dataToSend.distance_to_wp = 0;
+    return;
+  }
+
+  const float bearing = bearingDeg(dataToSend.latitude, dataToSend.longitude, tgt_lat, tgt_lon);
+  const float dist_m = distanceM(dataToSend.latitude, dataToSend.longitude, tgt_lat, tgt_lon);
+  const float err = wrapHeadingError(bearing, yaw_deg);
+
+  // TODO: PID rudder_cmd dari heading_error (+ gyro) — sementara hold netral
   rudder_hold_neutral();
+
+  dataToSend.heading_setpoint = (uint16_t)(bearing * 100.0f);
+  dataToSend.heading_error = (int16_t)(err * 100.0f);
+  dataToSend.track_wp_index = wp_index_field;
+  dataToSend.distance_to_wp = (uint16_t)(dist_m * 10.0f);
 }
 
 void check_mode_auto_manual(uint16_t modeautomanual) {
