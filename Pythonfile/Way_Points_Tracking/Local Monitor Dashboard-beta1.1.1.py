@@ -27,7 +27,7 @@ Catatan:
 - Parser memproses baris utuh (newline), validasi 23 kolom untuk telemetry
 - Log CSV memakai nilai tampilan (sama seperti panel Live)
 - Snapshot waypoint disimpan ke folder WayPoints/ saat Send to Remote
-- Lihat README.md di folder ini untuk dokumentasi lengkap
+- Lihat Ship Auto Way Maps Points Tracking.md di folder ini untuk dokumentasi lengkap
 """
 
 import csv
@@ -1756,10 +1756,6 @@ class MainWindow(QMainWindow):
         self.home_points_btn.clicked.connect(self.set_home_point_from_serial)
         home_points_btn_group.layout().addWidget(self.home_points_btn)
 
-        self.map_points_setup_btn = QPushButton("Setup", self)
-        self.map_points_setup_btn.clicked.connect(self._open_map_points_setup_dialog)
-        home_points_btn_group.layout().addWidget(self.map_points_setup_btn)
-
         map_points_right_panel.layout().addWidget(home_points_btn_group)
         
         # Table untuk menampilkan marker points di panel kanan
@@ -1880,6 +1876,25 @@ class MainWindow(QMainWindow):
         set_param_group.layout().addWidget(self.set_param_status_label)
 
         map_points_right_panel.layout().addWidget(set_param_group)
+
+        setup_group = QGroupBox("Setup", self)
+        setup_group.setLayout(QVBoxLayout())
+        setup_group.layout().setContentsMargins(12, 12, 12, 12)
+
+        setup_info_label = QLabel(
+            "Algoritma auto track dan parameter tuning Alg 1.\n"
+            "Nilai disimpan di dialog; commit ke kapal via Send to Remote.",
+            self,
+        )
+        setup_info_label.setWordWrap(True)
+        setup_info_label.setStyleSheet("color: #9ca3af; font-size: 10pt; padding: 0 0 6px 0;")
+        setup_group.layout().addWidget(setup_info_label)
+
+        self.map_points_setup_btn = QPushButton("Open Setup", self)
+        self.map_points_setup_btn.clicked.connect(self._open_map_points_setup_dialog)
+        setup_group.layout().addWidget(self.map_points_setup_btn)
+
+        map_points_right_panel.layout().addWidget(setup_group)
         map_points_right_panel.layout().addStretch(1)
 
         # Simpan reference ke map_points_webview untuk update table
@@ -2671,6 +2686,16 @@ class MainWindow(QMainWindow):
             QPushButton:hover { background-color: #2563eb; }
             QPushButton:pressed { background-color: #1d4ed8; }
             QPushButton:disabled { background-color: #6b7280; color: #d1d5db; }
+            """
+        )
+        setup_group.setStyleSheet(
+            """
+            QGroupBox { background: #1f2937; border: 1px solid #374151; border-radius: 10px; margin-top: 8px; }
+            QGroupBox::title { color: #e5e7eb; subcontrol-origin: margin; left: 10px; padding: 0 4px; }
+            QLabel { color: #e5e7eb; }
+            QPushButton { background-color: #6366f1; color: #fff; border-radius: 6px; padding: 6px 10px; }
+            QPushButton:hover { background-color: #4f46e5; }
+            QPushButton:pressed { background-color: #4338ca; }
             """
         )
 

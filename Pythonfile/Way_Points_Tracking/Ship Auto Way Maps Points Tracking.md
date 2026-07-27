@@ -1,4 +1,4 @@
-# Local Monitor Dashboard — Way Points Tracking
+# Ship Auto Way Maps Points Tracking
 
 Dashboard PySide6 untuk monitoring telemetry kapal model secara real-time, perencanaan waypoint, dan pengiriman konfigurasi ke Remote via User-Side ESP32.
 
@@ -30,8 +30,8 @@ Dashboard  --USB serial-->  User-Side ESP32  --ESP-NOW-->  Remote-Side (kapal)
 
 - Klik peta untuk menambah waypoint
 - **Set Home Point** — Home dari koordinat serial terbaru
-- **Setup** — dialog algoritma auto + tuning Alg 1
-- **Send to Remote** — kirim WP + tuning + verifikasi read-back
+- Panel **Send to Remote** — kirim WP + tuning + verifikasi read-back
+- Panel **Setup** (di bawah Send to Remote) — dialog algoritma auto + tuning Alg 1
 - Tabel waypoint + garis route biru di peta
 - Snapshot waypoint ke folder `WayPoints/` (CSV)
 
