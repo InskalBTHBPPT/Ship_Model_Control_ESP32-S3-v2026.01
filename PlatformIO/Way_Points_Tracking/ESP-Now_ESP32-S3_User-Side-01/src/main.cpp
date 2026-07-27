@@ -1,34 +1,23 @@
 /*
   ESP32-S3 User-Side-01 (gateway USB <-> ESP-NOW)
 
-  Peran:
-  - Menerima telemetry 23-kolom dari Remote-Side-01 via ESP-NOW dan
-    meneruskannya ke PC sebagai CSV via Serial (115200 baud).
-  - Menerima command "$WPSET,..." dari PC (dashboard PySide6) via Serial
-    dan meneruskannya ke Remote-Side via ESP-NOW dalam bentuk
-    struct waypoints_payload.
-
-  Protokol kontrol PC -> User-Side (ASCII, diakhiri '\n'):
+  Protokol PC -> User-Side (ASCII, '\n'):
     $WPSET,<home_lat>,<home_lon>,<wp_count>,<lat1>,<lon1>,...,<latN>,<lonN>
+    $TUNSET,<alg>[,<kp>,<kd>,<arrive_m>,<rudder_max>]   ; alg=1 butuh 4 float
+    $TUNGET
 
   Balasan User-Side -> PC:
-    $WACK,OK
-    $WACK,ERR,<reason>
+    $WACK,OK,WP | $WACK,OK,TUN | $WACK,ERR,<kind>,<reason>
+    $TACK,<alg>,<kp>,<kd>,<arrive_m>,<rudder_max>
+    $TACK,ERR,<reason>
 */
 
 #include <Arduino.h>
 #include <esp_now.h>
 #include <WiFi.h>
 
-// MAC address ESP32-S3 DevKitC-1 remote-side (peer ESP-NOW)
-//uint8_t remote_side_Address[] = {0x94, 0xa9, 0x90, 0x30, 0xab, 0xc0};
 uint8_t remote_side_Address[] = {0x10, 0x20, 0xba, 0x4c, 0x53, 0xfc};
 
-// =====================================================================
-// Telemetry struct (diterima dari Remote-Side-01). 23 field, urutan & tipe
-// HARUS sama dengan struct DatatoSend di firmware Remote-Side-01.
-// Total sizeof = 64 byte (62 data + 2 padding).
-// =====================================================================
 typedef struct receivedfromremoteside {
   double timestamp;
   double latitude;
@@ -57,20 +46,6 @@ typedef struct receivedfromremoteside {
 
 receivedfromremoteside myReceivedFromremoteSideData;
 
-// =====================================================================
-// Waypoints struct (dikirim ke Remote-Side). HARUS identik byte-per-byte
-// dengan struct waypoints_payload di firmware Remote-Side.
-//
-// Layout (total 180 byte, < 250 byte limit ESP-NOW):
-//   1 byte  msg_type     (0xA1)
-//   1 byte  home_valid   (0/1)
-//   1 byte  wp_count     (0..WP_MAX_COUNT)
-//   1 byte  reserved     (padding alignment)
-//   8 byte  home_lat
-//   8 byte  home_lon
-//   8 byte * 10 wp_lat[]
-//   8 byte * 10 wp_lon[]
-// =====================================================================
 #define WP_MAX_COUNT 10
 #define WP_MSG_TYPE  0xA1
 
@@ -85,19 +60,66 @@ typedef struct waypoints_payload {
   double   wp_lon[WP_MAX_COUNT];
 } waypoints_payload;
 
+#define TUN_MSG_TYPE_SET   0xA2
+#define TUN_MSG_TYPE_RESP  0xA3
+#define TUN_MSG_TYPE_GET   0xB1
+#define ACK_MSG_TYPE       0xC1
+#define ACK_KIND_WP        1
+#define ACK_KIND_TUN       2
+#define ACK_STATUS_OK      0
+#define ACK_STATUS_ERR     1
+#define TUN_PARAM_COUNT_ALG1 4
+
+typedef struct track_config_payload {
+  uint8_t msg_type;
+  uint8_t active_alg;
+  uint8_t param_count;
+  uint8_t reserved;
+  float params[4];
+} track_config_payload;
+
+typedef struct remote_ack_payload {
+  uint8_t msg_type;
+  uint8_t ack_kind;
+  uint8_t status;
+  uint8_t err_code;
+} remote_ack_payload;
+
+typedef struct tun_get_request {
+  uint8_t msg_type;
+} tun_get_request;
+
 waypoints_payload myWaypointsPayload;
+track_config_payload myTrackConfigPayload;
 
 esp_now_peer_info_t peerInfo;
 
-// =====================================================================
-// Callback ESP-NOW: telemetry dari Remote-Side -> CSV ke PC
-// =====================================================================
-void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
-  if (len != (int)sizeof(receivedfromremoteside)) {
-    return;
-  }
-  memcpy(&myReceivedFromremoteSideData, incomingData, sizeof(myReceivedFromremoteSideData));
-  // Print CSV 23 kolom (raw fixed-point) agar sama format dengan generator
+static unsigned long g_ack_deadline_ms = 0;
+static uint8_t g_waiting_ack_kind = 0;
+static bool g_waiting_tack = false;
+static const unsigned long ACK_TIMEOUT_MS = 2500;
+
+static bool parseIntStrict(const String& s, long &out) {
+  String t = s; t.trim();
+  if (t.length() == 0) return false;
+  char* endp = nullptr;
+  long v = strtol(t.c_str(), &endp, 10);
+  if (endp == t.c_str() || endp == nullptr || *endp != '\0') return false;
+  out = v;
+  return true;
+}
+
+static bool parseDoubleStrict(const String& s, double &out) {
+  String t = s; t.trim();
+  if (t.length() == 0) return false;
+  char* endp = nullptr;
+  double v = strtod(t.c_str(), &endp);
+  if (endp == t.c_str() || endp == nullptr || *endp != '\0') return false;
+  out = v;
+  return true;
+}
+
+static void printTelemetryCsv() {
   Serial.print(myReceivedFromremoteSideData.timestamp, 3); Serial.print(",");
   Serial.print(myReceivedFromremoteSideData.latitude, 6); Serial.print(",");
   Serial.print(myReceivedFromremoteSideData.longitude, 6); Serial.print(",");
@@ -123,6 +145,254 @@ void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
   Serial.println(myReceivedFromremoteSideData.mode_auto);
 }
 
+static void handleRemoteAck(const remote_ack_payload &ack) {
+  g_ack_deadline_ms = 0;
+  g_waiting_ack_kind = 0;
+  const char *kind_str = (ack.ack_kind == ACK_KIND_WP) ? "WP" : "TUN";
+  if (ack.status == ACK_STATUS_OK) {
+    Serial.print("$WACK,OK,");
+    Serial.println(kind_str);
+  } else {
+    Serial.print("$WACK,ERR,");
+    Serial.print(kind_str);
+    Serial.print(",");
+    Serial.println(ack.err_code);
+  }
+}
+
+static void handleTrackConfigResp(const track_config_payload &resp) {
+  g_waiting_tack = false;
+  g_ack_deadline_ms = 0;
+  Serial.print("$TACK,");
+  Serial.print(resp.active_alg);
+  Serial.print(",");
+  Serial.print(resp.params[0], 4);
+  Serial.print(",");
+  Serial.print(resp.params[1], 4);
+  Serial.print(",");
+  Serial.print(resp.params[2], 2);
+  Serial.print(",");
+  Serial.println(resp.params[3], 2);
+}
+
+void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
+  if (len == (int)sizeof(remote_ack_payload) && incomingData[0] == ACK_MSG_TYPE) {
+    remote_ack_payload ack;
+    memcpy(&ack, incomingData, sizeof(ack));
+    handleRemoteAck(ack);
+    return;
+  }
+  if (len == (int)sizeof(track_config_payload) && incomingData[0] == TUN_MSG_TYPE_RESP) {
+    track_config_payload resp;
+    memcpy(&resp, incomingData, sizeof(resp));
+    handleTrackConfigResp(resp);
+    return;
+  }
+  if (len != (int)sizeof(receivedfromremoteside)) {
+    return;
+  }
+  memcpy(&myReceivedFromremoteSideData, incomingData, sizeof(myReceivedFromremoteSideData));
+  printTelemetryCsv();
+}
+
+#define WP_TOKEN_BUF_SIZE 24
+
+static int tokenizeByComma(const String& payload, String tokens[], int maxTokens) {
+  int count = 0;
+  int start = 0;
+  int len = (int)payload.length();
+  while (start <= len && count < maxTokens) {
+    int comma = payload.indexOf(',', start);
+    if (comma < 0) {
+      tokens[count++] = payload.substring(start);
+      break;
+    }
+    tokens[count++] = payload.substring(start, comma);
+    start = comma + 1;
+  }
+  return count;
+}
+
+static void processWpSetLine(const String& line) {
+  String payload = line.substring(7);
+  String tokens[WP_TOKEN_BUF_SIZE];
+  int n = tokenizeByComma(payload, tokens, WP_TOKEN_BUF_SIZE);
+
+  if (n < 3) {
+    Serial.println("$WACK,ERR,WP,FORMAT");
+    return;
+  }
+
+  double home_lat = 0.0, home_lon = 0.0;
+  long wp_count = 0;
+  if (!parseDoubleStrict(tokens[0], home_lat)) { Serial.println("$WACK,ERR,WP,HOME_LAT"); return; }
+  if (!parseDoubleStrict(tokens[1], home_lon)) { Serial.println("$WACK,ERR,WP,HOME_LON"); return; }
+  if (!parseIntStrict(tokens[2],   wp_count))  { Serial.println("$WACK,ERR,WP,COUNT_NOT_INT"); return; }
+
+  if (wp_count < 0 || wp_count > WP_MAX_COUNT) {
+    Serial.println("$WACK,ERR,WP,COUNT_RANGE");
+    return;
+  }
+
+  long expected = 3 + 2 * wp_count;
+  if (n != expected) {
+    Serial.println("$WACK,ERR,WP,COUNT_MISMATCH");
+    return;
+  }
+
+  if (home_lat < -90.0 || home_lat > 90.0)   { Serial.println("$WACK,ERR,WP,LAT_RANGE,home"); return; }
+  if (home_lon < -180.0 || home_lon > 180.0) { Serial.println("$WACK,ERR,WP,LON_RANGE,home"); return; }
+
+  double wp_lat_local[WP_MAX_COUNT];
+  double wp_lon_local[WP_MAX_COUNT];
+  for (int i = 0; i < wp_count; i++) {
+    if (!parseDoubleStrict(tokens[3 + 2 * i], wp_lat_local[i])) {
+      Serial.print("$WACK,ERR,WP,WP_LAT,"); Serial.println(i + 1);
+      return;
+    }
+    if (!parseDoubleStrict(tokens[3 + 2 * i + 1], wp_lon_local[i])) {
+      Serial.print("$WACK,ERR,WP,WP_LON,"); Serial.println(i + 1);
+      return;
+    }
+    if (wp_lat_local[i] < -90.0 || wp_lat_local[i] > 90.0) {
+      Serial.print("$WACK,ERR,WP,LAT_RANGE,"); Serial.println(i + 1);
+      return;
+    }
+    if (wp_lon_local[i] < -180.0 || wp_lon_local[i] > 180.0) {
+      Serial.print("$WACK,ERR,WP,LON_RANGE,"); Serial.println(i + 1);
+      return;
+    }
+  }
+
+  memset(&myWaypointsPayload, 0, sizeof(myWaypointsPayload));
+  myWaypointsPayload.msg_type   = WP_MSG_TYPE;
+  myWaypointsPayload.home_valid = 1;
+  myWaypointsPayload.wp_count   = (uint8_t)wp_count;
+  myWaypointsPayload.home_lat   = home_lat;
+  myWaypointsPayload.home_lon   = home_lon;
+  for (int i = 0; i < wp_count; i++) {
+    myWaypointsPayload.wp_lat[i] = wp_lat_local[i];
+    myWaypointsPayload.wp_lon[i] = wp_lon_local[i];
+  }
+
+  esp_err_t result = esp_now_send(
+      remote_side_Address,
+      (uint8_t *)&myWaypointsPayload,
+      sizeof(myWaypointsPayload));
+
+  if (result != ESP_OK) {
+    Serial.println("$WACK,ERR,WP,SEND_FAIL");
+    return;
+  }
+  g_waiting_ack_kind = ACK_KIND_WP;
+  g_ack_deadline_ms = millis() + ACK_TIMEOUT_MS;
+}
+
+static void processTunSetLine(const String& line) {
+  String payload = line.substring(8);
+  String tokens[8];
+  int n = tokenizeByComma(payload, tokens, 8);
+  if (n < 1) {
+    Serial.println("$WACK,ERR,TUN,FORMAT");
+    return;
+  }
+
+  long alg = 0;
+  if (!parseIntStrict(tokens[0], alg)) {
+    Serial.println("$WACK,ERR,TUN,ALG");
+    return;
+  }
+  if (alg != 1 && alg != 2) {
+    Serial.println("$WACK,ERR,TUN,ALG_RANGE");
+    return;
+  }
+
+  memset(&myTrackConfigPayload, 0, sizeof(myTrackConfigPayload));
+  myTrackConfigPayload.msg_type = TUN_MSG_TYPE_SET;
+  myTrackConfigPayload.active_alg = (uint8_t)alg;
+
+  if (alg == 1) {
+    if (n != 5) {
+      Serial.println("$WACK,ERR,TUN,PARAM_COUNT");
+      return;
+    }
+    double v0, v1, v2, v3;
+    if (!parseDoubleStrict(tokens[1], v0)) { Serial.println("$WACK,ERR,TUN,KP"); return; }
+    if (!parseDoubleStrict(tokens[2], v1)) { Serial.println("$WACK,ERR,TUN,KD"); return; }
+    if (!parseDoubleStrict(tokens[3], v2)) { Serial.println("$WACK,ERR,TUN,ARRIVE"); return; }
+    if (!parseDoubleStrict(tokens[4], v3)) { Serial.println("$WACK,ERR,TUN,RUDMAX"); return; }
+    myTrackConfigPayload.param_count = TUN_PARAM_COUNT_ALG1;
+    myTrackConfigPayload.params[0] = (float)v0;
+    myTrackConfigPayload.params[1] = (float)v1;
+    myTrackConfigPayload.params[2] = (float)v2;
+    myTrackConfigPayload.params[3] = (float)v3;
+  } else {
+    myTrackConfigPayload.param_count = 0;
+  }
+
+  esp_err_t result = esp_now_send(
+      remote_side_Address,
+      (uint8_t *)&myTrackConfigPayload,
+      sizeof(myTrackConfigPayload));
+
+  if (result != ESP_OK) {
+    Serial.println("$WACK,ERR,TUN,SEND_FAIL");
+    return;
+  }
+  g_waiting_ack_kind = ACK_KIND_TUN;
+  g_ack_deadline_ms = millis() + ACK_TIMEOUT_MS;
+}
+
+static void processTunGetLine() {
+  tun_get_request req = {TUN_MSG_TYPE_GET};
+  esp_err_t result = esp_now_send(
+      remote_side_Address,
+      (uint8_t *)&req,
+      sizeof(req));
+  if (result != ESP_OK) {
+    Serial.println("$TACK,ERR,SEND_FAIL");
+    return;
+  }
+  g_waiting_tack = true;
+  g_ack_deadline_ms = millis() + ACK_TIMEOUT_MS;
+}
+
+static void processSerialLine(const String& line) {
+  if (line.startsWith("$WPSET,")) {
+    processWpSetLine(line);
+    return;
+  }
+  if (line.startsWith("$TUNSET,")) {
+    processTunSetLine(line);
+    return;
+  }
+  if (line == "$TUNGET") {
+    processTunGetLine();
+    return;
+  }
+}
+
+static void checkAckTimeout() {
+  if (g_ack_deadline_ms == 0 || millis() < g_ack_deadline_ms) {
+    return;
+  }
+  g_ack_deadline_ms = 0;
+  if (g_waiting_tack) {
+    g_waiting_tack = false;
+    Serial.println("$TACK,ERR,TIMEOUT");
+    return;
+  }
+  if (g_waiting_ack_kind == ACK_KIND_WP) {
+    g_waiting_ack_kind = 0;
+    Serial.println("$WACK,ERR,WP,TIMEOUT");
+    return;
+  }
+  if (g_waiting_ack_kind == ACK_KIND_TUN) {
+    g_waiting_ack_kind = 0;
+    Serial.println("$WACK,ERR,TUN,TIMEOUT");
+  }
+}
+
 void setup() {
   Serial.begin(115200);
   Serial.println("ESP32-S3 User-Side-01");
@@ -145,143 +415,7 @@ void setup() {
   esp_now_register_recv_cb(esp_now_recv_cb_t(OnDataRecv));
 }
 
-// =====================================================================
-// Strict parsers (token harus angka penuh, tanpa karakter sisa)
-// =====================================================================
-static bool parseIntStrict(const String& s, long &out) {
-  String t = s; t.trim();
-  if (t.length() == 0) return false;
-  char* endp = nullptr;
-  long v = strtol(t.c_str(), &endp, 10);
-  if (endp == t.c_str() || endp == nullptr || *endp != '\0') return false;
-  out = v;
-  return true;
-}
-
-static bool parseDoubleStrict(const String& s, double &out) {
-  String t = s; t.trim();
-  if (t.length() == 0) return false;
-  char* endp = nullptr;
-  double v = strtod(t.c_str(), &endp);
-  if (endp == t.c_str() || endp == nullptr || *endp != '\0') return false;
-  out = v;
-  return true;
-}
-
-// =====================================================================
-// Parser $WPSET. Format yang diharapkan (sudah tanpa newline):
-//   $WPSET,<home_lat>,<home_lon>,<wp_count>,<lat1>,<lon1>,...,<latN>,<lonN>
-// dengan wp_count = 0..WP_MAX_COUNT, dan jumlah pasangan lat,lon
-// SETELAH count harus sama persis dengan wp_count.
-// =====================================================================
-
-// Token buffer cukup untuk: home_lat, home_lon, count, + 2*WP_MAX_COUNT pair
-// = 3 + 20 = 23. Beri 1 slot ekstra untuk deteksi error "kelebihan".
-#define WP_TOKEN_BUF_SIZE 24
-
-static int tokenizeByComma(const String& payload, String tokens[], int maxTokens) {
-  int count = 0;
-  int start = 0;
-  int len = (int)payload.length();
-  while (start <= len && count < maxTokens) {
-    int comma = payload.indexOf(',', start);
-    if (comma < 0) {
-      tokens[count++] = payload.substring(start);
-      break;
-    }
-    tokens[count++] = payload.substring(start, comma);
-    start = comma + 1;
-  }
-  return count;
-}
-
-static void processSerialLine(const String& line) {
-  if (!line.startsWith("$WPSET,")) {
-    return;  // baris non-protokol diabaikan tanpa balasan
-  }
-  String payload = line.substring(7);
-
-  String tokens[WP_TOKEN_BUF_SIZE];
-  int n = tokenizeByComma(payload, tokens, WP_TOKEN_BUF_SIZE);
-
-  if (n < 3) {
-    Serial.println("$WACK,ERR,FORMAT");
-    return;
-  }
-
-  double home_lat = 0.0, home_lon = 0.0;
-  long wp_count = 0;
-  if (!parseDoubleStrict(tokens[0], home_lat)) { Serial.println("$WACK,ERR,HOME_LAT"); return; }
-  if (!parseDoubleStrict(tokens[1], home_lon)) { Serial.println("$WACK,ERR,HOME_LON"); return; }
-  if (!parseIntStrict(tokens[2],   wp_count))  { Serial.println("$WACK,ERR,COUNT_NOT_INT"); return; }
-
-  if (wp_count < 0 || wp_count > WP_MAX_COUNT) {
-    Serial.print("$WACK,ERR,COUNT_RANGE,");
-    Serial.println(wp_count);
-    return;
-  }
-
-  long expected = 3 + 2 * wp_count;
-  if (n != expected) {
-    Serial.print("$WACK,ERR,COUNT_MISMATCH,");
-    Serial.print(n);
-    Serial.print(",exp,");
-    Serial.println(expected);
-    return;
-  }
-
-  if (home_lat < -90.0 || home_lat > 90.0)   { Serial.println("$WACK,ERR,LAT_RANGE,home"); return; }
-  if (home_lon < -180.0 || home_lon > 180.0) { Serial.println("$WACK,ERR,LON_RANGE,home"); return; }
-
-  double wp_lat_local[WP_MAX_COUNT];
-  double wp_lon_local[WP_MAX_COUNT];
-  for (int i = 0; i < wp_count; i++) {
-    if (!parseDoubleStrict(tokens[3 + 2 * i], wp_lat_local[i])) {
-      Serial.print("$WACK,ERR,WP_LAT,"); Serial.println(i + 1);
-      return;
-    }
-    if (!parseDoubleStrict(tokens[3 + 2 * i + 1], wp_lon_local[i])) {
-      Serial.print("$WACK,ERR,WP_LON,"); Serial.println(i + 1);
-      return;
-    }
-    if (wp_lat_local[i] < -90.0 || wp_lat_local[i] > 90.0) {
-      Serial.print("$WACK,ERR,LAT_RANGE,"); Serial.println(i + 1);
-      return;
-    }
-    if (wp_lon_local[i] < -180.0 || wp_lon_local[i] > 180.0) {
-      Serial.print("$WACK,ERR,LON_RANGE,"); Serial.println(i + 1);
-      return;
-    }
-  }
-
-  // Susun struct dan kirim via ESP-NOW
-  memset(&myWaypointsPayload, 0, sizeof(myWaypointsPayload));
-  myWaypointsPayload.msg_type   = WP_MSG_TYPE;
-  myWaypointsPayload.home_valid = 1;
-  myWaypointsPayload.wp_count   = (uint8_t)wp_count;
-  myWaypointsPayload.home_lat   = home_lat;
-  myWaypointsPayload.home_lon   = home_lon;
-  for (int i = 0; i < wp_count; i++) {
-    myWaypointsPayload.wp_lat[i] = wp_lat_local[i];
-    myWaypointsPayload.wp_lon[i] = wp_lon_local[i];
-  }
-
-  esp_err_t result = esp_now_send(
-      remote_side_Address,
-      (uint8_t *)&myWaypointsPayload,
-      sizeof(myWaypointsPayload));
-
-  if (result == ESP_OK) {
-    Serial.println("$WACK,OK");
-  } else {
-    Serial.println("$WACK,ERR,SEND_FAIL");
-  }
-}
-
 void loop() {
-  // Non-blocking serial reader: kumpulkan byte sampai '\n', lalu parse.
-  // Buffer diperbesar agar muat $WPSET dengan 1 home + 10 waypoint
-  // (panjang maksimum praktis ~270 karakter).
   static String rxBuf;
   while (Serial.available()) {
     char ch = (char)Serial.read();
@@ -300,4 +434,5 @@ void loop() {
       }
     }
   }
+  checkAckTimeout();
 }

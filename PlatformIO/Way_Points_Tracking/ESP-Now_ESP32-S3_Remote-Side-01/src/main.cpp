@@ -40,6 +40,7 @@
 #include <JY901.h>
 #include <esp_now.h>
 #include <WiFi.h>
+#include <Preferences.h>
 #include <math.h>
 
 // ============================================================================
@@ -63,13 +64,52 @@ uint8_t user_side_Address[] = {0x94, 0xa9, 0x90, 0x30, 0xab, 0xc0};
 #define WP_MSG_TYPE  0xA1
 
 // =====================================================================
-// Pemilihan algoritma auto track (hardcode — ubah sebelum upload)
+// Pemilihan algoritma auto track — runtime (NVS) + tuning via ESP-NOW 0xA2
 // =====================================================================
-#define AUTO_TRACK_ALG 1       // 1 = waypoint haversine + PD, 2 = stub kosong
-#define WP_ARRIVE_M    3.0f    // jarak (m) untuk advance ke waypoint berikutnya
-#define AUTO_TRACK_KP  1.0f    // heading error (deg) -> rudder offset (deg)
-#define AUTO_TRACK_KD  0.05f   // damping dari gyro_z (deg/s)
-#define RUDDER_CMD_MAX 40.0f   // max offset rudder (deg)
+#define WP_ARRIVE_M_DEFAULT    3.0f
+#define AUTO_TRACK_KP_DEFAULT  1.0f
+#define AUTO_TRACK_KD_DEFAULT  0.05f
+#define RUDDER_CMD_MAX_DEFAULT 40.0f
+
+#define TUN_MSG_TYPE_SET   0xA2
+#define TUN_MSG_TYPE_RESP  0xA3
+#define TUN_MSG_TYPE_GET   0xB1
+#define ACK_MSG_TYPE       0xC1
+#define ACK_KIND_WP        1
+#define ACK_KIND_TUN       2
+#define ACK_STATUS_OK      0
+#define ACK_STATUS_ERR     1
+#define ACK_ERR_NONE       0
+#define ACK_ERR_VALIDATE   1
+#define ACK_ERR_NVS        2
+#define TUN_PARAM_COUNT_ALG1 4
+#define TUN_CFG_MAGIC      0xA24150u
+
+typedef struct track_config_payload {
+  uint8_t msg_type;
+  uint8_t active_alg;
+  uint8_t param_count;
+  uint8_t reserved;
+  float params[4];
+} track_config_payload;
+
+typedef struct remote_ack_payload {
+  uint8_t msg_type;
+  uint8_t ack_kind;
+  uint8_t status;
+  uint8_t err_code;
+} remote_ack_payload;
+
+typedef struct tun_get_request {
+  uint8_t msg_type;
+} tun_get_request;
+
+static uint8_t g_active_alg = 2;
+static float g_kp = AUTO_TRACK_KP_DEFAULT;
+static float g_kd = AUTO_TRACK_KD_DEFAULT;
+static float g_wp_arrive_m = WP_ARRIVE_M_DEFAULT;
+static float g_rudder_cmd_max = RUDDER_CMD_MAX_DEFAULT;
+static Preferences g_prefs;
 
 typedef struct waypoints_payload {
   uint8_t  msg_type;
@@ -131,15 +171,134 @@ static void printWaypoints(const waypoints_payload &wp) {
   }
 }
 
+static void sendRemoteAck(uint8_t kind, uint8_t status, uint8_t err_code) {
+  remote_ack_payload ack = {ACK_MSG_TYPE, kind, status, err_code};
+  esp_now_send(user_side_Address, (uint8_t *)&ack, sizeof(ack));
+}
+
+static void sendTrackConfigResponse() {
+  track_config_payload resp;
+  memset(&resp, 0, sizeof(resp));
+  resp.msg_type = TUN_MSG_TYPE_RESP;
+  resp.active_alg = g_active_alg;
+  resp.param_count = TUN_PARAM_COUNT_ALG1;
+  resp.params[0] = g_kp;
+  resp.params[1] = g_kd;
+  resp.params[2] = g_wp_arrive_m;
+  resp.params[3] = g_rudder_cmd_max;
+  esp_now_send(user_side_Address, (uint8_t *)&resp, sizeof(resp));
+}
+
+static bool validateTrackConfig(uint8_t alg, const float *params, uint8_t count) {
+  if (alg != 1 && alg != 2) {
+    return false;
+  }
+  if (alg == 1) {
+    if (count != TUN_PARAM_COUNT_ALG1) {
+      return false;
+    }
+    if (params[0] < 0.0f || params[0] > 10.0f) return false;
+    if (params[1] < 0.0f || params[1] > 2.0f) return false;
+    if (params[2] < 0.5f || params[2] > 50.0f) return false;
+    if (params[3] < 1.0f || params[3] > 45.0f) return false;
+  }
+  return true;
+}
+
+static bool saveTrackConfigToNvs() {
+  if (!g_prefs.begin("wptrack", false)) {
+    return false;
+  }
+  g_prefs.putUInt("magic", TUN_CFG_MAGIC);
+  g_prefs.putUChar("alg", g_active_alg);
+  g_prefs.putFloat("kp", g_kp);
+  g_prefs.putFloat("kd", g_kd);
+  g_prefs.putFloat("arrive", g_wp_arrive_m);
+  g_prefs.putFloat("rudmax", g_rudder_cmd_max);
+  g_prefs.end();
+  return true;
+}
+
+static void loadTrackConfigFromNvs() {
+  if (!g_prefs.begin("wptrack", true)) {
+    return;
+  }
+  uint32_t magic = g_prefs.getUInt("magic", 0);
+  if (magic != TUN_CFG_MAGIC) {
+    g_prefs.end();
+    return;
+  }
+  g_active_alg = g_prefs.getUChar("alg", 2);
+  if (g_active_alg != 1 && g_active_alg != 2) {
+    g_active_alg = 2;
+  }
+  g_kp = g_prefs.getFloat("kp", AUTO_TRACK_KP_DEFAULT);
+  g_kd = g_prefs.getFloat("kd", AUTO_TRACK_KD_DEFAULT);
+  g_wp_arrive_m = g_prefs.getFloat("arrive", WP_ARRIVE_M_DEFAULT);
+  g_rudder_cmd_max = g_prefs.getFloat("rudmax", RUDDER_CMD_MAX_DEFAULT);
+  g_prefs.end();
+}
+
+static void applyTrackConfigPayload(const track_config_payload &cfg) {
+  g_active_alg = cfg.active_alg;
+  if (cfg.active_alg == 1 && cfg.param_count >= TUN_PARAM_COUNT_ALG1) {
+    g_kp = cfg.params[0];
+    g_kd = cfg.params[1];
+    g_wp_arrive_m = cfg.params[2];
+    g_rudder_cmd_max = cfg.params[3];
+  }
+}
+
+static void handleWaypointsPayload(const uint8_t *incomingData) {
+  memcpy(&g_lastWaypoints, incomingData, sizeof(g_lastWaypoints));
+  g_hasWaypoints = true;
+  g_active_wp_index = 0;
+  Serial.print("[WP] Bytes received from User-Side: ");
+  Serial.println((int)sizeof(g_lastWaypoints));
+  printWaypoints(g_lastWaypoints);
+  Serial.println();
+  sendRemoteAck(ACK_KIND_WP, ACK_STATUS_OK, ACK_ERR_NONE);
+}
+
+static void handleTrackConfigSet(const uint8_t *incomingData) {
+  track_config_payload cfg;
+  memcpy(&cfg, incomingData, sizeof(cfg));
+  if (!validateTrackConfig(cfg.active_alg, cfg.params, cfg.param_count)) {
+    sendRemoteAck(ACK_KIND_TUN, ACK_STATUS_ERR, ACK_ERR_VALIDATE);
+    return;
+  }
+  applyTrackConfigPayload(cfg);
+  if (!saveTrackConfigToNvs()) {
+    sendRemoteAck(ACK_KIND_TUN, ACK_STATUS_ERR, ACK_ERR_NVS);
+    return;
+  }
+  Serial.print("[TUN] alg=");
+  Serial.print(g_active_alg);
+  Serial.print(" kp=");
+  Serial.print(g_kp, 3);
+  Serial.print(" kd=");
+  Serial.print(g_kd, 3);
+  Serial.print(" arrive=");
+  Serial.print(g_wp_arrive_m, 2);
+  Serial.print(" rudmax=");
+  Serial.println(g_rudder_cmd_max, 2);
+  sendRemoteAck(ACK_KIND_TUN, ACK_STATUS_OK, ACK_ERR_NONE);
+}
+
 void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len) {
+  if (len == (int)sizeof(remote_ack_payload) && incomingData[0] == ACK_MSG_TYPE) {
+    return;
+  }
   if (len == (int)sizeof(waypoints_payload) && incomingData[0] == WP_MSG_TYPE) {
-    memcpy(&g_lastWaypoints, incomingData, sizeof(g_lastWaypoints));
-    g_hasWaypoints = true;
-    g_active_wp_index = 0;
-    Serial.print("[WP] Bytes received from User-Side: ");
-    Serial.println(len);
-    printWaypoints(g_lastWaypoints);
-    Serial.println();
+    handleWaypointsPayload(incomingData);
+    return;
+  }
+  if (len == (int)sizeof(track_config_payload) && incomingData[0] == TUN_MSG_TYPE_SET) {
+    handleTrackConfigSet(incomingData);
+    return;
+  }
+  if (len == (int)sizeof(tun_get_request) && incomingData[0] == TUN_MSG_TYPE_GET) {
+    sendTrackConfigResponse();
     return;
   }
 
@@ -679,7 +838,7 @@ static void set_nav_idle_telemetry() {
 }
 
 static void apply_rudder_cmd_offset(float offset_deg) {
-  servo_angle_current_offset = constrain(offset_deg, -RUDDER_CMD_MAX, RUDDER_CMD_MAX);
+  servo_angle_current_offset = constrain(offset_deg, -g_rudder_cmd_max, g_rudder_cmd_max);
   const float calculated_angle = REFERENCE_ANGLE + servo_angle_current_offset;
   servo_duty = angleToDuty(calculated_angle);
   ledcWrite(SERVO_RUDDER_pin, servo_duty);
@@ -751,7 +910,7 @@ void auto_track_1() {
   float dist_m = distanceM(
       dataToSend.latitude, dataToSend.longitude, target.lat, target.lon);
 
-  if (g_lastWaypoints.wp_count > 0 && dist_m < WP_ARRIVE_M) {
+  if (g_lastWaypoints.wp_count > 0 && dist_m < g_wp_arrive_m) {
     if (g_active_wp_index + 1 < g_lastWaypoints.wp_count) {
       g_active_wp_index++;
       resolve_active_waypoint_target(target);
@@ -765,7 +924,7 @@ void auto_track_1() {
   const float err = wrapHeadingError(bearing, yaw_deg);
 
   const float gyro_z_dps = dataToSend.gyro_z / 100.0f;
-  const float rudder_offset = AUTO_TRACK_KP * err - AUTO_TRACK_KD * gyro_z_dps;
+  const float rudder_offset = g_kp * err - g_kd * gyro_z_dps;
   apply_rudder_cmd_offset(rudder_offset);
 
   dataToSend.heading_setpoint = (uint16_t)(bearing * 100.0f);
@@ -785,7 +944,7 @@ void auto_track_2() {
 
 void check_mode_auto_manual(uint16_t modeautomanual) {
   if (modeautomanual >= 1750) {
-    if (AUTO_TRACK_ALG == 1) {
+    if (g_active_alg == 1) {
       auto_track_1();
       dataToSend.mode_auto = 1;
     } else {
@@ -921,6 +1080,14 @@ void setup() {
       Serial.println("Failed to add peer");
       return;
     }
+
+    loadTrackConfigFromNvs();
+    Serial.print("[TUN] Loaded alg=");
+    Serial.print(g_active_alg);
+    Serial.print(" kp=");
+    Serial.print(g_kp, 3);
+    Serial.print(" kd=");
+    Serial.println(g_kd, 3);
 
     esp_now_register_recv_cb(esp_now_recv_cb_t(OnDataRecv));
 }

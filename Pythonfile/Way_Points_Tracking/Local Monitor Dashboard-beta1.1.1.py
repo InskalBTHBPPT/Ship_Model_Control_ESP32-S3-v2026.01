@@ -210,6 +210,7 @@ from PySide6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QDoubleSpinBox,
+    QRadioButton,
 )
 import pyqtgraph as pg
 from time import time, strftime
@@ -320,6 +321,112 @@ class LiveRudderSetupDialog(QDialog):
       parent.rudder2_correction_value = self.sp_rud2.value()
       parent.rudder_cmd_correction_enabled = self.cb_rud_cmd.isChecked()
       parent.rudder_cmd_correction_value = self.sp_rud_cmd.value()
+
+
+class MapPointsSetupDialog(QDialog):
+    """Dialog setup algoritma auto track + parameter tuning (kirim ke Remote)."""
+
+    def __init__(self, parent: "MainWindow"):
+        super().__init__(parent)
+        self.setWindowTitle("Map Points Setup — Auto Track")
+        self.setMinimumWidth(440)
+
+        layout = QVBoxLayout(self)
+
+        info = QLabel(
+            "Pilih algoritma auto dan parameter tuning Alg 1.\n"
+            "Nilai disimpan di dialog; commit ke kapal via Send to Remote.\n"
+            "Read from Remote mengambil parameter dari NVS Remote.",
+            self,
+        )
+        info.setWordWrap(True)
+        info.setStyleSheet("color: #000000; font-size: 10pt; padding: 4px 0 8px 0;")
+        layout.addWidget(info)
+
+        algo_box = QGroupBox("Active algorithm", self)
+        algo_layout = QVBoxLayout(algo_box)
+        self.rb_alg1 = QRadioButton("Auto Alg 1 — waypoint + PD", self)
+        self.rb_alg2 = QRadioButton("Auto Alg 2 — stub (default)", self)
+        algo_layout.addWidget(self.rb_alg1)
+        algo_layout.addWidget(self.rb_alg2)
+        layout.addWidget(algo_box)
+
+        self.alg1_form_box = QGroupBox("Alg 1 tuning parameters", self)
+        alg1_form = QFormLayout(self.alg1_form_box)
+        self.sp_kp = QDoubleSpinBox(self)
+        self.sp_kp.setRange(0.0, 10.0)
+        self.sp_kp.setDecimals(3)
+        self.sp_kp.setSingleStep(0.1)
+        self.sp_kd = QDoubleSpinBox(self)
+        self.sp_kd.setRange(0.0, 2.0)
+        self.sp_kd.setDecimals(4)
+        self.sp_kd.setSingleStep(0.01)
+        self.sp_arrive = QDoubleSpinBox(self)
+        self.sp_arrive.setRange(0.5, 50.0)
+        self.sp_arrive.setDecimals(2)
+        self.sp_arrive.setSingleStep(0.5)
+        self.sp_rudmax = QDoubleSpinBox(self)
+        self.sp_rudmax.setRange(1.0, 45.0)
+        self.sp_rudmax.setDecimals(1)
+        self.sp_rudmax.setSingleStep(1.0)
+        alg1_form.addRow("Kp (heading error → rudder °)", self.sp_kp)
+        alg1_form.addRow("Kd (gyro_z damping)", self.sp_kd)
+        alg1_form.addRow("WP arrive radius (m)", self.sp_arrive)
+        alg1_form.addRow("Rudder max offset (°)", self.sp_rudmax)
+        layout.addWidget(self.alg1_form_box)
+
+        self.alg2_info = QLabel("Alg 2: tidak ada parameter tuning (stub).", self)
+        self.alg2_info.setWordWrap(True)
+        self.alg2_info.setStyleSheet("color: #6b7280; font-size: 10pt;")
+        layout.addWidget(self.alg2_info)
+
+        self.read_remote_btn = QPushButton("Read from Remote", self)
+        self.read_remote_btn.clicked.connect(self._on_read_remote)
+        layout.addWidget(self.read_remote_btn)
+
+        self.rb_alg1.toggled.connect(self._on_algo_changed)
+        self.rb_alg2.toggled.connect(self._on_algo_changed)
+
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel,
+            self,
+        )
+        buttons.accepted.connect(self.accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+        self._load_from_parent(parent)
+
+    def _on_algo_changed(self) -> None:
+        use_alg1 = self.rb_alg1.isChecked()
+        self.alg1_form_box.setEnabled(use_alg1)
+        self.alg2_info.setVisible(not use_alg1)
+
+    def _on_read_remote(self) -> None:
+        parent = self.parent()
+        if parent is not None and hasattr(parent, "request_read_track_config"):
+            parent.request_read_track_config(from_setup=True)
+
+    def _load_from_parent(self, parent: "MainWindow") -> None:
+        if parent.track_active_alg == 1:
+            self.rb_alg1.setChecked(True)
+        else:
+            self.rb_alg2.setChecked(True)
+        self.sp_kp.setValue(parent.track_alg1_kp)
+        self.sp_kd.setValue(parent.track_alg1_kd)
+        self.sp_arrive.setValue(parent.track_alg1_arrive_m)
+        self.sp_rudmax.setValue(parent.track_alg1_rudder_max)
+        self._on_algo_changed()
+
+    def apply_to_parent(self, parent: "MainWindow") -> None:
+        parent.track_active_alg = 1 if self.rb_alg1.isChecked() else 2
+        parent.track_alg1_kp = self.sp_kp.value()
+        parent.track_alg1_kd = self.sp_kd.value()
+        parent.track_alg1_arrive_m = self.sp_arrive.value()
+        parent.track_alg1_rudder_max = self.sp_rudmax.value()
+
+    def refresh_from_parent(self, parent: "MainWindow") -> None:
+        self._load_from_parent(parent)
 
 
 class ClickableMapPage(QWebEnginePage):
@@ -1575,6 +1682,16 @@ class MainWindow(QMainWindow):
         self.latest_serial_lat = None  # Latest latitude dari serial
         self.latest_serial_lon = None  # Latest longitude dari serial
         self.latest_serial_heading = None  # Latest heading dari serial
+
+        # Auto track tuning (Map Points Setup → Send to Remote)
+        self.track_active_alg = 2
+        self.track_alg1_kp = 1.0
+        self.track_alg1_kd = 0.05
+        self.track_alg1_arrive_m = 3.0
+        self.track_alg1_rudder_max = 40.0
+        self._remote_send_phase = "idle"
+        self._tunget_mode = "verify"
+        self._map_points_setup_dialog: MapPointsSetupDialog | None = None
         
         # Tab "Map Points" - tab baru sebelum Live Data
         map_points_tab = QWidget(self)
@@ -1629,6 +1746,10 @@ class MainWindow(QMainWindow):
         self.home_points_btn.setEnabled(False)  # Disabled by default, akan di-enable saat connected
         self.home_points_btn.clicked.connect(self.set_home_point_from_serial)
         home_points_btn_group.layout().addWidget(self.home_points_btn)
+
+        self.map_points_setup_btn = QPushButton("Setup", self)
+        self.map_points_setup_btn.clicked.connect(self._open_map_points_setup_dialog)
+        home_points_btn_group.layout().addWidget(self.map_points_setup_btn)
 
         map_points_right_panel.layout().addWidget(home_points_btn_group)
         
@@ -1690,7 +1811,7 @@ class MainWindow(QMainWindow):
         # - Tombol & status label internal masih bernama set_param_btn /
         #   set_param_status_label untuk menjaga referensi lain (connect_serial,
         #   disconnect_serial) tidak putus selama transisi.
-        set_param_group = QGroupBox("Send Way Points", self)
+        set_param_group = QGroupBox("Send to Remote", self)
         set_param_group.setLayout(QVBoxLayout())
         set_param_group.layout().setContentsMargins(12, 12, 12, 12)
 
@@ -1732,7 +1853,7 @@ class MainWindow(QMainWindow):
         self.waypoints_info_label.setStyleSheet("color: #e5e7eb; padding: 2px 0;")
         set_param_group.layout().addWidget(self.waypoints_info_label)
 
-        self.set_param_btn = QPushButton("Send Way Points", self)
+        self.set_param_btn = QPushButton("Send to Remote", self)
         # Gate awal: tombol baru aktif setelah Connect berhasil (lihat connect_serial / disconnect_serial)
         self.set_param_btn.setEnabled(False)
         self.set_param_btn.clicked.connect(self.on_set_param_clicked)
@@ -1801,7 +1922,7 @@ class MainWindow(QMainWindow):
         self._set_param_pending = False
         self._set_param_timeout_timer = QTimer(self)
         self._set_param_timeout_timer.setSingleShot(True)
-        self._set_param_timeout_timer.setInterval(1500)  # 1.5 detik tanpa ACK -> TIMEOUT
+        self._set_param_timeout_timer.setInterval(3000)  # 3s — ESP-NOW chain butuh >1.5s
         self._set_param_timeout_timer.timeout.connect(self._on_set_param_timeout)
         
         # Helper connection state method
@@ -2613,24 +2734,224 @@ class MainWindow(QMainWindow):
             return
         self.map_webview.show_waypoint_route(home, waypoints)
 
+    def _open_map_points_setup_dialog(self) -> None:
+        if self._map_points_setup_dialog is None:
+            self._map_points_setup_dialog = MapPointsSetupDialog(self)
+        else:
+            self._map_points_setup_dialog.refresh_from_parent(self)
+        if self._map_points_setup_dialog.exec() == QDialog.DialogCode.Accepted:
+            self._map_points_setup_dialog.apply_to_parent(self)
+
+    def _write_serial_line(self, line: str) -> bool:
+        if not self.ser:
+            return False
+        try:
+            self.ser.write(line.encode("utf-8"))
+            try:
+                self.ser.flush()
+            except Exception:
+                pass
+            return True
+        except Exception as e:
+            self._update_set_param_status(
+                f"Status: ERR - write failed: {e}", color="#ef4444"
+            )
+            return False
+
+    def _start_remote_send_timer(self) -> None:
+        self._set_param_timeout_timer.start()
+
+    def _finish_remote_send_chain(self) -> None:
+        self._set_param_pending = False
+        self._remote_send_phase = "idle"
+        if self.is_connected() and hasattr(self, "set_param_btn"):
+            self.set_param_btn.setEnabled(True)
+
+    def _build_tunset_line(self) -> str:
+        alg = self.track_active_alg
+        if alg == 1:
+            return (
+                f"$TUNSET,{alg},"
+                f"{self.track_alg1_kp:.4f},"
+                f"{self.track_alg1_kd:.4f},"
+                f"{self.track_alg1_arrive_m:.2f},"
+                f"{self.track_alg1_rudder_max:.2f}\n"
+            )
+        return f"$TUNSET,{alg}\n"
+
+    def _send_tunset_after_wp(self) -> None:
+        line = self._build_tunset_line()
+        if not self._write_serial_line(line):
+            self._finish_remote_send_chain()
+            return
+        self._remote_send_phase = "tun"
+        ts = strftime("%H:%M:%S")
+        self._update_set_param_status(
+            f"Status: WP OK, sending TUN... ({ts})",
+            color="#f59e0b",
+            italic=True,
+        )
+        print(f"[TUNSET] {line.strip()}")
+        self._start_remote_send_timer()
+
+    def _start_tunget_verify(self) -> None:
+        self._remote_send_phase = "tunget"
+        self._tunget_mode = "verify"
+        if not self._write_serial_line("$TUNGET\n"):
+            self._finish_remote_send_chain()
+            return
+        ts = strftime("%H:%M:%S")
+        self._update_set_param_status(
+            f"Status: TUN OK, verifying... ({ts})",
+            color="#f59e0b",
+            italic=True,
+        )
+        print("[TUNGET] verify")
+        self._start_remote_send_timer()
+
+    def _apply_track_config_from_remote(
+        self,
+        alg: int,
+        kp: float,
+        kd: float,
+        arrive: float,
+        rudmax: float,
+    ) -> None:
+        self.track_active_alg = alg
+        if alg == 1:
+            self.track_alg1_kp = kp
+            self.track_alg1_kd = kd
+            self.track_alg1_arrive_m = arrive
+            self.track_alg1_rudder_max = rudmax
+        dlg = self._map_points_setup_dialog
+        if dlg is not None and dlg.isVisible():
+            dlg.refresh_from_parent(self)
+
+    def _verify_track_config(
+        self,
+        alg: int,
+        kp: float,
+        kd: float,
+        arrive: float,
+        rudmax: float,
+    ) -> bool:
+        if alg != self.track_active_alg:
+            return False
+        if alg == 2:
+            return True
+        eps = 1e-3
+        return (
+            abs(kp - self.track_alg1_kp) < eps
+            and abs(kd - self.track_alg1_kd) < eps
+            and abs(arrive - self.track_alg1_arrive_m) < 0.05
+            and abs(rudmax - self.track_alg1_rudder_max) < 0.05
+        )
+
+    def request_read_track_config(self, from_setup: bool = False) -> None:
+        if not self.is_connected():
+            QMessageBox.warning(
+                self,
+                "Not connected",
+                "Connect serial terlebih dahulu.",
+            )
+            return
+        if self._set_param_pending:
+            QMessageBox.warning(
+                self,
+                "Busy",
+                "Pengiriman atau read-back sedang berjalan.",
+            )
+            return
+        self._set_param_pending = True
+        self._remote_send_phase = "tunget"
+        self._tunget_mode = "read"
+        if hasattr(self, "set_param_btn"):
+            self.set_param_btn.setEnabled(False)
+        if not self._write_serial_line("$TUNGET\n"):
+            self._finish_remote_send_chain()
+            return
+        ts = strftime("%H:%M:%S")
+        self._update_set_param_status(
+            f"Status: reading Remote... ({ts})",
+            color="#f59e0b",
+            italic=True,
+        )
+        print("[TUNGET] read")
+        self._start_remote_send_timer()
+
+    def _handle_tack_response(self, text: str) -> None:
+        if self._set_param_timeout_timer.isActive():
+            self._set_param_timeout_timer.stop()
+
+        parts = [p.strip() for p in text.split(",")]
+        ts = strftime("%H:%M:%S")
+
+        if len(parts) >= 3 and parts[0] == "$TACK" and parts[1] == "ERR":
+            reason = ",".join(parts[2:])
+            self._update_set_param_status(
+                f"Status: TACK ERR - {reason} ({ts})",
+                color="#ef4444",
+            )
+            self._finish_remote_send_chain()
+            return
+
+        if len(parts) < 6:
+            self._update_set_param_status(
+                f"Status: TACK bad format ({ts})",
+                color="#ef4444",
+            )
+            if self._set_param_pending:
+                self._finish_remote_send_chain()
+            return
+
+        try:
+            alg = int(parts[1])
+            kp = float(parts[2])
+            kd = float(parts[3])
+            arrive = float(parts[4])
+            rudmax = float(parts[5])
+        except ValueError:
+            self._update_set_param_status(
+                f"Status: TACK parse err ({ts})",
+                color="#ef4444",
+            )
+            self._finish_remote_send_chain()
+            return
+
+        self._apply_track_config_from_remote(alg, kp, kd, arrive, rudmax)
+
+        if self._tunget_mode == "read":
+            self._update_set_param_status(
+                f"Status: Remote read OK alg={alg} ({ts})",
+                color="#10b981",
+            )
+            self._finish_remote_send_chain()
+            return
+
+        if self._remote_send_phase == "tunget":
+            ok = self._verify_track_config(alg, kp, kd, arrive, rudmax)
+            if ok:
+                self._update_set_param_status(
+                    f"Status: Verified OK ({ts})",
+                    color="#10b981",
+                )
+            else:
+                self._update_set_param_status(
+                    f"Status: MISMATCH ({ts})",
+                    color="#ef4444",
+                )
+            self._finish_remote_send_chain()
+
     def on_set_param_clicked(self):
         """
-        Handler tombol "Send Way Points" di tab Map Points.
+        Handler tombol "Send to Remote" di tab Map Points.
 
         Alur:
         1. Gate: pastikan port serial sudah terkoneksi.
-        2. Validasi:
-           - Home harus sudah di-set (self.home_point_coords).
-           - Total minimal 3 point: 1 Home + minimal 2 waypoint navigasi
-             dari self.map_points_webview.click_marker_coords.
-           - Tiap koordinat numerik dan dalam rentang lat/lon valid.
-        3. Susun payload protokol baru:
-             $WPSET,<home_lat>,<home_lon>,<wp_count>,<lat1>,<lon1>,...,<latN>,<lonN>\n
-           dengan wp_count = jumlah waypoint navigasi (= len(click_marker_coords)).
-        4. Tulis ke serial.
-        5. Tunggu balasan $WACK,OK / $WACK,ERR,<reason> dari firmware
-           user-side dengan timeout 1.5 detik (lihat poll_serial -> handler
-           akan dipanggil saat respons tiba).
+        2. Validasi waypoint (Home + minimal 2 WP).
+        3. Kirim $WPSET → tunggu $WACK,OK,WP
+        4. Kirim $TUNSET → tunggu $WACK,OK,TUN
+        5. Kirim $TUNGET → bandingkan $TACK dengan nilai Setup (Verified)
         """
         if not self.is_connected():
             self._update_set_param_status(
@@ -2718,10 +3039,11 @@ class MainWindow(QMainWindow):
 
         ts = strftime("%H:%M:%S")
         self._update_set_param_status(
-            f"Status: sending {total} points... ({ts})",
+            f"Status: sending WP ({total} pts)... ({ts})",
             color="#f59e0b",
             italic=True,
         )
+        self._remote_send_phase = "wp"
         self._set_param_pending = True
         if hasattr(self, 'set_param_btn'):
             self.set_param_btn.setEnabled(False)
@@ -2785,16 +3107,15 @@ class MainWindow(QMainWindow):
         return file_path
 
     def _on_set_param_timeout(self):
-        """Dipanggil bila tidak ada $WACK,... dalam 1.5 detik setelah pengiriman."""
+        """Dipanggil bila tidak ada respons dalam timeout setelah pengiriman."""
         if not self._set_param_pending:
             return
-        self._set_param_pending = False
+        phase = self._remote_send_phase
         ts = strftime("%H:%M:%S")
         self._update_set_param_status(
-            f"Status: TIMEOUT no ACK ({ts})", color="#f59e0b"
+            f"Status: TIMEOUT ({phase}) ({ts})", color="#f59e0b"
         )
-        if self.is_connected() and hasattr(self, 'set_param_btn'):
-            self.set_param_btn.setEnabled(True)
+        self._finish_remote_send_chain()
 
     def _handle_set_param_response(self, text: str):
         """
@@ -2802,32 +3123,68 @@ class MainWindow(QMainWindow):
         legacy; lihat poll_serial filter).
 
         Format yang diharapkan:
-          $WACK,OK
-          $WACK,ERR,<reason>[,<extra>...]
+          $WACK,OK,WP | $WACK,OK,TUN
+          $WACK,ERR,<kind>,<reason>[,<extra>...]
         """
         if self._set_param_timeout_timer.isActive():
             self._set_param_timeout_timer.stop()
-        self._set_param_pending = False
 
         parts = [p.strip() for p in text.split(",")]
         ts = strftime("%H:%M:%S")
-        if len(parts) >= 2 and parts[1] == "OK":
+
+        if parts[0] == "$PACK":
+            if len(parts) >= 2 and parts[1] == "OK":
+                self._update_set_param_status(
+                    f"Status: OK (legacy PACK) ({ts})", color="#10b981"
+                )
+            elif len(parts) >= 3 and parts[1] == "ERR":
+                reason = ",".join(parts[2:])
+                self._update_set_param_status(
+                    f"Status: ERR - {reason} ({ts})", color="#ef4444"
+                )
+            else:
+                self._update_set_param_status(
+                    f"Status: {text} ({ts})", color="#f59e0b"
+                )
+            self._finish_remote_send_chain()
+            return
+
+        if len(parts) >= 3 and parts[0] == "$WACK" and parts[1] == "OK":
+            kind = parts[2]
+            if kind == "WP" and self._remote_send_phase == "wp":
+                self._send_tunset_after_wp()
+                return
+            if kind == "TUN" and self._remote_send_phase == "tun":
+                self._start_tunget_verify()
+                return
+            self._update_set_param_status(
+                f"Status: OK {kind} ({ts})", color="#10b981"
+            )
+            self._finish_remote_send_chain()
+            return
+
+        if len(parts) >= 3 and parts[0] == "$WACK" and parts[1] == "ERR":
+            kind = parts[2]
+            reason = ",".join(parts[3:]) if len(parts) > 3 else ""
+            msg = f"Status: ERR {kind}"
+            if reason:
+                msg += f" - {reason}"
+            msg += f" ({ts})"
+            self._update_set_param_status(msg, color="#ef4444")
+            self._finish_remote_send_chain()
+            return
+
+        if len(parts) >= 2 and parts[0] == "$WACK" and parts[1] == "OK":
             self._update_set_param_status(
                 f"Status: OK ({ts})", color="#10b981"
             )
-        elif len(parts) >= 3 and parts[1] == "ERR":
-            # Gabungkan reason + field extra (mis. COUNT_MISMATCH,5,exp,7)
-            reason = ",".join(parts[2:])
-            self._update_set_param_status(
-                f"Status: ERR - {reason} ({ts})", color="#ef4444"
-            )
-        else:
-            self._update_set_param_status(
-                f"Status: {text} ({ts})", color="#f59e0b"
-            )
+            self._finish_remote_send_chain()
+            return
 
-        if self.is_connected() and hasattr(self, 'set_param_btn'):
-            self.set_param_btn.setEnabled(True)
+        self._update_set_param_status(
+            f"Status: {text} ({ts})", color="#f59e0b"
+        )
+        self._finish_remote_send_chain()
 
 
     def update_indicators(self, yaw: float, heading_setpoint: float, heading_error: float,
@@ -3527,6 +3884,7 @@ class MainWindow(QMainWindow):
                 if hasattr(self, '_set_param_timeout_timer') and self._set_param_timeout_timer.isActive():
                     self._set_param_timeout_timer.stop()
                 self._set_param_pending = False
+                self._remote_send_phase = "idle"
             except Exception:
                 pass
             # Reset status label ke idle saat disconnect
@@ -3592,11 +3950,12 @@ class MainWindow(QMainWindow):
                 text = line.decode('utf-8', errors='replace').strip()
                 if not text:
                     continue
-                # Tangkap respons control protocol dari user-side ESP32 sebelum
-                # filter telemetri 23-kolom, agar tidak ikut di-drop.
-                # $WACK,... = balasan baru untuk $WPSET (Send Way Points).
-                # $PACK,... = balasan lama untuk $PARAM (deprecated, masih
-                #             di-handle untuk backward compatibility singkat).
+                # $WACK,... = balasan WP/TUN dari user-side ESP32.
+                # $TACK,... = read-back tuning dari Remote via user-side.
+                # $PACK,... = balasan lama untuk $PARAM (deprecated).
+                if text.startswith("$TACK"):
+                    self._handle_tack_response(text)
+                    continue
                 if text.startswith("$WACK") or text.startswith("$PACK"):
                     self._handle_set_param_response(text)
                     continue
