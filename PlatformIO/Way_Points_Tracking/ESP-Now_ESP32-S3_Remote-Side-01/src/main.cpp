@@ -1,36 +1,24 @@
 ﻿/**
  * @file main.cpp
- * @brief ESP32-S3 Remote-Side-01 â€” Ship Model Control System
+ * @brief ESP32-S3 Remote-Side-01 — Ship Model Control (kapal)
  *
  * @description
- * Firmware sisi kapal (Remote-Side) yang mengumpulkan data sensor dan
- * actuator, menjalankan kontrol rudder/propeller, lalu mengirim telemetry
- * 23-kolom telemetry ke User-Side via ESP-NOW.
+ * Firmware sisi kapal: sensor/actuator, kontrol rudder/propeller, waypoint
+ * tracking, runtime tuning (NVS), telemetry 23-kolom ke User-Side via ESP-NOW.
  *
- * Clone dari ESP_Now_Send_Ver2025_revJan2026.
+ * Auto track:
+ * - Alg 1: waypoint + PD (bearing → heading setpoint, Kp/Kd dari NVS)
+ * - Alg 2: stub (default)
  *
- * Hardware yang digunakan:
- * - Receiver RC (FS-iA6B) dengan output PPM
- * - Servo rudder dengan feedback potensiometer
- * - Motor propeller dengan rotary encoder (RPM measurement)
- * - GNSS module (u-blox GPS) via Serial1
- * - IMU (HWT905TTL) via Serial2
- * - ADC untuk monitoring baterai
- *
- * Fitur kontrol:
- * - Mode Manual: Kontrol rudder langsung dari RC (CH1)
- * - Mode Auto alg 1: waypoint + PD rudder (AUTO_TRACK_ALG=1)
- * - Mode Auto alg 2: stub kosong (AUTO_TRACK_ALG=2)
+ * Terima dari User-Side (ESP-NOW):
+ * - 0xA1 waypoints, 0xA2 tuning set, 0xB1 tuning get
+ * Balas: 0xC1 ACK, 0xA3 tuning read-back
  *
  * @author Chandra P - Ship Model Control System
- * @version 1.0 (Remote-Side-01)
+ * @version 1.1
  * @date 2026
  *
- * @note
- * - Update rate: 10 Hz (setiap 100ms)
- * - Data dikirim dalam format fixed-point (Ã— 100) untuk efisiensi
- * - Struktur data harus sama dengan ESP-Now_ESP32-S3_User-Side (PENDING: penyesuaian)
- * - Penerimaan waypoint dari User-Side (dashboard -> User-Side -> ESP-NOW)
+ * @note Update rate telemetry ~10 Hz. Lihat README.md di root proyek.
  */
 
 #include <Arduino.h>
@@ -53,7 +41,8 @@
  * @note UBAH MAC ADDRESS INI sesuai MAC User-Side Anda.
  */
 // uint8_t user_side_Address[] = {0x10, 0x20, 0xba, 0x4c, 0x53, 0xfc};
-uint8_t user_side_Address[] = {0x94, 0xa9, 0x90, 0x30, 0xab, 0xc0};
+// uint8_t user_side_Address[] = {0x94, 0xa9, 0x90, 0x30, 0xab, 0xc0};
+uint8_t user_side_Address[] = {0x80, 0xb5, 0x4e, 0xc1, 0xd5, 0xac};
 
 // =====================================================================
 // Waypoints (diterima dari User-Side). HARUS identik dengan User-Side.

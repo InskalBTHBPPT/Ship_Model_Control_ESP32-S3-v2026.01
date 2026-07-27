@@ -1,16 +1,27 @@
-/*
-  ESP32-S3 User-Side-01 (gateway USB <-> ESP-NOW)
-
-  Protokol PC -> User-Side (ASCII, '\n'):
-    $WPSET,<home_lat>,<home_lon>,<wp_count>,<lat1>,<lon1>,...,<latN>,<lonN>
-    $TUNSET,<alg>[,<kp>,<kd>,<arrive_m>,<rudder_max>]   ; alg=1 butuh 4 float
-    $TUNGET
-
-  Balasan User-Side -> PC:
-    $WACK,OK,WP | $WACK,OK,TUN | $WACK,ERR,<kind>,<reason>
-    $TACK,<alg>,<kp>,<kd>,<arrive_m>,<rudder_max>
-    $TACK,ERR,<reason>
-*/
+/**
+ * @file main.cpp
+ * @brief ESP32-S3 User-Side-01 — gateway USB-serial ↔ ESP-NOW
+ *
+ * @description
+ * Meneruskan perintah dashboard ke Remote via ESP-NOW dan relay telemetry
+ * CSV 23-kolom ke PC. ACK WP/TUN hanya setelah Remote membalas 0xC1.
+ *
+ * PC → User-Side (ASCII, '\n'):
+ *   $WPSET,<home_lat>,<home_lon>,<wp_count>,<lat1>,<lon1>,...
+ *   $TUNSET,<alg>[,<kp>,<kd>,<arrive_m>,<rudder_max>]
+ *   $TUNGET
+ *
+ * User-Side → PC:
+ *   $WACK,OK,WP | $WACK,OK,TUN | $WACK,ERR,<kind>,<reason>
+ *   $TACK,<alg>,<kp>,<kd>,<arrive_m>,<rudder_max>
+ *   $TACK,ERR,<reason>
+ *
+ * @author Chandra P - Ship Model Control System
+ * @version 1.0
+ * @date 2026
+ *
+ * @note Lihat README.md di root proyek untuk detail protokol.
+ */
 
 #include <Arduino.h>
 #include <esp_now.h>

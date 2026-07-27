@@ -1,24 +1,33 @@
 """
-Local Monitor Dashboard beta 1.1.1
+Local Monitor Dashboard beta 1.1.1 — Way Points Tracking
 
-Ringkasan:
-- Dashboard PySide6 untuk monitoring telemetry kapal secara real-time.
-- Input data berasal dari serial CSV text (UTF-8 compatible).
-- Mendukung map tracking, indikator live, plotting time-series, logging CSV, analyze,
-  serta fitur Home Points dari koordinat serial terbaru.
+Dashboard PySide6 untuk monitoring telemetry kapal model secara real-time,
+perencanaan waypoint, pengiriman konfigurasi ke Remote, dan analisis log CSV.
 
-Format data serial yang dibaca (23 kolom, raw fixed-point dari User-Side-01):
-1) timestamp  2) latitude  3) longitude
-4) speedMps (x100)  5-6) Calc_deg_servo_1/2 (x100, °)
-7) yaw (x100)  8) heading_setpoint (x100)  9) heading_error (x100)
-10) rudder_cmd (x100)  11) track_wp_index  12) distance_to_wp (x10, m)
-13-18) accel_x/y/z, gyro_x/y/z (x100) — di-log, tidak di panel live
-19-20) rpm_prop_1/2 (x100)  21-22) battery_1/2 (x100, V)  23) mode_auto
+Arsitektur:
+  Dashboard --USB serial--> User-Side ESP32 --ESP-NOW--> Remote-Side (kapal)
 
-Catatan pengolahan:
-- Parser memproses baris utuh yang diakhiri newline dan memvalidasi jumlah kolom = 23.
-- Data lat/lon tervalidasi range; nilai 0,0 dapat diganti default location.
-- Nilai terbaru lat/lon disimpan untuk fitur Home Points.
+Tab utama:
+- Live Data: peta, indikator, plot, logging CSV, route waypoint
+- Map Points: Home + waypoint, Setup (alg/tuning), Send to Remote + verify
+- Analyze: replay CSV (display/raw/legacy), peta + plot + indikator
+
+Protokol kirim (tab Map Points):
+  $WPSET → $WACK,OK,WP → $TUNSET → $WACK,OK,TUN → $TUNGET → $TACK (verify)
+
+Telemetry masuk (23 kolom, raw fixed-point dari User-Side-01):
+  1) timestamp  2) latitude  3) longitude
+  4) speedMps (x100)  5-6) Calc_deg_servo_1/2 (x100, deg)
+  7) yaw (x100)  8) heading_setpoint (x100)  9) heading_error (x100)
+  10) rudder_cmd (x100)  11) track_wp_index  12) distance_to_wp (x10, m)
+  13-18) accel_x/y/z, gyro_x/y/z (x100) — di-log, tidak di panel live
+  19-20) rpm_prop_1/2 (x100)  21-22) battery_1/2 (x100, V)  23) mode_auto
+
+Catatan:
+- Parser memproses baris utuh (newline), validasi 23 kolom untuk telemetry
+- Log CSV memakai nilai tampilan (sama seperti panel Live)
+- Snapshot waypoint disimpan ke folder WayPoints/ saat Send to Remote
+- Lihat README.md di folder ini untuk dokumentasi lengkap
 """
 
 import csv
