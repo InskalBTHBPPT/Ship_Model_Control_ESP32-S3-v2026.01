@@ -1,0 +1,142 @@
+/*
+ * Standalone RPM Calculator for Motor Propeller 2
+ * Extracted from main.cpp
+ * 
+ * Hardware:
+ * - ESP32-S3
+ * - Encoder on GPIO 9
+ * - PPR = 1 (1 pulse = 1 rotation)
+ * 
+ * Features:
+ * - Interrupt-based pulse counting
+ * - Moving average filter (10 samples)
+ * - Update rate: 10 Hz (every 100ms)
+ * - Output: Direct RPM value (uint16_t, 0-65535)
+ */
+
+#include <Arduino.h>
+
+// ==================== CONFIGURATION ====================
+#define PULSE_PIN_Motor_prop_2 9        // GPIO pin for encoder
+#define RPM_SAMPLES_motor_prop_2 10     // Number of samples for moving average
+#define INTERVAL_MS 100                  // Update interval in milliseconds (10 Hz)
+
+// ==================== VARIABLES ====================
+// Pulse counter (incremented by interrupt)
+volatile uint32_t pulse_counter_motor_prop_2 = 0;
+
+// Moving average buffer and index
+uint32_t pulse_buffer_motor_prop_2[RPM_SAMPLES_motor_prop_2] = {0};
+uint8_t buffer_index_motor_prop_2 = 0;
+
+// Timing for loop interval
+unsigned long previousMillis = 0;
+
+// Output: calculated RPM
+uint16_t rpm_motor_prop_2 = 0;
+
+// ==================== INTERRUPT HANDLER ====================
+// Called on every RISING edge of encoder pulse
+void IRAM_ATTR pulse_interrupt_handler_motor_prop_2() {
+  pulse_counter_motor_prop_2 = pulse_counter_motor_prop_2 + 1;
+}
+
+// ==================== SETUP ====================
+void setup() {
+  Serial.begin(115200);
+  Serial.println("RPM Motor Prop 2 - Standalone");
+  Serial.println("GPIO: 9 | PPR: 1 | Update: 100ms");
+  
+  // Setup pulse counter pin and interrupt
+  pinMode(PULSE_PIN_Motor_prop_2, INPUT);
+  attachInterrupt(digitalPinToInterrupt(PULSE_PIN_Motor_prop_2), 
+                  pulse_interrupt_handler_motor_prop_2, 
+                  RISING);
+  
+  Serial.println("Setup complete!");
+  delay(1000);
+}
+
+// ==================== MAIN LOOP ====================
+void loop() {
+  unsigned long currentMillis = millis();
+  
+  // Execute every 100ms (10 Hz)
+  if (currentMillis - previousMillis >= INTERVAL_MS) {
+    previousMillis = currentMillis;
+    
+    // ========== Calculate RPM for Motor Prop 2 ==========
+    
+    // Calculate pulses per loop (100ms) using delta method
+    static uint32_t previous_pulse_counter_motor_prop_2 = 0;
+    uint32_t pulses_per_loop_motor_prop_2 = pulse_counter_motor_prop_2 - previous_pulse_counter_motor_prop_2;
+    previous_pulse_counter_motor_prop_2 = pulse_counter_motor_prop_2;
+    
+    // Add to moving average buffer (circular buffer)
+    pulse_buffer_motor_prop_2[buffer_index_motor_prop_2] = pulses_per_loop_motor_prop_2;
+    buffer_index_motor_prop_2 = (buffer_index_motor_prop_2 + 1) % RPM_SAMPLES_motor_prop_2;
+    
+    // Calculate moving average
+    uint32_t pulse_sum_motor_prop_2 = 0;
+    for (uint8_t i = 0; i < RPM_SAMPLES_motor_prop_2; i++) {
+      pulse_sum_motor_prop_2 += pulse_buffer_motor_prop_2[i];
+    }
+    float avg_pulses_per_loop_motor_prop_2 = pulse_sum_motor_prop_2 / (float)RPM_SAMPLES_motor_prop_2;
+    
+    // Calculate RPM and cast directly to uint16_t
+    // Formula: RPM = (avg_pulses_per_loop / 0.1s) * 60 = avg_pulses_per_loop * 600
+    // Explanation:
+    // - avg_pulses_per_loop = pulses in 100ms (0.1 second)
+    // - avg_pulses_per_loop / 0.1 = pulses per second (RPS)
+    // - RPS * 60 = pulses per minute (RPM)
+    // - Simplified: avg_pulses_per_loop * (1/0.1) * 60 = avg_pulses_per_loop * 600
+    rpm_motor_prop_2 = (uint16_t)(avg_pulses_per_loop_motor_prop_2 * 600.0);
+    
+    // ========== Print Results ==========
+    Serial.print("Pulses/100ms: ");
+    Serial.print(pulses_per_loop_motor_prop_2);
+    Serial.print(" | RPM: ");
+    Serial.print(rpm_motor_prop_2);
+    Serial.print(" | Total pulses: ");
+    Serial.println(pulse_counter_motor_prop_2);
+  }
+}
+
+/*
+ * ==================== NOTES ====================
+ * 
+ * 1. PULSE COUNTING METHOD:
+ *    - Interrupt-based (hardware triggered on RISING edge)
+ *    - No CPU overhead for counting
+ *    - Very accurate for pulse rates < 60 Hz
+ * 
+ * 2. DELTA METHOD:
+ *    - Calculate difference between current and previous counter
+ *    - Prevents overflow issues (wraps around automatically)
+ *    - More accurate than resetting counter
+ * 
+ * 3. MOVING AVERAGE:
+ *    - Smooths out fluctuations in RPM reading
+ *    - Window size: 10 samples (1 second of data)
+ *    - Circular buffer for memory efficiency
+ * 
+ * 4. RPM CALCULATION:
+ *    - PPR = 1 (1 pulse = 1 rotation)
+ *    - Formula: RPM = pulses_per_loop * 600
+ *    - Max RPM: 65,535 (limited by uint16_t)
+ * 
+ * 5. OUTPUT FORMAT:
+ *    - Direct integer value (no scaling factor)
+ *    - Range: 0 to 65,535 RPM
+ *    - Type: uint16_t
+ * 
+ * 6. EXAMPLE OUTPUT:
+ *    Pulses/100ms: 3 | RPM: 2220 | Total pulses: 37
+ *    Pulses/100ms: 4 | RPM: 2232 | Total pulses: 41
+ * 
+ * 7. TYPICAL VALUES (for reference):
+ *    - Brushed DC motor: 3,000 - 10,000 RPM
+ *    - Brushless motor: 5,000 - 30,000 RPM
+ *    - Boat propeller: 1,000 - 5,000 RPM
+ */
+
