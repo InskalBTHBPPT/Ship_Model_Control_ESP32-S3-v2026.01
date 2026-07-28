@@ -1,0 +1,300 @@
+clc; clear; close all;
+
+%% Parameter Kapal
+L = 101.07;         % Panjang Kapal (m)
+B = 14;             % Lebar Kapal (m)
+T = 3.7;            % Draft Kapal (m)
+m = 2423*1e3;       % Massa Kapal (kg)
+u_0 = 15.4;         % Kecepatan surge Kapal (m/s)
+C_B = 0.65;         % Koefisien Blok
+x_G = 5.25;         % Pusat massa sumbu-x
+A_delta = 5.7224;   % Luas rudder (m^2)
+rho = 1024;         % Massa jenis air laut (kg/m^3)
+r = 0.156*L;        % Kisaran jari-jari girisa
+
+%% Koefisien Hidrodinamika
+Y_v_dot = -(1 + 0.16*C_B*B/T - 5.1*(B/L)^2)*pi*(T/L)^2;
+Y_r_dot = -(0.67*(B/L) - 0.0033*(B/T)^2)*pi*(T/L)^2;
+N_v_dot = -(1.1*B/L - 0.041*B/T)*pi*(T/L)^2;
+N_r_dot = -((1/12) + 0.017*C_B*B/T - 0.33*B/L)*pi*(T/L)^2;
+Y_v = -(1 + 0.4*C_B*B/T)*pi*(T/L)^2;
+Y_r = -(-0.5 + 2.2*B/L - 0.08*B/T)*pi*(T/L)^2;
+N_v = -(0.5 + 2.4*T/L)*pi*(T/L)^2;
+N_r = -(0.25 + 0.039*B/T - 0.56*B/L)*pi*(T/L)^2;
+
+m_nd = 2*m/(rho*L^3);
+x_G_nd = x_G/L;
+I_z_nd = 1.2392*10^(-4);
+u_0_nd = 1;
+
+%% Model Gerak Kapal
+M_mat = [m_nd-Y_v_dot , m_nd*x_G_nd-Y_r_dot ;
+         m_nd*x_G_nd - N_v_dot , I_z_nd - N_r_dot ];
+
+a11 = ((I_z_nd - N_r_dot)*Y_v - (m_nd*x_G_nd - Y_r_dot)*N_v)/det(M_mat);
+a12 = ((I_z_nd - N_r_dot)*(Y_r - m_nd*u_0_nd) - (m_nd*x_G_nd - Y_r_dot)*(N_r - m_nd*x_G_nd*u_0_nd))/det(M_mat);
+a21 = ((m_nd - Y_v_dot)*N_v - (m_nd*x_G_nd - N_v_dot)*Y_v)/det(M_mat);
+a22 = ((m_nd - Y_v_dot)*(N_r - m_nd*x_G_nd*u_0_nd) - (m_nd*x_G_nd - N_v_dot)*(Y_r - m_nd*u_0_nd))/det(M_mat);
+
+A_sys = [a11 , a12 ;
+         a21 , a22 ];
+B_sys = [0.01 ;
+         1];
+
+%% Setup NMPC
+Tp = 30;            % Horizon waktu prediksi (s)
+T_sim = 1;          % Langkah waktu simulasi  / interval waktu simulasi (s)
+T_sim_total = 150;  % Waktu simulasi total (s)
+N = round(Tp / T_sim);   % Banyak titik prediksi secara diskrit
+
+Q = diag([10, 1, 1]);       % Bobot state
+R = 1;                      % Bobot input
+
+% Batasan state (yaw rate)
+r_limit = 0.0932; % (dalam radian)
+r_limit_nd = r_limit * (L / u_0);
+
+% Batasan input (rudder)
+u_limit = deg2rad(35);
+
+% Batasan perubahan input (rudder)
+u_rate_limit = deg2rad(5);
+du_max = u_rate_limit * T_sim;
+
+u_prev = 0; % Inisialisasi input awal
+
+% Batasan Perubahan Input
+[A_du, b_du] = du_constraints(N, u_prev, du_max); 
+
+% Batasan Batas Atas dan Batas Bawah Input
+lb = -u_limit * ones(N,1);
+ub =  u_limit * ones(N,1);
+
+s0_dim = [0; 0; 0; 100; 0];         % Inisialisasi kondisi awal [v; r; x; y; psi]
+s0_nd = dimensional_to_nondimensional(s0_dim, L, u_0); % Konversi ke nondimensional
+
+h_ref = [0; 0; 0]; % Lintasan Referensi
+
+
+history_state_nd = s0_nd; % Inisialisasi riwayat state
+history_input = [];       % Inisialisasi riwayat input
+s_nd = s0_nd;
+
+% options optimizer
+options = optimoptions('fmincon', 'Algorithm', 'sqp', 'Display', 'none', 'MaxIterations', 200, 'OptimalityTolerance', 1e-6);
+
+fprintf('Memulai simulasi NMPC \n');
+timer_val = tic; % Memulai timer
+
+for t = 0:T_sim:T_sim_total-T_sim
+    % Referensi untuk horizon prediksi
+    t_pred = t + (1:N)*T_sim;
+    x_ref_seq = (h_ref(1) + t_pred * u_0) / L;   % x_ref nondimensional
+    y_ref_seq = h_ref(2) / L * ones(N,1);        % y_ref nondimensional
+    psi_ref_seq = h_ref(3) * ones(N,1);          % psi_ref nondimensional
+    
+    % fungsi objektif 
+    cost_fun = @(U) mpc_cost(U, s_nd, u_prev, x_ref_seq, y_ref_seq, psi_ref_seq, T_sim, L, u_0, A_sys, B_sys, u_0_nd, Q, R);
+    
+    % fungsi kendala
+    nonlcon = @(U) state_constraints(U, s_nd, T_sim, L, u_0, A_sys, B_sys, u_0_nd, r_limit_nd);
+    
+    % Input sebelumnya dalam bentuk matriks sebanyak N×1
+    U0 = u_prev * ones(N,1);
+    
+    % Optimasi
+    % Hasil dari optimasi adalah berupa u
+    [U_opt, ~, exitflag] = fmincon(cost_fun, U0, A_du, b_du, [], [], lb, ub, nonlcon, options);
+
+    % Mengecek apakah optimasi berhasil
+    if exitflag <= 0
+        warning('fmincon gagal pada t=%.1f s, exitflag=%d', t, exitflag);
+        U_opt = U0;
+    end
+    
+    u_applied = U_opt(1); % Ambil nilai input optimal pertama
+    history_input = [history_input, u_applied]; % Menyimpan hasil input
+    
+    % Update variabel state
+    dt_nd = T_sim * u_0 / L; 
+    s_nd = euler_step(@(s,u) ship_dynamics(s, u, A_sys, B_sys, u_0_nd), s_nd, u_applied, dt_nd);
+    history_state_nd = [history_state_nd, s_nd]; % Menyimpan hasil state
+    
+    % Update perubahan input
+    u_prev = u_applied;
+    [A_du, b_du] = du_constraints(N, u_prev, du_max);
+    
+    if mod(t,20) == 0
+        fprintf('t = %.1f s\n', t);
+    end
+end
+
+time_vector = 0:T_sim:T_sim_total;
+% Menambahkan input terakhir untuk keperluan plotting
+history_input = [history_input, history_input(end)];
+waktu = toc(timer_val); % Menghentikan timer dan menghitung total waktu komputasi
+fprintf('SIMULASI SELESAI\n');
+fprintf('Total Waktu Komputasi: %.4f detik\n', waktu);
+
+%% Konversi State ke Dimensional
+hist_dim = zeros(size(history_state_nd)); % Inisialisasi matriks state dimensional
+for i = 1:size(history_state_nd,2) % Loop melalui setiap kolom state dimensional
+    hist_dim(:,i) = nondimensional_to_dimensional(history_state_nd(:,i), L, u_0); % Konversi ke dimensional
+end
+
+%% Perhitungan RMSE
+x_ref_full = h_ref(1) + time_vector * u_0;
+y_ref_full = h_ref(2) * ones(size(time_vector));
+psi_ref_full = h_ref(3) * ones(size(time_vector));
+
+rmse_x = sqrt(mean((hist_dim(3, :) - x_ref_full).^2));
+rmse_y = sqrt(mean((hist_dim(4, :) - y_ref_full).^2));
+rmse_psi = sqrt(mean((hist_dim(5, :) - psi_ref_full).^2));
+
+fprintf('\n Hasil Perhitungan RMSE \n');
+fprintf('RMSE X   : %.4f meter\n', rmse_x);
+fprintf('RMSE Y   : %.4f meter\n', rmse_y);
+fprintf('RMSE Psi : %.4f rad (%.4f derajat)\n\n', rmse_psi, rad2deg(rmse_psi));
+
+%% Plot Hasil
+% Plot 1: Trajektori Kapal
+figure('Name', 'Lintasan Kapal');
+plot(hist_dim(3,:), hist_dim(4,:), 'b-', 'LineWidth', 2); hold on;
+plot(hist_dim(3,1), hist_dim(4,1), 'o', 'MarkerSize', 10, 'MarkerEdgeColor', 'k', 'MarkerFaceColor', 'k'); hold on; % Titik Awal
+plot(hist_dim(3,end), hist_dim(4,end), 's', 'MarkerSize', 10, 'MarkerEdgeColor', 'y', 'MarkerFaceColor', 'y'); hold on; % Titik Akhir NMPC
+plot([0 2800], [0 0], 'r--', 'LineWidth', 1.5);
+xlabel('Posisi X (m)'); ylabel('Posisi Y (m)');
+title('Lintasan Kapal'); 
+legend('NMPC', 'Titik Awal', 'Titik Akhir NMPC', 'Lintasan Referensi'); 
+xlim([0 2800]);
+ylim([-100 600]);
+grid on;
+
+% Plot 2: Grafik Yaw Rate
+figure('Name', 'Grafik Yaw Rate');
+plot(time_vector, rad2deg(hist_dim(2,:)), 'b-', 'LineWidth', 2); hold on;
+yline(rad2deg(r_limit), 'r--', 'LineWidth', 1.5); 
+yline(-rad2deg(r_limit), 'r--', 'LineWidth', 1.5);
+xlabel('Waktu (s)'); ylabel('Yaw Rate (derajat/s)');
+title('Grafik Yaw Rate'); 
+legend('NMPC', 'Batasan Yaw Rate'); 
+grid on; ylim([-rad2deg(r_limit)*1.5, rad2deg(r_limit)*1.5]);
+
+% Plot 3: Input u (Sudut Rudder)
+figure('Name', 'Input u (Sudut Rudder)');
+plot(time_vector, rad2deg(history_input), 'b-', 'LineWidth', 2); hold on;
+yline(rad2deg(u_limit), 'r--', 'LineWidth', 1.5); 
+yline(-rad2deg(u_limit), 'r--', 'LineWidth', 1.5);
+xlabel('Waktu (s)'); ylabel('Sudut Rudder (derajat)');
+title('Input (u)'); 
+legend('NMPC', 'Batasan Input'); 
+grid on; ylim([-40 40]);
+
+% Plot 4: Perubahan Input u
+figure('Name', 'Perubahan Input u');
+u_changes_norm = [0, diff(rad2deg(history_input))];
+u_rate_norm = u_changes_norm / T_sim;
+
+plot(time_vector, u_rate_norm, 'b-', 'LineWidth', 2); hold on;
+yline(rad2deg(u_rate_limit), 'r--', 'LineWidth', 1.5); 
+yline(-rad2deg(u_rate_limit), 'r--', 'LineWidth', 1.5);
+xlabel('Waktu (s)'); ylabel('Perubahan Sudut Rudder (derajat)');
+title('Perubahan Input (\Deltau)'); 
+legend('NMPC', 'Batasan Perubahan Input'); 
+grid on; ylim([-10 10]);
+
+%% Fungsi Euler untuk Prediksi State
+function x_next = euler_step(f, x, u, dt)
+    x_next = x + dt * f(x, u);
+end
+
+%% Fungsi Dinamika Kapal
+function s_dot = ship_dynamics(s, u, A_sys, B_sys, u0_nd)
+    % s = [v; r; x; y; psi]
+    v = s(1); 
+    r = s(2); 
+    psi = s(5);
+    
+    % Dinamika
+    v_r_dot = A_sys * [v; r] + B_sys * u;
+    
+    % Kinematika
+    x_dot = u0_nd*cos(psi) - v*sin(psi);
+    y_dot = u0_nd*sin(psi) + v*cos(psi);
+    
+    s_dot = [v_r_dot(1); v_r_dot(2); x_dot; y_dot; r];
+end
+
+%% Fungsi Biaya NMPC (Sequential Approach)
+function J = mpc_cost(U, s0, u_prev, x_ref_seq, y_ref_seq, psi_ref_seq, ...
+                      T_sim, L, u0, A_sys, B_sys, u0_nd, Q, R)
+    N = length(U); % langkah dalam horizon prediksi
+    s = s0;
+    u_last = u_prev;
+    dt_nd = T_sim * u0 / L;
+    J = 0; % Inisialisasi nilai objektif
+    
+    for i = 1:N
+        u = U(i);
+        % Prediksi state dengan metode Euler
+        s = euler_step(@(s,u) ship_dynamics(s, u, A_sys, B_sys, u0_nd), s, u, dt_nd);
+        
+        % Error pada (x, y, psi) nondimensional
+        err = [s(3) - x_ref_seq(i);
+               s(4) - y_ref_seq(i);
+               s(5) - psi_ref_seq(i)];
+
+        J = J + err' * Q * err + R * u^2;
+        u_last = u;
+    end
+end
+
+%% Fungsi Kendala Nonlinear: Batasan Yaw Rate
+function [c, ceq] = state_constraints(U, s0, T_sim, L, u0, A_sys, B_sys, u0_nd, r_limit_nd)
+    N = length(U);
+    s = s0;
+    dt_nd = T_sim * u0 / L;
+    c = [];
+    
+    for i = 1:N
+        % Prediksi state
+        s = euler_step(@(s,u) ship_dynamics(s, u, A_sys, B_sys, u0_nd), s, U(i), dt_nd);
+        r = s(2);    % yaw rate nondimensional
+        
+        % Menambahkan kendala yaw rate
+        c = [c; r - r_limit_nd; -r_limit_nd - r];
+    end
+    ceq = [];
+end
+
+%% Fungsi Pembuatan Kendala Linear untuk Perubahan Input (du)
+function [A, b] = du_constraints(N, u_prev, du_max)
+    A = zeros(2*N, N);
+    b = zeros(2*N, 1);
+    
+    % u0 - u_prev <= du_max
+    A(1,1) = 1;   b(1) = u_prev + du_max;
+    % u_{k} - u_{k-1} <= du_max
+    for i = 2:N
+        A(i, i-1) = -1;   A(i, i) = 1;
+        b(i) = du_max;
+    end
+    
+    % -u0 + u_prev <= du_max
+    A(N+1,1) = -1;   b(N+1) = du_max - u_prev;
+    % -u_k + u_{k-1} <= du_max
+    for i = 2:N
+        A(N+i, i-1) = 1;   A(N+i, i) = -1;
+        b(N+i) = du_max;
+    end
+end
+
+%% Fungsi Konversi Dimensional ke Nondimensional
+function x_nd = dimensional_to_nondimensional(x, L, u0)
+    x_nd = [x(1)/u0; x(2)*L/u0; x(3)/L; x(4)/L; x(5)];
+end
+
+%% Fungsi Konversi Nondimensional ke Dimensional
+function x_dim = nondimensional_to_dimensional(x, L, u0)
+    x_dim = [x(1)*u0; x(2)*u0/L; x(3)*L; x(4)*L; x(5)];
+end
