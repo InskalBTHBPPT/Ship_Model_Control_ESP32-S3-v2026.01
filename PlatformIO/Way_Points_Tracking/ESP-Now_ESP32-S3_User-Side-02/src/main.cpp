@@ -1,6 +1,6 @@
 /**
  * @file main.cpp
- * @brief ESP32-S3 User-Side-01 — gateway USB-serial ↔ ESP-NOW
+ * @brief ESP32-S3 User-Side-02 — gateway USB-serial ↔ ESP-NOW
  *
  * @description
  * Meneruskan perintah dashboard ke Remote via ESP-NOW dan relay telemetry
@@ -17,7 +17,7 @@
  *   $TACK,ERR,<reason>
  *
  * @author Chandra P - Ship Model Control System
- * @version 1.0
+ * @version 1.2
  * @date 2026
  *
  * @note Lihat README.md di root proyek untuk detail protokol.
@@ -406,7 +406,7 @@ static void checkAckTimeout() {
 
 void setup() {
   Serial.begin(115200);
-  Serial.println("ESP32-S3 User-Side-01");
+  Serial.println("ESP32-S3 User-Side-02");
 
   WiFi.mode(WIFI_STA);
 

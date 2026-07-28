@@ -1,4 +1,4 @@
-# ESP-Now_ESP32-S3_User-Side-01
+# ESP-Now_ESP32-S3_User-Side-02
 
 Gateway USB-serial ↔ ESP-NOW antara PC (dashboard) dan kapal (Remote-Side).
 
@@ -9,7 +9,7 @@ Gateway USB-serial ↔ ESP-NOW antara PC (dashboard) dan kapal (Remote-Side).
 Salinan sama ada di:
 
 - `Pythonfile/Way_Points_Tracking/Ship Auto Way Maps Points Tracking.md`
-- `PlatformIO/Way_Points_Tracking/ESP-Now_ESP32-S3_Remote-Side-01/Ship Auto Way Maps Points Tracking.md`
+- `PlatformIO/Way_Points_Tracking/ESP-Now_ESP32-S3_Remote-Side-02/Ship Auto Way Maps Points Tracking.md`
 
 ## Ringkasan cepat
 
@@ -31,8 +31,8 @@ pio run --target upload
 pio device monitor
 ```
 
-Path: `PlatformIO/Way_Points_Tracking/ESP-Now_ESP32-S3_User-Side-01`
+Path: `PlatformIO/Way_Points_Tracking/ESP-Now_ESP32-S3_User-Side-02`
 
 ## Author
 
-Chandra P — Ship Model Control System | v1.0
+Chandra P — Ship Model Control System | v1.2

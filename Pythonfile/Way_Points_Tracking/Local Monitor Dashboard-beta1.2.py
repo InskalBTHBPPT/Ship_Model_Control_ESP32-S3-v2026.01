@@ -1,5 +1,5 @@
 """
-Local Monitor Dashboard beta 1.1.1 — Way Points Tracking
+Local Monitor Dashboard beta 1.2 — Way Points Tracking
 
 Dashboard PySide6 untuk monitoring telemetry kapal model secara real-time,
 perencanaan waypoint, pengiriman konfigurasi ke Remote, dan analisis log CSV.
@@ -15,7 +15,7 @@ Tab utama:
 Protokol kirim (tab Map Points):
   $WPSET → $WACK,OK,WP → $TUNSET → $WACK,OK,TUN → $TUNGET → $TACK (verify)
 
-Telemetry masuk (23 kolom, raw fixed-point dari User-Side-01):
+Telemetry masuk (23 kolom, raw fixed-point dari User-Side-02):
   1) timestamp  2) latitude  3) longitude
   4) speedMps (x100)  5-6) Calc_deg_servo_1/2 (x100, deg)
   7) yaw (x100)  8) heading_setpoint (x100)  9) heading_error (x100)
@@ -1678,7 +1678,7 @@ class MainWindow(QMainWindow):
         """
         super().__init__()
         self.resize(800, 700)
-        self.setWindowTitle("Ship Model Local Dashboard")
+        self.setWindowTitle("Ship Model Local Dashboard — beta 1.2")
         self.tab_widget = QTabWidget(self)
         self.setCentralWidget(self.tab_widget)
         

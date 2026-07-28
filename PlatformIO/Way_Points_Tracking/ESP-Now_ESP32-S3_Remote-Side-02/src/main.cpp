@@ -1,6 +1,6 @@
 ﻿/**
  * @file main.cpp
- * @brief ESP32-S3 Remote-Side-01 — Ship Model Control (kapal)
+ * @brief ESP32-S3 Remote-Side-02 — Ship Model Control (kapal)
  *
  * @description
  * Firmware sisi kapal: sensor/actuator, kontrol rudder/propeller, waypoint
@@ -15,7 +15,7 @@
  * Balas: 0xC1 ACK, 0xA3 tuning read-back
  *
  * @author Chandra P - Ship Model Control System
- * @version 1.1
+ * @version 1.2
  * @date 2026
  *
  * @note Update rate telemetry ~10 Hz. Lihat README.md di root proyek.

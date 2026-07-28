@@ -2,7 +2,7 @@
 
 Dokumentasi sistem **Ship Auto Way Maps Points Tracking** — kontrol kapal model ESP32-S3 dengan waypoint, tuning algoritma auto, telemetry real-time, dan dashboard PySide6.
 
-**Versi dokumen:** beta 1.1.1 | **Author:** Chandra P — Ship Model Control System
+**Versi dokumen:** beta 1.2 | **Author:** Chandra P — Ship Model Control System
 
 ---
 
@@ -44,10 +44,10 @@ Alur end-to-end:
 Dashboard (PySide6)
     │ USB serial 115200, ASCII + CSV
     ▼
-User-Side ESP32-S3  (ESP-Now_ESP32-S3_User-Side-01)
+User-Side ESP32-S3  (ESP-Now_ESP32-S3_User-Side-02)
     │ ESP-NOW peer-to-peer
     ▼
-Remote-Side ESP32-S3 (ESP-Now_ESP32-S3_Remote-Side-01) — di kapal
+Remote-Side ESP32-S3 (ESP-Now_ESP32-S3_Remote-Side-02) — di kapal
 ```
 
 ---
@@ -56,13 +56,13 @@ Remote-Side ESP32-S3 (ESP-Now_ESP32-S3_Remote-Side-01) — di kapal
 
 | Komponen | Path (dari root repo) | File utama |
 |----------|----------------------|------------|
-| Dashboard | `Pythonfile/Way_Points_Tracking/` | `Local Monitor Dashboard-beta1.1.1.py` |
-| User-Side | `PlatformIO/Way_Points_Tracking/ESP-Now_ESP32-S3_User-Side-01/` | `src/main.cpp` |
-| Remote-Side | `PlatformIO/Way_Points_Tracking/ESP-Now_ESP32-S3_Remote-Side-01/` | `src/main.cpp` |
+| Dashboard | `Pythonfile/Way_Points_Tracking/` | `Local Monitor Dashboard-beta1.2.py` |
+| User-Side | `PlatformIO/Way_Points_Tracking/ESP-Now_ESP32-S3_User-Side-02/` | `src/main.cpp` |
+| Remote-Side | `PlatformIO/Way_Points_Tracking/ESP-Now_ESP32-S3_Remote-Side-02/` | `src/main.cpp` |
 
 Dokumentasi ini disalin ke setiap folder proyek firmware sebagai referensi yang sama.
 
-Salinan: `ESP-Now_ESP32-S3_Remote-Side-01/`, `ESP-Now_ESP32-S3_User-Side-01/`
+Salinan: `ESP-Now_ESP32-S3_Remote-Side-02/`, `ESP-Now_ESP32-S3_User-Side-02/`
 
 ---
 
@@ -94,7 +94,7 @@ Salinan: `ESP-Now_ESP32-S3_Remote-Side-01/`, `ESP-Now_ESP32-S3_User-Side-01/`
 
 ## 4. Remote-Side (firmware kapal)
 
-**Proyek:** `ESP-Now_ESP32-S3_Remote-Side-01`
+**Proyek:** `ESP-Now_ESP32-S3_Remote-Side-02`
 
 Firmware di kapal: sensor, actuator, kontrol rudder/propeller, waypoint tracking, NVS tuning, telemetry ESP-NOW.
 
@@ -158,7 +158,7 @@ ESP32Servo, TinyGPSPlus, JY901 (lib lokal), Preferences, ESP-NOW, WiFi.
 
 ## 5. User-Side (gateway USB)
 
-**Proyek:** `ESP-Now_ESP32-S3_User-Side-01`
+**Proyek:** `ESP-Now_ESP32-S3_User-Side-02`
 
 Bridge: perintah ASCII dari PC ↔ binary ESP-NOW ke Remote. **Tidak** mengirim `$WACK,OK` sebelum Remote membalas `0xC1`.
 
@@ -183,7 +183,7 @@ Identik field dengan `DatatoSend` Remote (64 byte). User-Side tidak mengubah ska
 
 ## 6. Dashboard (PC)
 
-**File:** `Local Monitor Dashboard-beta1.1.1.py` (PySide6)
+**File:** `Local Monitor Dashboard-beta1.2.py` (PySide6)
 
 ### 6.1 Tab aplikasi
 
@@ -244,7 +244,7 @@ Python 3.10+, PySide6, pyserial, PyQtWebEngine.
 
 ```bash
 cd Pythonfile/Way_Points_Tracking
-python "Local Monitor Dashboard-beta1.1.1.py"
+python "Local Monitor Dashboard-beta1.2.py"
 ```
 
 ---
@@ -486,7 +486,7 @@ Cek MAC perangkat: upload firmware yang print MAC di `setup()`, atau tool WiFi s
 ### Remote-Side
 
 ```bash
-cd PlatformIO/Way_Points_Tracking/ESP-Now_ESP32-S3_Remote-Side-01
+cd PlatformIO/Way_Points_Tracking/ESP-Now_ESP32-S3_Remote-Side-02
 pio run
 pio run --target upload
 pio device monitor
@@ -495,7 +495,7 @@ pio device monitor
 ### User-Side
 
 ```bash
-cd PlatformIO/Way_Points_Tracking/ESP-Now_ESP32-S3_User-Side-01
+cd PlatformIO/Way_Points_Tracking/ESP-Now_ESP32-S3_User-Side-02
 pio run
 pio run --target upload
 pio device monitor
@@ -507,7 +507,7 @@ Sesuaikan `upload_port` / `monitor_port` di `platformio.ini` tiap proyek.
 
 ```bash
 cd Pythonfile/Way_Points_Tracking
-python "Local Monitor Dashboard-beta1.1.1.py"
+python "Local Monitor Dashboard-beta1.2.py"
 ```
 
 ---
@@ -569,4 +569,4 @@ python "Local Monitor Dashboard-beta1.1.1.py"
 
 ---
 
-*Dokumen ini: Ship Auto Way Maps Points Tracking — beta 1.1.1*
+*Dokumen ini: Ship Auto Way Maps Points Tracking — beta 1.2*
