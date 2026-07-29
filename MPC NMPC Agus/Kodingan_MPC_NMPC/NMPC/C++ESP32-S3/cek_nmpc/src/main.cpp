@@ -1,6 +1,9 @@
 #include <Arduino.h>
 #include "esp_system.h"
 #include "esp_heap_caps.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/semphr.h"
 #include "simulate_nmpc_kapal.h"
 #include "simulate_nmpc_kapal_initialize.h"
 #include "simulate_nmpc_kapal_terminate.h"
@@ -33,6 +36,11 @@ void initBuffers() {
 // Variabel Benchmark & Statistik Komputasi
 // ============================================================================
 uint32_t runCount = 0;
+static SemaphoreHandle_t benchmarkDoneSem = nullptr;
+static volatile bool benchmarkRunning = false;
+
+// Stack solver NMPC besar; dengan PSRAM stack eksternal, 512 KB aman.
+static constexpr uint32_t NMPC_TASK_STACK_BYTES = 512 * 1024;
 
 struct BenchmarkStats {
   uint32_t totalDurationUs;
@@ -46,9 +54,39 @@ struct BenchmarkStats {
   uint32_t freePsramAfter;
 };
 
-// Function declarations
 void printSystemInfo();
 void runNMPCBenchmark();
+void nmpcBenchmarkTask(void *param);
+static StackType_t *nmpcTaskStack = nullptr;
+static StaticTask_t nmpcTaskBuffer;
+
+static bool createNmpcBenchmarkTask() {
+  const uint32_t stackWords = NMPC_TASK_STACK_BYTES / sizeof(StackType_t);
+
+  if (!nmpcTaskStack) {
+    nmpcTaskStack = static_cast<StackType_t *>(
+      heap_caps_malloc(stackWords * sizeof(StackType_t), MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT));
+    if (!nmpcTaskStack) {
+      Serial.printf("[ERROR] Alokasi stack PSRAM %u byte gagal.\n", NMPC_TASK_STACK_BYTES);
+      return false;
+    }
+  }
+
+  if (xTaskCreateStaticPinnedToCore(
+        nmpcBenchmarkTask,
+        "nmpc_bench",
+        stackWords,
+        nullptr,
+        1,
+        nmpcTaskStack,
+        &nmpcTaskBuffer,
+        1) == nullptr) {
+    Serial.println("[ERROR] Gagal membuat task benchmark.");
+    return false;
+  }
+
+  return true;
+}
 
 void setup() {
   Serial.begin(115200);
@@ -63,6 +101,7 @@ void setup() {
 
   // 2. Inisialisasi Buffers Memori PSRAM & Solver NMPC
   initBuffers();
+  benchmarkDoneSem = xSemaphoreCreateBinary();
   Serial.println("\n[INIT] Menginisialisasi Solver NMPC...");
   simulate_nmpc_kapal_initialize();
   Serial.println("[INIT] Solver NMPC Berhasil Diinisialisasi.");
@@ -72,14 +111,32 @@ void setup() {
 }
 
 void loop() {
+  if (benchmarkRunning) {
+    return;
+  }
+
   runCount++;
   Serial.printf("\n>>> MEMULAI RUN BENCHMARK NMPC #%u <<<\n", runCount);
 
-  runNMPCBenchmark();
+  benchmarkRunning = true;
+  if (!createNmpcBenchmarkTask()) {
+    benchmarkRunning = false;
+    delay(5000);
+    return;
+  }
 
-  // Jeda antar pengujian (misal 5 detik)
+  xSemaphoreTake(benchmarkDoneSem, portMAX_DELAY);
+
   Serial.println("\n[WAIT] Menunggu 5 detik sebelum siklus pengujian berikutnya...");
   delay(5000);
+}
+
+void nmpcBenchmarkTask(void *param) {
+  (void)param;
+  runNMPCBenchmark();
+  benchmarkRunning = false;
+  xSemaphoreGive(benchmarkDoneSem);
+  vTaskDelete(nullptr);
 }
 
 void printSystemInfo() {
