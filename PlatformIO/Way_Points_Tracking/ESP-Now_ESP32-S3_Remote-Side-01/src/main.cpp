@@ -52,7 +52,7 @@
  * @note UBAH MAC ADDRESS INI sesuai MAC User-Side Anda.
  */
 // uint8_t user_side_Address[] = {0x10, 0x20, 0xba, 0x4c, 0x53, 0xfc};
-uint8_t user_side_Address[] = {0x94, 0xa9, 0x90, 0x30, 0xab, 0xc0};
+uint8_t user_side_Address[] = {0x80, 0xb5, 0x4e, 0xc1, 0xd5, 0xac};
 
 // =====================================================================
 // Waypoints (diterima dari User-Side). HARUS identik dengan User-Side.
@@ -1118,18 +1118,18 @@ void loop() {
         dataToSend.battery_2 = (uint16_t)(volt_batt_2 * 100); // batere for motor propeller
 
         // ========== Serial Print Debugging ==========
-        Serial.print(dataToSend.timestamp, 3); Serial.println("");
+        // Serial.print(dataToSend.timestamp, 3); Serial.println("");
         // Serial.print(dataToSend.latitude, 6); Serial.println(""); //Serial.print(",");
         // Serial.print(dataToSend.longitude, 6); Serial.print(",");
         // Serial.print(dataToSend.speedMps / 100.0, 2); Serial.print(",");
-        Serial.print(dataToSend.Calc_deg_servo_1 / 100.0, 2); Serial.print(",");
-        Serial.print(dataToSend.Calc_deg_servo_2 / 100.0, 2); Serial.print(",");
-        Serial.print(dataToSend.yaw / 100.0, 2); Serial.print(",");
+        // Serial.print(dataToSend.Calc_deg_servo_1 / 100.0, 2); Serial.print(",");
+        // Serial.print(dataToSend.Calc_deg_servo_2 / 100.0, 2); Serial.print(",");
+        // Serial.print(dataToSend.yaw / 100.0, 2); Serial.print(",");
         // Serial.print(dataToSend.rpm_prop_1 / 100.0, 2); Serial.print(",");
         // Serial.print(dataToSend.rpm_prop_2 / 100.0, 2); Serial.print(",");
         // Serial.print(dataToSend.battery_1 / 100.0, 2); Serial.print(",");
         // Serial.println(dataToSend.battery_2 / 100.0, 2);
-        Serial.println(dataToSend.mode_auto);
+        // Serial.println(dataToSend.mode_auto);
 
         // ========== Send message via ESP-NOW ==========
         esp_err_t result = esp_now_send(user_side_Address, (uint8_t *) &dataToSend, sizeof(dataToSend));

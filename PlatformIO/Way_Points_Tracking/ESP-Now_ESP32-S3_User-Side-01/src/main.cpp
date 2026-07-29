@@ -22,7 +22,7 @@
 
 // MAC address ESP32-S3 DevKitC-1 remote-side (peer ESP-NOW)
 //uint8_t remote_side_Address[] = {0x94, 0xa9, 0x90, 0x30, 0xab, 0xc0};
-uint8_t remote_side_Address[] = {0x10, 0x20, 0xba, 0x4c, 0x53, 0xfc};
+uint8_t remote_side_Address[] = {0x98, 0xa3, 0x16, 0xf5, 0x01, 0xa0};
 
 // =====================================================================
 // Telemetry struct (diterima dari Remote-Side-01). 23 field, urutan & tipe
