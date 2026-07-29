@@ -23,9 +23,28 @@ from nmpc_model import (
 )
 
 
+class _StepOptimizerStats:
+    """Counter evaluasi optimizer untuk satu langkah waktu t."""
+
+    __slots__ = ("mpc_cost_calls", "constraint_calls")
+
+    def __init__(self) -> None:
+        self.mpc_cost_calls = 0
+        self.constraint_calls = 0
+
+    def reset(self) -> None:
+        self.mpc_cost_calls = 0
+        self.constraint_calls = 0
+
+    @property
+    def total_propagations(self) -> int:
+        return self.mpc_cost_calls + self.constraint_calls
+
+
 def run_simulation(
     plot: bool = True,
     show_plots: bool = True,
+    log_step_time: bool = True,
 ) -> dict:
     """Jalankan simulasi NMPC penuh 150 detik."""
     ship = ShipParams()
@@ -59,14 +78,29 @@ def run_simulation(
 
     history_state_nd = [s0_nd.copy()]
     history_input: list[float] = []
+    step_times_s: list[float] = []
+    slsqp_iters: list[int] = []
+    mpc_cost_calls_log: list[int] = []
+    constraint_calls_log: list[int] = []
+    total_propagations_log: list[int] = []
+    opt_stats = _StepOptimizerStats()
     s_nd = s0_nd.copy()
 
     num_steps = int(t_sim_total / t_sim)
     print("Memulai simulasi NMPC")
+    if log_step_time:
+        print(
+            f"{'t (s)':>8}  {'waktu (ms)':>10}  {'SLSQP':>6}  {'mpc_cost':>9}  "
+            f"{'kendala':>8}  {'prop_tot':>9}  {'status':>6}"
+        )
+        print(f"{'':>8}  {'':>10}  {'':>6}  {'':>9}  {'':>8}  {f'(N={n})':>9}")
+        print("-" * 68)
     t_start = time.perf_counter()
 
     for step in range(num_steps):
         t = step * t_sim
+        step_start = time.perf_counter()
+        opt_stats.reset()
 
         t_pred = t + (np.arange(1, n + 1)) * t_sim
         x_ref_seq = (h_ref[0] + t_pred * u_0) / L
@@ -76,6 +110,7 @@ def run_simulation(
         u0_guess = np.full(n, u_prev)
 
         def objective(u_vec: np.ndarray) -> float:
+            opt_stats.mpc_cost_calls += 1
             return mpc_cost(
                 u_vec,
                 s_nd,
@@ -93,6 +128,7 @@ def run_simulation(
             )
 
         def nonlinear_ineq(u_vec: np.ndarray) -> np.ndarray:
+            opt_stats.constraint_calls += 1
             return state_constraints(
                 u_vec, s_nd, t_sim, L, u_0, a_sys, b_sys, u_0_nd, r_limit_nd
             )
@@ -131,12 +167,60 @@ def run_simulation(
         u_prev = u_applied
         a_du, b_du = du_constraints(n, u_prev, du_max)
 
-        if step % 20 == 0:
-            print(f"t = {t:.1f} s")
+        step_elapsed = time.perf_counter() - step_start
+        step_times_s.append(step_elapsed)
+
+        slsqp_iter = int(getattr(result, "nit", 0))
+        mpc_cost_count = opt_stats.mpc_cost_calls
+        constraint_count = opt_stats.constraint_calls
+        propagations_in_opt = opt_stats.total_propagations * n
+
+        slsqp_iters.append(slsqp_iter)
+        mpc_cost_calls_log.append(mpc_cost_count)
+        constraint_calls_log.append(constraint_count)
+        total_propagations_log.append(propagations_in_opt)
+
+        if log_step_time:
+            status = "OK" if result.success else "FAIL"
+            print(
+                f"{t:8.1f}  {step_elapsed * 1000.0:10.2f}  {slsqp_iter:6d}  "
+                f"{mpc_cost_count:9d}  {constraint_count:8d}  "
+                f"{propagations_in_opt:9d}  {status:>6}"
+            )
 
     elapsed = time.perf_counter() - t_start
+    step_times_arr = np.array(step_times_s, dtype=float)
+    slsqp_iters_arr = np.array(slsqp_iters, dtype=int)
+    mpc_cost_calls_arr = np.array(mpc_cost_calls_log, dtype=int)
+    constraint_calls_arr = np.array(constraint_calls_log, dtype=int)
+    total_propagations_arr = np.array(total_propagations_log, dtype=int)
     print("SIMULASI SELESAI")
     print(f"Total Waktu Komputasi: {elapsed:.4f} detik")
+    if len(step_times_arr) > 0:
+        print(
+            "Waktu per langkah t - "
+            f"min: {step_times_arr.min() * 1000.0:.2f} ms, "
+            f"max: {step_times_arr.max() * 1000.0:.2f} ms, "
+            f"rata-rata: {step_times_arr.mean() * 1000.0:.2f} ms"
+        )
+        print(
+            "SLSQP per t - "
+            f"min: {slsqp_iters_arr.min()}, max: {slsqp_iters_arr.max()}, "
+            f"rata-rata: {slsqp_iters_arr.mean():.1f}"
+        )
+        print(
+            "mpc_cost per t - "
+            f"min: {mpc_cost_calls_arr.min()}, max: {mpc_cost_calls_arr.max()}, "
+            f"rata-rata: {mpc_cost_calls_arr.mean():.1f}"
+        )
+        print(
+            f"Propagasi horizon (N={n} per evaluasi) - "
+            f"min: {total_propagations_arr.min()}, max: {total_propagations_arr.max()}, "
+            f"total seluruh simulasi: {total_propagations_arr.sum()}"
+        )
+        print(
+            f"(+ {num_steps} propagasi nyata kapal, 1x Euler per langkah t di luar optimizer)"
+        )
 
     history_state_nd_arr = np.column_stack(history_state_nd)
     history_input_arr = np.array(history_input, dtype=float)
@@ -164,6 +248,8 @@ def run_simulation(
     print(f"RMSE Y   : {rmse_y:.4f} meter")
     print(f"RMSE Psi : {rmse_psi:.4f} rad ({np.rad2deg(rmse_psi):.4f} derajat)\n")
 
+    step_time_vector = np.arange(0.0, t_sim_total, t_sim)
+
     if plot:
         _plot_results(
             hist_dim,
@@ -173,6 +259,8 @@ def run_simulation(
             u_limit,
             u_rate_limit,
             t_sim,
+            step_time_vector,
+            step_times_arr,
             show=show_plots,
         )
 
@@ -183,6 +271,13 @@ def run_simulation(
         "hist_dim": hist_dim,
         "history_input": history_input_plot,
         "time_vector": time_vector,
+        "step_time_vector": step_time_vector,
+        "step_times_s": step_times_arr,
+        "slsqp_iters": slsqp_iters_arr,
+        "mpc_cost_calls": mpc_cost_calls_arr,
+        "constraint_calls": constraint_calls_arr,
+        "total_propagations": total_propagations_arr,
+        "horizon_n": n,
         "elapsed_s": elapsed,
     }
 
@@ -195,6 +290,8 @@ def _plot_results(
     u_limit: float,
     u_rate_limit: float,
     t_sim: float,
+    step_time_vector: np.ndarray,
+    step_times_s: np.ndarray,
     show: bool = True,
 ) -> None:
     """Empat grafik setara NMPC_Biasa.m."""
@@ -245,6 +342,14 @@ def _plot_results(
     ax4.set_ylim(-10, 10)
     ax4.legend(["NMPC", "Batasan Perubahan Input"])
     ax4.grid(True)
+
+    fig5, ax5 = plt.subplots(figsize=(8, 4))
+    ax5.plot(step_time_vector, step_times_s * 1000.0, "b-", linewidth=1.5, label="Waktu solve")
+    ax5.set_xlabel("Waktu simulasi t (s)")
+    ax5.set_ylabel("Waktu komputasi (ms)")
+    ax5.set_title("Waktu Aktual per Langkah t")
+    ax5.grid(True)
+    ax5.legend()
 
     if show:
         plt.show()
