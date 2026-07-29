@@ -13,10 +13,11 @@ Format data serial yang dibaca (23 kolom, raw fixed-point dari User-Side-01):
 7) yaw (x100)  8) heading_setpoint (x100)  9) heading_error (x100)
 10) rudder_cmd (x100)  11) track_wp_index  12) distance_to_wp (x10, m)
 13-18) accel_x/y/z, gyro_x/y/z (x100) — di-log, tidak di panel live
-19-20) rpm_prop_1/2 (x100)  21-22) battery_1/2 (x100, V)  23) mode_auto
+19-20) rpm_prop_1/2 (integer RPM langsung, bukan x100)  21-22) battery_1/2 (x100, V)  23) mode_auto
 
 Catatan pengolahan:
 - Parser memproses baris utuh yang diakhiri newline dan memvalidasi jumlah kolom = 23.
+- RPM: nilai mentah dari Remote-Side = putaran/menit langsung (sama seperti beta 1.1 + Receive).
 - Data lat/lon tervalidasi range; nilai 0,0 dapat diganti default location.
 - Nilai terbaru lat/lon disimpan untuk fitur Home Points.
 """
@@ -82,6 +83,11 @@ def _telemetry_scale(parts: list[str], idx: int, divisor: float = 100.0) -> floa
     return float(parts[idx]) / divisor
 
 
+def _telemetry_rpm(parts: list[str], idx: int) -> int:
+    """RPM dari User-Side: integer langsung (bukan fixed-point x100)."""
+    return int(float(parts[idx]))
+
+
 def _format_track_wp_index(raw: int) -> str:
     if raw == 0:
         return "—"
@@ -123,8 +129,8 @@ def _parse_analyze_csv_row(row: dict, fmt: str) -> dict | None:
             rudder_cmd = float(_csv_row_value(row, "rudder_cmd (raw)", "rudder_cmd")) / 100.0
             track_wp_index = int(float(_csv_row_value(row, "track_wp_index", default="0")))
             distance_to_wp = float(_csv_row_value(row, "distance_to_wp (raw)", "distance_to_wp")) / 10.0
-            rpm1 = float(_csv_row_value(row, "rpm_prop_1 (raw)", "rpm_prop_1")) / 100.0
-            rpm2 = float(_csv_row_value(row, "rpm_prop_2 (raw)", "rpm_prop_2")) / 100.0
+            rpm1 = int(float(_csv_row_value(row, "rpm_prop_1 (raw)", "rpm_prop_1")))
+            rpm2 = int(float(_csv_row_value(row, "rpm_prop_2 (raw)", "rpm_prop_2")))
             bat1 = float(_csv_row_value(row, "battery_1 (raw)", "battery_1")) / 100.0
             bat2 = float(_csv_row_value(row, "battery_2 (raw)", "battery_2")) / 100.0
         elif fmt == "display_v23":
@@ -3645,8 +3651,8 @@ class MainWindow(QMainWindow):
                     gyro_x = _telemetry_scale(parts, 15)
                     gyro_y = _telemetry_scale(parts, 16)
                     gyro_z = _telemetry_scale(parts, 17)
-                    rpm1 = _telemetry_scale(parts, 18)
-                    rpm2 = _telemetry_scale(parts, 19)
+                    rpm1 = _telemetry_rpm(parts, 18)
+                    rpm2 = _telemetry_rpm(parts, 19)
                     bat1 = _telemetry_scale(parts, 20)
                     bat2 = _telemetry_scale(parts, 21)
                     mode_auto = int(parts[22])
