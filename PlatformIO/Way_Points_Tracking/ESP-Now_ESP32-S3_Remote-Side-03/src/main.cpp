@@ -821,6 +821,7 @@ void setup() {
     // ========== Serial Monitor Initialization ==========
     Serial.begin(115200);
     delay(500);
+    Serial.println("timestamp,lat,lon,calc_deg_servo_1,calc_deg_servo_2,yaw,gyro_z,yaw_rate");
     
     // ========== PPM Interrupt Setup ==========
     pinMode(PPM_PIN, INPUT);
@@ -1010,6 +1011,19 @@ void loop() {
         dataToSend.gyro_x = (int16_t)((JY901.stcGyro.w[0] / 32768.0f * 2000.0f) * 100.0f);
         dataToSend.gyro_y = (int16_t)((JY901.stcGyro.w[1] / 32768.0f * 2000.0f) * 100.0f);
         dataToSend.gyro_z = (int16_t)((JY901.stcGyro.w[2] / 32768.0f * 2000.0f) * 100.0f);
+
+        // yaw_rate lokal untuk debug (tidak masuk struct DatatoSend)
+        static float prev_yaw_deg = 0.0f;
+        static bool prev_yaw_valid = false;
+        float yaw_rate_dps = 0.0f;
+        if (prev_yaw_valid) {
+          float dyaw = yaw - prev_yaw_deg;
+          while (dyaw > 180.0f)  dyaw -= 360.0f;
+          while (dyaw < -180.0f) dyaw += 360.0f;
+          yaw_rate_dps = dyaw / (intervaltime / 1000.0f);
+        }
+        prev_yaw_deg = yaw;
+        prev_yaw_valid = true;
         
         for (uint8_t i = 0; i < CHANNEL_COUNT; i++) {
             // Convert raw PPM FS-iA6B values (600-1600) to standard servo range (1000-2000)
@@ -1117,19 +1131,15 @@ void loop() {
         // Konversi ke uint16_t (Ã— 100) untuk pengiriman
         dataToSend.battery_2 = (uint16_t)(volt_batt_2 * 100); // batere for motor propeller
 
-        // ========== Serial Print Debugging ==========
-        // Serial.print(dataToSend.timestamp, 3); Serial.println("");
-        // Serial.print(dataToSend.latitude, 6); Serial.println(""); //Serial.print(",");
-        // Serial.print(dataToSend.longitude, 6); Serial.print(",");
-        // Serial.print(dataToSend.speedMps / 100.0, 2); Serial.print(",");
-        // Serial.print(dataToSend.Calc_deg_servo_1 / 100.0, 2); Serial.print(",");
-        // Serial.print(dataToSend.Calc_deg_servo_2 / 100.0, 2); Serial.print(",");
-        // Serial.print(dataToSend.yaw / 100.0, 2); Serial.print(",");
-        // Serial.print(dataToSend.rpm_prop_1 / 100.0, 2); Serial.print(",");
-        // Serial.print(dataToSend.rpm_prop_2 / 100.0, 2); Serial.print(",");
-        // Serial.print(dataToSend.battery_1 / 100.0, 2); Serial.print(",");
-        // Serial.println(dataToSend.battery_2 / 100.0, 2);
-        // Serial.println(dataToSend.mode_auto);
+        // ========== Serial Print Debugging (8 kolom CSV @ 10 Hz) ==========
+        Serial.print(dataToSend.timestamp, 3); Serial.print(",");
+        Serial.print(dataToSend.latitude, 6);    Serial.print(",");
+        Serial.print(dataToSend.longitude, 6);   Serial.print(",");
+        Serial.print(dataToSend.Calc_deg_servo_1 / 100.0f, 2); Serial.print(",");
+        Serial.print(dataToSend.Calc_deg_servo_2 / 100.0f, 2); Serial.print(",");
+        Serial.print(dataToSend.yaw / 100.0f, 2);              Serial.print(",");
+        Serial.print(dataToSend.gyro_z / 100.0f, 2);           Serial.print(",");
+        Serial.println(yaw_rate_dps, 2);
 
         // ========== Send message via ESP-NOW ==========
         esp_err_t result = esp_now_send(user_side_Address, (uint8_t *) &dataToSend, sizeof(dataToSend));
