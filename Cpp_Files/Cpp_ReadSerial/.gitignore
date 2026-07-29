@@ -1,0 +1,5 @@
+build/
+read_serial
+read_serial.exe
+*.o
+*.obj
