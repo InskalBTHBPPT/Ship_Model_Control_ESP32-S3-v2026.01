@@ -85,11 +85,11 @@ int main(int argc, char **argv) {
       std::cerr << "[ERROR] Tidak bisa membuka file output: " << output_file << "\n";
       return 1;
     }
-    log_file << "timestamp,lat,lon,calc_deg_servo_1,calc_deg_servo_2,yaw,gyro_z,yaw_rate\n";
   }
 
-  std::cout << "[INFO] Membaca port " << port << " @ " << baud << " baud\n";
-  std::cout << "[INFO] Tekan Ctrl+C untuk berhenti\n";
+  std::cerr << "[INFO] Membaca port " << port << " @ " << baud << " baud\n";
+  std::cerr << "[INFO] Tekan Ctrl+C untuk berhenti\n";
+  std::cerr << "[INFO] Output CSV ke stdout (format sama dengan serial port)\n";
 
   uint64_t valid_lines = 0;
   uint64_t skipped_lines = 0;
@@ -105,30 +105,30 @@ int main(int argc, char **argv) {
       continue;
     }
 
+    if (is_header_line(line)) {
+      std::cout << line << "\n";
+      if (log_file) {
+        log_file << line << "\n";
+      }
+      continue;
+    }
+
     const auto row = parse_telemetry_line(line);
     if (!row) {
       ++skipped_lines;
       continue;
     }
 
+    (void)row;
     ++valid_lines;
-    std::cout
-        << "t=" << row->timestamp
-        << " lat=" << row->lat
-        << " lon=" << row->lon
-        << " srv1=" << row->calc_deg_servo_1
-        << " srv2=" << row->calc_deg_servo_2
-        << " yaw=" << row->yaw
-        << " gyro_z=" << row->gyro_z
-        << " yaw_rate=" << row->yaw_rate
-        << "\n";
+    std::cout << line << "\n";
 
     if (log_file) {
       log_file << line << "\n";
     }
   }
 
-  std::cout << "\n[INFO] Selesai. Baris valid: " << valid_lines
+  std::cerr << "\n[INFO] Selesai. Baris valid: " << valid_lines
             << ", baris dilewati: " << skipped_lines << "\n";
   return 0;
 }

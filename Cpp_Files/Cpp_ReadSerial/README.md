@@ -24,7 +24,7 @@ timestamp,lat,lon,calc_deg_servo_1,calc_deg_servo_2,yaw,gyro_z,yaw_rate
 | `gyro_z` | derajat/s | Laju sudut dari gyro Z |
 | `yaw_rate` | derajat/s | Turunan yaw (delta yaw / dt) |
 
-Baris header `timestamp,lat,lon,...` otomatis dilewati. Format lain **tidak** didukung.
+Baris header `timestamp,lat,lon,...` dari serial diteruskan ke stdout; baris lain yang bukan format 8 kolom dilewati.
 
 **Baud rate default:** `115200` (sesuai `platformio.ini` Remote-Side-03).
 
@@ -50,7 +50,36 @@ Tidak ada library eksternal — serial port memakai API native Windows (`CreateF
 
 ## Build
 
-### Windows (CMake + MSVC atau MinGW)
+Dua cara build — **g++** (disarankan, tanpa instalasi tambahan selain compiler) atau **CMake** (jika sudah terpasang).
+
+### Opsi A — g++ (disarankan)
+
+Hanya butuh compiler C++ (MinGW `g++` di Windows, `g++` dari `build-essential` di Linux). Tidak perlu CMake.
+
+**Windows (PowerShell):**
+
+```powershell
+cd "Cpp_Files\Cpp_ReadSerial"
+g++ -std=c++17 -Iinclude src/main.cpp src/serial_port.cpp -o read_serial.exe
+```
+
+Executable: `read_serial.exe` (di folder proyek)
+
+**Linux:**
+
+```bash
+sudo apt install build-essential
+cd Cpp_Files/Cpp_ReadSerial
+g++ -std=c++17 -Iinclude src/main.cpp src/serial_port.cpp -o read_serial
+```
+
+Executable: `read_serial`
+
+### Opsi B — CMake
+
+Butuh [CMake](https://cmake.org/) terpasang di PATH.
+
+**Windows:**
 
 ```powershell
 cd "Cpp_Files\Cpp_ReadSerial"
@@ -65,10 +94,9 @@ build\Release\read_serial.exe    # MSVC
 build\read_serial.exe            # MinGW/Ninja
 ```
 
-### Linux (Ubuntu/Debian)
+**Linux (Ubuntu/Debian):**
 
 ```bash
-sudo apt update
 sudo apt install build-essential cmake
 cd Cpp_Files/Cpp_ReadSerial
 cmake -S . -B build
@@ -81,14 +109,18 @@ Executable: `build/read_serial`
 
 ## Penggunaan
 
+Ganti path executable sesuai cara build:
+- **g++:** `.\read_serial.exe` (Windows) atau `./read_serial` (Linux)
+- **CMake:** `.\build\Release\read_serial.exe` atau `./build/read_serial`
+
 ### Windows
 
 ```powershell
-# Default port COM16
-.\build\Release\read_serial.exe
+# Default port COM16 (build g++)
+.\read_serial.exe
 
 # Port dan simpan ke CSV
-.\build\Release\read_serial.exe --port COM16 --baud 115200 --output telemetry.csv
+.\read_serial.exe --port COM16 --baud 115200 --output telemetry.csv
 ```
 
 Cek port di Device Manager atau:
@@ -107,7 +139,7 @@ sudo usermod -aG dialout $USER
 ls /dev/ttyUSB* /dev/ttyACM*
 
 # Jalankan
-./build/read_serial --port /dev/ttyUSB0 --baud 115200 --output telemetry.csv
+./read_serial --port /dev/ttyUSB0 --baud 115200 --output telemetry.csv
 ```
 
 ### Opsi CLI
@@ -126,14 +158,25 @@ Hentikan program dengan **Ctrl+C**.
 
 ## Contoh output
 
+Pesan status ditulis ke **stderr**. Data CSV ditulis ke **stdout** (format sama persis dengan serial port):
+
 ```text
-[INFO] Membaca port COM16 @ 115200 baud
-[INFO] Tekan Ctrl+C untuk berhenti
-t=9.685 lat=0 lon=0 srv1=-62.37 srv2=-67.67 yaw=0 gyro_z=0 yaw_rate=0
-t=9.785 lat=0 lon=0 srv1=-62.73 srv2=-67.55 yaw=0 gyro_z=0 yaw_rate=0
+timestamp,lat,lon,calc_deg_servo_1,calc_deg_servo_2,yaw,gyro_z,yaw_rate
+9.685,0.000000,0.000000,-62.37,-67.67,0.00,0.00,0.00
+9.785,0.000000,0.000000,-62.73,-67.55,0.00,0.00,0.00
 ```
 
-Jika `--output telemetry.csv` dipakai, baris mentah CSV ikut disimpan (tanpa header ganda).
+Redirect hanya data CSV ke file:
+
+```powershell
+.\read_serial.exe --port COM16 2>nul > telemetry.csv
+```
+
+```bash
+./read_serial --port /dev/ttyUSB0 2>/dev/null > telemetry.csv
+```
+
+Jika `--output telemetry.csv` dipakai, baris CSV juga disimpan ke file tersebut (header dari serial ikut diteruskan bila diterima).
 
 ---
 
@@ -142,19 +185,4 @@ Jika `--output telemetry.csv` dipakai, baris mentah CSV ikut disimpan (tanpa hea
 1. Tutup Serial Monitor PlatformIO / Arduino IDE sebelum menjalankan program ini — port COM hanya bisa dipakai satu aplikasi.
 2. `lat=0, lon=0` biasanya berarti GPS belum fix; parser tetap menerima baris tersebut.
 3. Program ini untuk **pembacaan/logging** di PC, bukan kontrol kapal.
-
----
-
-## Build cepat tanpa CMake (opsional)
-
-### Windows (MinGW g++)
-
-```powershell
-g++ -std=c++17 -Iinclude src/main.cpp src/serial_port.cpp -o read_serial.exe
-```
-
-### Linux
-
-```bash
-g++ -std=c++17 -Iinclude src/main.cpp src/serial_port.cpp -o read_serial
-```
+4. Setelah mengubah kode `.cpp`, jalankan ulang perintah `g++` (Opsi A) atau `cmake --build` (Opsi B).
