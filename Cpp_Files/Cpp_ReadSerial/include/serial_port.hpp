@@ -17,6 +17,7 @@ public:
   bool is_open() const;
 
   bool read_line(std::string &line, uint32_t timeout_ms = 1000);
+  bool write_line(const std::string &line);
   std::string last_error() const { return last_error_; }
 
 private:

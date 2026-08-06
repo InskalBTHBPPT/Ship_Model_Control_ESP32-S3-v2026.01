@@ -259,3 +259,40 @@ bool SerialPort::read_line(std::string &line, uint32_t timeout_ms) {
 #endif
   }
 }
+
+bool SerialPort::write_line(const std::string &line) {
+  if (!is_open()) {
+    last_error_ = "Port serial belum dibuka";
+    return false;
+  }
+
+  const std::string payload = line + "\n";
+
+#ifdef _WIN32
+  DWORD bytes_written = 0;
+  HANDLE handle = static_cast<HANDLE>(handle_);
+  if (!WriteFile(
+          handle,
+          payload.data(),
+          static_cast<DWORD>(payload.size()),
+          &bytes_written,
+          nullptr) ||
+      bytes_written != payload.size()) {
+    last_error_ = "WriteFile gagal";
+    return false;
+  }
+  return true;
+#else
+  const ssize_t bytes_written =
+      ::write(fd_, payload.data(), payload.size());
+  if (bytes_written < 0) {
+    last_error_ = "write gagal: " + std::string(std::strerror(errno));
+    return false;
+  }
+  if (static_cast<size_t>(bytes_written) != payload.size()) {
+    last_error_ = "write tidak lengkap";
+    return false;
+  }
+  return true;
+#endif
+}

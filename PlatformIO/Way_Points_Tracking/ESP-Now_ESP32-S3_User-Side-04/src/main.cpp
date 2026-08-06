@@ -1,8 +1,8 @@
 /*
-  ESP32-S3 User-Side-03 (gateway USB <-> ESP-NOW)
+  ESP32-S3 User-Side-04 (gateway USB <-> ESP-NOW)
 
   Peran:
-  - Menerima telemetry 23-kolom dari Remote-Side-03 via ESP-NOW dan
+  - Menerima telemetry 24-kolom dari Remote-Side-04 via ESP-NOW dan
     meneruskannya ke PC sebagai CSV via Serial (115200 baud).
   - Menerima command "$WPSET,..." dari PC (dashboard PySide6) via Serial
     dan meneruskannya ke Remote-Side via ESP-NOW dalam bentuk
@@ -25,9 +25,9 @@
 uint8_t remote_side_Address[] = {0x98, 0xa3, 0x16, 0xf5, 0x01, 0xa0};
 
 // =====================================================================
-// Telemetry struct (diterima dari Remote-Side-03). 23 field, urutan & tipe
-// HARUS sama dengan struct DatatoSend di firmware Remote-Side-03.
-// Total sizeof = 64 byte (62 data + 2 padding).
+// Telemetry struct (diterima dari Remote-Side-04). 24 field, urutan & tipe
+// HARUS sama dengan struct DatatoSend di firmware Remote-Side-04.
+// Total sizeof = 64 byte.
 // =====================================================================
 typedef struct receivedfromremoteside {
   double timestamp;
@@ -53,6 +53,7 @@ typedef struct receivedfromremoteside {
   uint16_t battery_1;
   uint16_t battery_2;
   uint8_t mode_auto;
+  uint8_t mini_pc_link;
 } receivedfromremoteside;
 
 receivedfromremoteside myReceivedFromremoteSideData;
@@ -97,7 +98,7 @@ void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
     return;
   }
   memcpy(&myReceivedFromremoteSideData, incomingData, sizeof(myReceivedFromremoteSideData));
-  // Print CSV 23 kolom (raw fixed-point) agar sama format dengan generator
+  // Print CSV 24 kolom (raw fixed-point)
   Serial.print(myReceivedFromremoteSideData.timestamp, 3); Serial.print(",");
   Serial.print(myReceivedFromremoteSideData.latitude, 6); Serial.print(",");
   Serial.print(myReceivedFromremoteSideData.longitude, 6); Serial.print(",");
@@ -120,12 +121,13 @@ void OnDataRecv(const uint8_t * mac, const uint8_t *incomingData, int len) {
   Serial.print(myReceivedFromremoteSideData.rpm_prop_2); Serial.print(",");
   Serial.print(myReceivedFromremoteSideData.battery_1); Serial.print(",");
   Serial.print(myReceivedFromremoteSideData.battery_2); Serial.print(",");
-  Serial.println(myReceivedFromremoteSideData.mode_auto);
+  Serial.print(myReceivedFromremoteSideData.mode_auto); Serial.print(",");
+  Serial.println(myReceivedFromremoteSideData.mini_pc_link);
 }
 
 void setup() {
   Serial.begin(115200);
-  Serial.println("ESP32-S3 User-Side-03");
+  Serial.println("ESP32-S3 User-Side-04");
 
   WiFi.mode(WIFI_STA);
 

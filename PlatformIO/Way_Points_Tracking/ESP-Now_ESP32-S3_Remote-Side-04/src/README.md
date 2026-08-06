@@ -1,19 +1,17 @@
-# ESP-Now_ESP32-S3_Remote-Side-03
+# ESP-Now_ESP32-S3_Remote-Side-04
 
 Firmware sisi kapal (Remote-Side) untuk sistem **Way Points Tracking**.
 
-Mengumpulkan data sensor dan actuator, menjalankan kontrol rudder/propeller, menerima waypoint dari User-Side via ESP-NOW, lalu mengirim telemetry **23 kolom** ke User-Side @ 10 Hz.
+Mengumpulkan data sensor dan actuator, menjalankan kontrol rudder/propeller, menerima waypoint dari User-Side via ESP-NOW, lalu mengirim telemetry **24 kolom** ke User-Side @ 10 Hz.
 
-Clone dari `ESP_Now_Send_Ver2025_revJan2026` / `Remote-Side-01`, dengan penambahan auto-track waypoint + debug CSV serial.
-
-**Pasangan User-Side:** `ESP-Now_ESP32-S3_User-Side-01` (struct telemetry harus identik).
+**Pasangan User-Side:** `ESP-Now_ESP32-S3_User-Side-04` (struct telemetry harus identik).
 
 ---
 
 ## Ringkasan Fitur
 
 - Pembacaan PPM dari receiver RC (FS-iA6B)
-- Kontrol rudder: manual (CH1) atau auto waypoint + PD heading
+- Kontrol rudder: manual (CH1) atau auto mini PC (default alg 2)
 - Kontrol propeller speed/direction via LEDC (CH3, CH5)
 - GNSS u-blox @ 115200 baud, 10 Hz (UBX)
 - IMU HWT905TTL / JY901 @ 115200 baud
@@ -21,7 +19,20 @@ Clone dari `ESP_Now_Send_Ver2025_revJan2026` / `Remote-Side-01`, dengan penambah
 - Monitoring tegangan baterai (2 channel ADC)
 - **Terima waypoint** dari User-Side (`waypoints_payload`, msg `0xA1`)
 - **Kirim telemetry** `DatatoSend` (64 byte) ke User-Side via ESP-NOW
-- **Debug CSV** ke Serial Monitor @ 10 Hz (8 kolom)
+- **Debug CSV** ke mini PC @ 10 Hz (8 kolom, hanya saat RC auto)
+- **Mini PC serial:** terima `$HB` + `timestamp,result` (rudder deg)
+
+---
+
+## Protokol Mini PC (USB Serial 115200)
+
+| Arah | Format | Keterangan |
+|------|--------|------------|
+| ESP32 → PC | CSV 8 kolom | Hanya saat CH6 auto |
+| PC → ESP32 | `$HB` | Heartbeat ~1 Hz (manual/auto) |
+| PC → ESP32 | `timestamp,result` | `result` = rudder offset (°), timestamp harus sama dengan baris CSV input |
+
+Field telemetry ESP-NOW tambahan: `mini_pc_link` (kolom 24) — `1` jika heartbeat OK (< 3 s).
 
 ---
 
@@ -38,20 +49,18 @@ Dipilih via **CH6** receiver RC:
 
 | Nilai | Fungsi |
 |-------|--------|
-| `1` | **Waypoint + PD** — bearing haversine ke WP aktif, rudder = `Kp·err − Kd·gyro_z` |
-| `2` | **Stub** — rudder netral, telemetry navigasi nol |
+| `1` | **Waypoint + PD** (opsional) — bearing haversine ke WP aktif |
+| `2` | **Mini PC** (default) — rudder dari `timestamp,result` serial |
 
-Parameter auto-track (default):
+Parameter (default):
 
 ```cpp
-#define AUTO_TRACK_ALG 1
-#define WP_ARRIVE_M    3.0f    // jarak (m) advance ke WP berikutnya
-#define AUTO_TRACK_KP  1.0f    // heading error (deg) → rudder offset (deg)
-#define AUTO_TRACK_KD  0.05f   // damping gyro_z (deg/s)
-#define RUDDER_CMD_MAX 40.0f   // max offset rudder (deg)
+#define AUTO_TRACK_ALG 2
+#define MINI_PC_HB_TIMEOUT_MS 3000
+#define RUDDER_CMD_MAX 40.0f
 ```
 
-Auto-track membutuhkan: GPS valid + waypoint diterima dari User-Side. Tanpa itu, rudder netral.
+Auto alg 2: jika `mini_pc_link=0` saat RC auto → rudder netral + `[WARN]` serial. Tidak fallback ke PD.
 
 ---
 
@@ -227,7 +236,7 @@ rudder_cmd = Kp × err − Kd × gyro_z
 Path proyek:
 
 ```text
-PlatformIO/Way_Points_Tracking/ESP-Now_ESP32-S3_Remote-Side-03
+PlatformIO/Way_Points_Tracking/ESP-Now_ESP32-S3_Remote-Side-04
 ```
 
 ```bash
@@ -279,7 +288,7 @@ Sesuaikan `upload_port` / `monitor_port` di `platformio.ini` (default: `COM14`).
 ## Author & Versi
 
 - **Author:** Chandra P — Ship Model Control System
-- **Version:** 1.0 (Remote-Side-03)
+- **Version:** 1.0 (Remote-Side-04)
 - **Last update:** 2026
 - **Board:** ESP32-S3 DevKitC1-N16R8
 - **Framework:** Arduino / PlatformIO

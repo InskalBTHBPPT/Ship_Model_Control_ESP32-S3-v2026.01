@@ -2,6 +2,7 @@
 #include "serial_port.hpp"
 #include "telemetry_parser.hpp"
 
+#include <chrono>
 #include <csignal>
 #include <iomanip>
 #include <iostream>
@@ -21,16 +22,18 @@ void print_usage(const char *program_name) {
       << "  --port <nama_port>       Port serial (default: COM16 / /dev/ttyUSB0)\n"
       << "  --baud <rate>            Baud rate (default: 115200)\n"
       << "  --timeout <ms>           Timeout baca baris (default: 1000)\n"
-      << "  --op <add|sub|mul|div>   Operasi matematika (default: sub)\n"
+      << "  --op <add|sub|mul|div>   Operasi demo (default: sub)\n"
       << "  --field-a <nama_field>   Field pertama (default: calc_deg_servo_1)\n"
       << "  --field-b <nama_field>   Field kedua (default: calc_deg_servo_2)\n"
+      << "  --rudder-mode <demo|zero> demo=--op math, zero=rudder 0 deg (default: zero)\n"
       << "  --help                   Tampilkan bantuan ini\n\n"
       << "Field yang didukung:\n"
       << "  timestamp, lat, lon, calc_deg_servo_1, calc_deg_servo_2,\n"
       << "  yaw, gyro_z, yaw_rate\n\n"
       << "Perilaku:\n"
-      << "  - Baris CSV asli dari ESP32 -> stdout (tidak ke serial)\n"
-      << "  - Baris timestamp,result   -> serial TX saja (tidak ke stdout)\n";
+      << "  - Heartbeat $HB -> ESP32 setiap 1 detik (manual/auto)\n"
+      << "  - Baris CSV asli dari ESP32 -> stdout\n"
+      << "  - Baris timestamp,result (rudder deg) -> serial TX saja\n";
 }
 
 std::string default_port() {
@@ -56,6 +59,7 @@ int main(int argc, char **argv) {
   MathOp math_op = MathOp::Sub;
   TelemetryField field_a = TelemetryField::CalcDegServo1;
   TelemetryField field_b = TelemetryField::CalcDegServo2;
+  std::string rudder_mode = "zero";
 
   for (int i = 1; i < argc; ++i) {
     const std::string arg = argv[i];
@@ -73,6 +77,10 @@ int main(int argc, char **argv) {
     }
     if (arg == "--timeout" && i + 1 < argc) {
       timeout_ms = static_cast<uint32_t>(std::stoul(argv[++i]));
+      continue;
+    }
+    if (arg == "--rudder-mode" && i + 1 < argc) {
+      rudder_mode = argv[++i];
       continue;
     }
     if (arg == "--op" && i + 1 < argc) {
@@ -120,15 +128,25 @@ int main(int argc, char **argv) {
   }
 
   std::cerr << "[INFO] Port " << port << " @ " << baud << " baud (read + write)\n";
-  std::cerr << "[INFO] CSV asli -> stdout | timestamp,result -> serial TX\n";
+  std::cerr << "[INFO] Heartbeat $HB -> ESP32 setiap 1 detik\n";
+  std::cerr << "[INFO] CSV asli -> stdout | timestamp,result (rudder deg) -> serial TX\n";
+  std::cerr << "[INFO] Rudder mode: " << rudder_mode << "\n";
   std::cerr << "[INFO] Tekan Ctrl+C untuk berhenti\n";
-  std::cerr << "[INFO] Catatan: firmware ESP32 belum membaca baris result (pending)\n";
 
   uint64_t valid_lines = 0;
   uint64_t skipped_lines = 0;
   uint64_t write_errors = 0;
+  auto last_hb = std::chrono::steady_clock::now();
 
   while (g_running) {
+    const auto now = std::chrono::steady_clock::now();
+    if (std::chrono::duration_cast<std::chrono::milliseconds>(now - last_hb).count() >= 1000) {
+      if (!serial.write_line("$HB")) {
+        std::cerr << "[WARN] Gagal kirim heartbeat: " << serial.last_error() << "\n";
+      }
+      last_hb = now;
+    }
+
     std::string raw_line;
     if (!serial.read_line(raw_line, timeout_ms)) {
       continue;
@@ -150,20 +168,22 @@ int main(int argc, char **argv) {
       continue;
     }
 
-    const auto result = compute_result(*row, math_op, field_a, field_b);
-    if (!result) {
-      ++skipped_lines;
-      std::cerr << "[WARN] Hitung result gagal (mis. div by zero) pada t="
-                << row->timestamp << "\n";
-      std::cout << line << "\n";
-      continue;
+    double rudder_deg = 0.0;
+    if (rudder_mode == "demo") {
+      const auto result = compute_result(*row, math_op, field_a, field_b);
+      if (!result) {
+        ++skipped_lines;
+        std::cerr << "[WARN] Hitung result gagal pada t=" << row->timestamp << "\n";
+        std::cout << line << "\n";
+        continue;
+      }
+      rudder_deg = *result;
     }
 
     ++valid_lines;
     std::cout << line << "\n";
 
-    const std::string result_line =
-        format_result_line(row->timestamp, *result);
+    const std::string result_line = format_result_line(row->timestamp, rudder_deg);
     if (!serial.write_line(result_line)) {
       ++write_errors;
       std::cerr << "[ERROR] Gagal tulis ke serial: " << serial.last_error()

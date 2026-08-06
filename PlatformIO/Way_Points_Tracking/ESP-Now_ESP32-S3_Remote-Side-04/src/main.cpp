@@ -1,6 +1,6 @@
 ﻿/**
  * @file main.cpp
- * @brief ESP32-S3 Remote-Side-03 — Ship Model Control System
+ * @brief ESP32-S3 Remote-Side-04 — Ship Model Control System
  *
  * @description
  * Firmware sisi kapal (Remote-Side) yang mengumpulkan data sensor dan
@@ -19,11 +19,11 @@
  *
  * Fitur kontrol:
  * - Mode Manual: Kontrol rudder langsung dari RC (CH1)
- * - Mode Auto alg 1: waypoint + PD rudder (AUTO_TRACK_ALG=1)
- * - Mode Auto alg 2: stub kosong (AUTO_TRACK_ALG=2)
+ * - Mode Auto alg 1: waypoint + PD rudder (AUTO_TRACK_ALG=1, opsional)
+ * - Mode Auto alg 2: rudder dari mini PC via serial timestamp,result (default)
  *
  * @author Chandra P - Ship Model Control System
- * @version 1.0 (Remote-Side-03)
+ * @version 1.0 (Remote-Side-04)
  * @date 2026
  *
  * @note
@@ -65,11 +65,28 @@ uint8_t user_side_Address[] = {0x80, 0xb5, 0x4e, 0xc1, 0xd5, 0xac};
 // =====================================================================
 // Pemilihan algoritma auto track (hardcode — ubah sebelum upload)
 // =====================================================================
-#define AUTO_TRACK_ALG 1       // 1 = waypoint haversine + PD, 2 = stub kosong
+#define AUTO_TRACK_ALG 2       // 1 = waypoint PD, 2 = mini PC (default)
 #define WP_ARRIVE_M    3.0f    // jarak (m) untuk advance ke waypoint berikutnya
-#define AUTO_TRACK_KP  1.0f    // heading error (deg) -> rudder offset (deg)
-#define AUTO_TRACK_KD  0.05f   // damping dari gyro_z (deg/s)
+#define AUTO_TRACK_KP  1.0f    // heading error (deg) -> rudder offset (deg) [alg 1]
+#define AUTO_TRACK_KD  0.05f   // damping dari gyro_z (deg/s) [alg 1]
 #define RUDDER_CMD_MAX 40.0f   // max offset rudder (deg)
+#define MINI_PC_HB_TIMEOUT_MS 3000
+
+// Mini PC serial: $HB heartbeat + timestamp,result rudder command
+static uint32_t g_lastHbMs = 0;
+static String   g_miniPcRxLine;
+static double   g_lastCsvTxTs = 0.0;
+static double   g_matchedResultTs = -1.0;
+static float    g_matchedRudderDeg = 0.0f;
+static bool     g_warnedAutoNoPc = false;
+
+static bool timestampsMatch(double a, double b) {
+  return fabs(a - b) < 0.051;
+}
+
+static bool isAutoRcMode(uint16_t modeCh6) {
+  return modeCh6 >= 1750;
+}
 
 typedef struct waypoints_payload {
   uint8_t  msg_type;
@@ -372,10 +389,56 @@ struct DatatoSend {
   uint16_t rpm_prop_2;    // rpm motor propeller 2 (Ã— 100)
   uint16_t battery_1;     // batere for ESP32-S3, Servo, HWT905TTL, Receiver RC, GNSS, Rotary Encoder (Ã— 100)
   uint16_t battery_2;     // batere for motor propeller (Ã— 100)
-  uint8_t mode_auto;      // 0: manual, 1: auto alg1 (PD track), 2: auto alg2 (stub)
+  uint8_t mode_auto;      // 0: manual, 1: auto alg1 (PD track), 2: auto alg2 (mini PC)
+  uint8_t mini_pc_link;   // 0: mini PC offline, 1: heartbeat OK
 };
 
+static_assert(sizeof(DatatoSend) == 64, "DatatoSend must be 64 bytes for ESP-NOW");
+
 DatatoSend dataToSend;
+
+static void updateMiniPcLinkField() {
+  dataToSend.mini_pc_link =
+      (millis() - g_lastHbMs < MINI_PC_HB_TIMEOUT_MS) ? 1 : 0;
+}
+
+static void processMiniPcLine(const String &line) {
+  if (line == "$HB") {
+    g_lastHbMs = millis();
+    return;
+  }
+  const int comma = line.indexOf(',');
+  if (comma <= 0) {
+    return;
+  }
+  const double ts = line.substring(0, comma).toDouble();
+  const float rudder = line.substring(comma + 1).toFloat();
+  if (timestampsMatch(ts, g_lastCsvTxTs)) {
+    g_matchedResultTs = ts;
+    g_matchedRudderDeg = rudder;
+  }
+}
+
+static void pollMiniPcSerial() {
+  while (Serial.available()) {
+    const char c = static_cast<char>(Serial.read());
+    if (c == '\r') {
+      continue;
+    }
+    if (c == '\n') {
+      String line = g_miniPcRxLine;
+      g_miniPcRxLine = "";
+      line.trim();
+      if (line.length() > 0) {
+        processMiniPcLine(line);
+      }
+    } else if (g_miniPcRxLine.length() < 80) {
+      g_miniPcRxLine += c;
+    } else {
+      g_miniPcRxLine = "";
+    }
+  }
+}
 
 // Utility: map long to float with custom output range
 static inline float mapFloat(long x, long in_min, long in_max, float out_min, float out_max) {
@@ -775,15 +838,28 @@ void auto_track_1() {
 }
 
 void auto_track_2() {
-  // Stub kosong — rudder netral, telemetry navigasi nol
-  rudder_hold_neutral();
-  dataToSend.heading_setpoint = 0;
-  dataToSend.heading_error = 0;
-  dataToSend.track_wp_index = 0;
-  dataToSend.distance_to_wp = 0;
+  set_nav_idle_telemetry();
+
+  if (dataToSend.mini_pc_link == 0) {
+    rudder_hold_neutral();
+    if (!g_warnedAutoNoPc) {
+      Serial.println("[WARN] AUTO alg2: mini PC tidak terhubung (heartbeat timeout)");
+      g_warnedAutoNoPc = true;
+    }
+    return;
+  }
+
+  g_warnedAutoNoPc = false;
+
+  if (g_matchedResultTs >= 0.0 && timestampsMatch(g_matchedResultTs, g_lastCsvTxTs)) {
+    apply_rudder_cmd_offset(g_matchedRudderDeg);
+  } else {
+    rudder_hold_neutral();
+  }
 }
 
 void check_mode_auto_manual(uint16_t modeautomanual) {
+  updateMiniPcLinkField();
   if (modeautomanual >= 1750) {
     if (AUTO_TRACK_ALG == 1) {
       auto_track_1();
@@ -793,6 +869,7 @@ void check_mode_auto_manual(uint16_t modeautomanual) {
       dataToSend.mode_auto = 2;
     }
   } else {
+    g_warnedAutoNoPc = false;
     rudder_manual();
     dataToSend.mode_auto = 0;
   }
@@ -951,6 +1028,8 @@ void setup() {
  */
 void loop() {
     unsigned long currentMillis = millis();
+
+    pollMiniPcSerial();
     
     // ========== Read GNSS Data ==========
     // Parse data GPS dari Serial1 (non-blocking)
@@ -1032,8 +1111,6 @@ void loop() {
         
         controlInput.mode_auto_manual = ppm_mapped[5];  // CH6
         controlInput.rudder = ppm_mapped[0];            // CH1
-
-        check_mode_auto_manual(controlInput.mode_auto_manual);
 
         
         // Read analog values of servo potensiometer output in millivolts
@@ -1131,15 +1208,20 @@ void loop() {
         // Konversi ke uint16_t (Ã— 100) untuk pengiriman
         dataToSend.battery_2 = (uint16_t)(volt_batt_2 * 100); // batere for motor propeller
 
-        // ========== Serial Print Debugging (8 kolom CSV @ 10 Hz) ==========
-        Serial.print(dataToSend.timestamp, 3); Serial.print(",");
-        Serial.print(dataToSend.latitude, 6);    Serial.print(",");
-        Serial.print(dataToSend.longitude, 6);   Serial.print(",");
-        Serial.print(dataToSend.Calc_deg_servo_1 / 100.0f, 2); Serial.print(",");
-        Serial.print(dataToSend.Calc_deg_servo_2 / 100.0f, 2); Serial.print(",");
-        Serial.print(dataToSend.yaw / 100.0f, 2);              Serial.print(",");
-        Serial.print(dataToSend.gyro_z / 100.0f, 2);           Serial.print(",");
-        Serial.println(yaw_rate_dps, 2);
+        check_mode_auto_manual(controlInput.mode_auto_manual);
+
+        // CSV 8 kolom ke mini PC (hanya saat RC mode auto)
+        if (isAutoRcMode(controlInput.mode_auto_manual)) {
+          Serial.print(dataToSend.timestamp, 3); Serial.print(",");
+          Serial.print(dataToSend.latitude, 6);    Serial.print(",");
+          Serial.print(dataToSend.longitude, 6);   Serial.print(",");
+          Serial.print(dataToSend.Calc_deg_servo_1 / 100.0f, 2); Serial.print(",");
+          Serial.print(dataToSend.Calc_deg_servo_2 / 100.0f, 2); Serial.print(",");
+          Serial.print(dataToSend.yaw / 100.0f, 2);              Serial.print(",");
+          Serial.print(dataToSend.gyro_z / 100.0f, 2);           Serial.print(",");
+          Serial.println(yaw_rate_dps, 2);
+          g_lastCsvTxTs = dataToSend.timestamp;
+        }
 
         // ========== Send message via ESP-NOW ==========
         esp_err_t result = esp_now_send(user_side_Address, (uint8_t *) &dataToSend, sizeof(dataToSend));

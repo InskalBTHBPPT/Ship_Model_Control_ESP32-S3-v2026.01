@@ -1,5 +1,5 @@
 """
-Local Monitor Dashboard beta 1.3
+Local Monitor Dashboard beta 1.4
 
 Ringkasan:
 - Dashboard PySide6 untuk monitoring telemetry kapal secara real-time.
@@ -7,13 +7,13 @@ Ringkasan:
 - Mendukung map tracking, indikator live, plotting time-series, logging CSV, analyze,
   serta fitur Home Points dari koordinat serial terbaru.
 
-Format data serial yang dibaca (23 kolom, raw fixed-point dari User-Side-03):
+Format data serial yang dibaca (24 kolom, raw fixed-point dari User-Side-04):
 1) timestamp  2) latitude  3) longitude
 4) speedMps (x100)  5-6) Calc_deg_servo_1/2 (x100, °)
 7) yaw (x100)  8) heading_setpoint (x100)  9) heading_error (x100)
 10) rudder_cmd (x100)  11) track_wp_index  12) distance_to_wp (x10, m)
 13-18) accel_x/y/z, gyro_x/y/z (x100) — di-log, tidak di panel live
-19-20) rpm_prop_1/2 (integer RPM langsung, bukan x100)  21-22) battery_1/2 (x100, V)  23) mode_auto
+19-20) rpm_prop_1/2 (integer RPM langsung, bukan x100)  21-22) battery_1/2 (x100, V)  23) mode_auto  24) mini_pc_link (0/1)
 
 Catatan pengolahan:
 - Parser memproses baris utuh yang diakhiri newline dan memvalidasi jumlah kolom = 23.
@@ -29,13 +29,13 @@ import sys
 from bisect import bisect_left
 from datetime import datetime
 
-TELEMETRY_COL_COUNT = 23
+TELEMETRY_COL_COUNT = 24
 
 TELEMETRY_LOG_HEADER = (
     "timestamp (s),latitude (°),longitude (°),speedMps (m/s),Calc_deg_servo_1 (°),Calc_deg_servo_2 (°),"
     "yaw (°),heading_setpoint (°),heading_error (°),rudder_cmd (°),track_wp_index,distance_to_wp (m),"
     "accel_x (g),accel_y (g),accel_z (g),gyro_x (deg/s),gyro_y (deg/s),gyro_z (deg/s),"
-    "rpm_prop_1 (rpm),rpm_prop_2 (rpm),battery_1 (V),battery_2 (V),mode_auto\n"
+    "rpm_prop_1 (rpm),rpm_prop_2 (rpm),battery_1 (V),battery_2 (V),mode_auto,mini_pc_link\n"
 )
 
 
@@ -63,6 +63,7 @@ def _build_telemetry_log_line(
     bat1: float,
     bat2: float,
     mode_auto: int,
+    mini_pc_link: int = 0,
 ) -> str:
     """Baris CSV log — nilai tampilan (sama seperti panel Live)."""
     return (
@@ -75,7 +76,7 @@ def _build_telemetry_log_line(
         f"{gyro_x:.2f},{gyro_y:.2f},{gyro_z:.2f},"
         f"{rpm1:.0f},{rpm2:.0f},"
         f"{bat1:.2f},{bat2:.2f},"
-        f"{mode_auto}\n"
+        f"{mode_auto},{mini_pc_link}\n"
     )
 
 
@@ -1568,7 +1569,7 @@ class MainWindow(QMainWindow):
         """
         super().__init__()
         self.resize(800, 700)
-        self.setWindowTitle("Ship Model Local Dashboard — beta 1.3")
+        self.setWindowTitle("Ship Model Local Dashboard — beta 1.4")
         self.tab_widget = QTabWidget(self)
         self.setCentralWidget(self.tab_widget)
         
@@ -1902,6 +1903,13 @@ class MainWindow(QMainWindow):
         self.mode_label = QLabel("Manual", self)
         self.mode_label.setStyleSheet("color: #10b981; font-weight: bold; font-size: 13pt; text-align: center;")
 
+        self.mini_pc_link_label = QLabel("Mini PC: —", self)
+        self.mini_pc_link_label.setStyleSheet("color: #9ca3af; font-weight: bold; font-size: 11pt; text-align: center;")
+
+        self.auto_warn_label = QLabel("", self)
+        self.auto_warn_label.setStyleSheet("color: #f59e0b; font-weight: bold; font-size: 10pt; text-align: center;")
+        self.auto_warn_label.setWordWrap(True)
+
         self.speed_label = QLabel("0.00 m/s", self)
         self.speed_label.setStyleSheet(value_style)
 
@@ -1945,6 +1953,10 @@ class MainWindow(QMainWindow):
 
         # Baris 1: Mode
         _add_indicator_row([_make_live_stat_cell(self, "Mode", self.mode_label)])
+
+        # Baris 1b: Mini PC link + auto warning
+        _add_indicator_row([_make_live_stat_cell(self, "Mini PC", self.mini_pc_link_label)])
+        indicator.layout().addWidget(self.auto_warn_label)
 
         # Baris 2: GPS Speed
         _add_indicator_row([_make_live_stat_cell(self, "GPS Speed (m/s)", self.speed_label)])
@@ -2840,7 +2852,8 @@ class MainWindow(QMainWindow):
                           rudder_cmd: float, rud1_sensor: float, rud2_sensor: float,
                           rpm1: float, rpm2: float, bat1: float, bat2: float,
                           speed: float, track_wp_index: int, distance_to_wp: float,
-                          mode_auto: int = 0, timestamp: float = 0.0):
+                          mode_auto: int = 0, timestamp: float = 0.0,
+                          mini_pc_link: int = 0):
         """Update panel indikator live dan time-series plots."""
         try:
             self.yaw_label.setText(f"{yaw:.1f}°")
@@ -2932,8 +2945,8 @@ class MainWindow(QMainWindow):
 
         mode_descriptions = {
             0: "Manual",
-            1: "Auto Alg 1",
-            2: "Auto Alg 2",
+            1: "Auto Alg 1 (PD)",
+            2: "Auto Mini PC",
         }
         mode_colors = {
             0: "#6b7280",
@@ -2946,6 +2959,27 @@ class MainWindow(QMainWindow):
             mode_color = mode_colors.get(mode_int, "#6b7280")
             self.mode_label.setText(mode_text)
             self.mode_label.setStyleSheet(f"color: {mode_color}; font-weight: bold;")
+        except Exception:
+            pass
+
+        try:
+            if int(mini_pc_link) == 1:
+                self.mini_pc_link_label.setText("CONNECTED")
+                self.mini_pc_link_label.setStyleSheet(
+                    "color: #10b981; font-weight: bold; font-size: 11pt; text-align: center;")
+            else:
+                self.mini_pc_link_label.setText("DISCONNECTED")
+                self.mini_pc_link_label.setStyleSheet(
+                    "color: #ef4444; font-weight: bold; font-size: 11pt; text-align: center;")
+        except Exception:
+            pass
+
+        try:
+            mode_int = int(mode_auto)
+            if mode_int == 2 and int(mini_pc_link) == 0:
+                self.auto_warn_label.setText("⚠ Auto aktif — Mini PC tidak terhubung")
+            else:
+                self.auto_warn_label.setText("")
         except Exception:
             pass
 
@@ -3608,7 +3642,8 @@ class MainWindow(QMainWindow):
                     continue
                 # Format target: 1854.900,-7.286621,112.796040,1.53,-3.95,7.07,3.18,62.33,98.57,0.00,463.38,2880.63,10.54,11.88
                 parts = [p.strip() for p in text.split(',')]
-                if len(parts) != TELEMETRY_COL_COUNT:
+                col_count = len(parts)
+                if col_count not in (23, TELEMETRY_COL_COUNT):
                     continue
                 try:
                     lat = float(parts[1])
@@ -3656,6 +3691,7 @@ class MainWindow(QMainWindow):
                     bat1 = _telemetry_scale(parts, 20)
                     bat2 = _telemetry_scale(parts, 21)
                     mode_auto = int(parts[22])
+                    mini_pc_link = int(parts[23]) if col_count >= TELEMETRY_COL_COUNT else 0
                     timestamp = float(parts[0])
                     self.latest_serial_heading = heading
                 except Exception:
@@ -3685,7 +3721,7 @@ class MainWindow(QMainWindow):
                     rudder_cmd, rud1_sensor, rud2_sensor,
                     rpm1, rpm2, bat1, bat2, speed,
                     track_wp_index, distance_to_wp,
-                    mode_auto, timestamp)
+                    mode_auto, timestamp, mini_pc_link)
                 # Append raw CSV line to log buffer if logging enabled
                 if self.log_file is not None:
                     try:
@@ -3697,7 +3733,7 @@ class MainWindow(QMainWindow):
                                 track_wp_index, distance_to_wp,
                                 accel_x, accel_y, accel_z,
                                 gyro_x, gyro_y, gyro_z,
-                                rpm1, rpm2, bat1, bat2, mode_auto,
+                                rpm1, rpm2, bat1, bat2, mode_auto, mini_pc_link,
                             )
                         )
                     except Exception:

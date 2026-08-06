@@ -1,6 +1,7 @@
 #include "serial_port.hpp"
 #include "telemetry_parser.hpp"
 
+#include <chrono>
 #include <csignal>
 #include <cstdlib>
 #include <fstream>
@@ -21,7 +22,9 @@ void print_usage(const char *program_name) {
       << "  --baud <rate>          Baud rate (default: 115200)\n"
       << "  --output <file.csv>    Simpan baris valid ke CSV (opsional)\n"
       << "  --timeout <ms>         Timeout baca baris (default: 1000)\n"
-      << "  --help                 Tampilkan bantuan ini\n";
+      << "  --help                 Tampilkan bantuan ini\n\n"
+      << "Heartbeat:\n"
+      << "  Mengirim $HB ke ESP32 setiap 1 detik (manual/auto).\n";
 }
 
 std::string default_port() {
@@ -88,13 +91,23 @@ int main(int argc, char **argv) {
   }
 
   std::cerr << "[INFO] Membaca port " << port << " @ " << baud << " baud\n";
+  std::cerr << "[INFO] Heartbeat $HB -> ESP32 setiap 1 detik\n";
   std::cerr << "[INFO] Tekan Ctrl+C untuk berhenti\n";
   std::cerr << "[INFO] Output CSV ke stdout (format sama dengan serial port)\n";
 
   uint64_t valid_lines = 0;
   uint64_t skipped_lines = 0;
+  auto last_hb = std::chrono::steady_clock::now();
 
   while (g_running) {
+    const auto now = std::chrono::steady_clock::now();
+    if (std::chrono::duration_cast<std::chrono::milliseconds>(now - last_hb).count() >= 1000) {
+      if (!serial.write_line("$HB")) {
+        std::cerr << "[WARN] Gagal kirim heartbeat: " << serial.last_error() << "\n";
+      }
+      last_hb = now;
+    }
+
     std::string raw_line;
     if (!serial.read_line(raw_line, timeout_ms)) {
       continue;
