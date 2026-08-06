@@ -2,6 +2,7 @@
 #include "serial_port.hpp"
 #include "telemetry_parser.hpp"
 
+#include <algorithm>
 #include <chrono>
 #include <csignal>
 #include <iomanip>
@@ -25,7 +26,10 @@ void print_usage(const char *program_name) {
       << "  --op <add|sub|mul|div>   Operasi demo (default: sub)\n"
       << "  --field-a <nama_field>   Field pertama (default: calc_deg_servo_1)\n"
       << "  --field-b <nama_field>   Field kedua (default: calc_deg_servo_2)\n"
-      << "  --rudder-mode <demo|zero> demo=--op math, zero=rudder 0 deg (default: zero)\n"
+      << "  --rudder-mode <zero|yawrate2|demo>\n"
+      << "                         zero=rudder 0 deg (default)\n"
+      << "                         yawrate2=clamp(yaw_rate*2, -10, +10) deg\n"
+      << "                         demo=--op math pada field\n"
       << "  --help                   Tampilkan bantuan ini\n\n"
       << "Field yang didukung:\n"
       << "  timestamp, lat, lon, calc_deg_servo_1, calc_deg_servo_2,\n"
@@ -49,6 +53,10 @@ std::string format_result_line(double timestamp, double result) {
   oss << std::fixed << std::setprecision(3) << timestamp << ","
       << std::setprecision(2) << result;
   return oss.str();
+}
+
+double clamp_rudder_deg(double value, double min_deg, double max_deg) {
+  return std::max(min_deg, std::min(max_deg, value));
 }
 } // namespace
 
@@ -81,6 +89,10 @@ int main(int argc, char **argv) {
     }
     if (arg == "--rudder-mode" && i + 1 < argc) {
       rudder_mode = argv[++i];
+      if (rudder_mode != "zero" && rudder_mode != "yawrate2" && rudder_mode != "demo") {
+        std::cerr << "[ERROR] rudder-mode tidak dikenal. Gunakan: zero, yawrate2, demo\n";
+        return 1;
+      }
       continue;
     }
     if (arg == "--op" && i + 1 < argc) {
@@ -169,7 +181,9 @@ int main(int argc, char **argv) {
     }
 
     double rudder_deg = 0.0;
-    if (rudder_mode == "demo") {
+    if (rudder_mode == "yawrate2") {
+      rudder_deg = clamp_rudder_deg(row->yaw_rate * 2.0, -10.0, 10.0);
+    } else if (rudder_mode == "demo") {
       const auto result = compute_result(*row, math_op, field_a, field_b);
       if (!result) {
         ++skipped_lines;
