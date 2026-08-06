@@ -23,6 +23,10 @@ void print_usage(const char *program_name) {
       << "  --port <nama_port>       Port serial (default: COM16 / /dev/ttyUSB0)\n"
       << "  --baud <rate>            Baud rate (default: 115200)\n"
       << "  --timeout <ms>           Timeout baca baris (default: 1000)\n"
+      << "  --print <all|csv|wp>     Filter stdout (default: all)\n"
+      << "                         all=CSV 8 kolom + [WP]\n"
+      << "                         csv=hanya CSV / header\n"
+      << "                         wp=hanya baris [WP]\n"
       << "  --op <add|sub|mul|div>   Operasi demo (default: sub)\n"
       << "  --field-a <nama_field>   Field pertama (default: calc_deg_servo_1)\n"
       << "  --field-b <nama_field>   Field kedua (default: calc_deg_servo_2)\n"
@@ -36,14 +40,32 @@ void print_usage(const char *program_name) {
       << "  yaw, gyro_z, yaw_rate\n\n"
       << "Perilaku:\n"
       << "  - Heartbeat $HB -> ESP32 setiap 1 detik (manual/auto)\n"
-      << "  - Baris CSV asli dari ESP32 -> stdout\n"
-      << "  - Baris waypoint [WP] dari ESP32 -> stdout (saat diterima)\n"
+      << "  - Filter stdout via --print (hitung rudder + TX tetap jalan)\n"
       << "  - Baris timestamp,result (rudder deg) -> serial TX saja\n";
 }
 
 bool is_waypoint_line(const std::string &line) {
   // Remote-Side printWaypoints(): "[WP] ..." ke USB Serial yang sama.
   return line.size() >= 4 && line.compare(0, 4, "[WP]") == 0;
+}
+
+bool parse_print_mode(const std::string &value, bool &print_csv, bool &print_wp) {
+  if (value == "all") {
+    print_csv = true;
+    print_wp = true;
+    return true;
+  }
+  if (value == "csv") {
+    print_csv = true;
+    print_wp = false;
+    return true;
+  }
+  if (value == "wp") {
+    print_csv = false;
+    print_wp = true;
+    return true;
+  }
+  return false;
 }
 
 std::string default_port() {
@@ -74,6 +96,9 @@ int main(int argc, char **argv) {
   TelemetryField field_a = TelemetryField::CalcDegServo1;
   TelemetryField field_b = TelemetryField::CalcDegServo2;
   std::string rudder_mode = "zero";
+  std::string print_mode = "all";
+  bool print_csv = true;
+  bool print_wp = true;
 
   for (int i = 1; i < argc; ++i) {
     const std::string arg = argv[i];
@@ -91,6 +116,14 @@ int main(int argc, char **argv) {
     }
     if (arg == "--timeout" && i + 1 < argc) {
       timeout_ms = static_cast<uint32_t>(std::stoul(argv[++i]));
+      continue;
+    }
+    if (arg == "--print" && i + 1 < argc) {
+      print_mode = argv[++i];
+      if (!parse_print_mode(print_mode, print_csv, print_wp)) {
+        std::cerr << "[ERROR] --print tidak dikenal. Gunakan: all, csv, wp\n";
+        return 1;
+      }
       continue;
     }
     if (arg == "--rudder-mode" && i + 1 < argc) {
@@ -147,7 +180,8 @@ int main(int argc, char **argv) {
 
   std::cerr << "[INFO] Port " << port << " @ " << baud << " baud (read + write)\n";
   std::cerr << "[INFO] Heartbeat $HB -> ESP32 setiap 1 detik\n";
-  std::cerr << "[INFO] CSV asli + [WP] -> stdout | timestamp,result -> serial TX\n";
+  std::cerr << "[INFO] Print mode: " << print_mode
+            << " | timestamp,result -> serial TX\n";
   std::cerr << "[INFO] Rudder mode: " << rudder_mode << "\n";
   std::cerr << "[INFO] Tekan Ctrl+C untuk berhenti\n";
 
@@ -177,14 +211,18 @@ int main(int argc, char **argv) {
     }
 
     if (is_header_line(line)) {
-      std::cout << line << "\n" << std::flush;
+      if (print_csv) {
+        std::cout << line << "\n" << std::flush;
+      }
       continue;
     }
 
-    // Waypoint dari Remote (setelah dashboard Send Way Points) — print ke stdout.
+    // Waypoint dari Remote (setelah dashboard Send Way Points).
     if (is_waypoint_line(line)) {
       ++waypoint_lines;
-      std::cout << line << "\n" << std::flush;
+      if (print_wp) {
+        std::cout << line << "\n" << std::flush;
+      }
       continue;
     }
 
@@ -202,14 +240,18 @@ int main(int argc, char **argv) {
       if (!result) {
         ++skipped_lines;
         std::cerr << "[WARN] Hitung result gagal pada t=" << row->timestamp << "\n";
-        std::cout << line << "\n";
+        if (print_csv) {
+          std::cout << line << "\n" << std::flush;
+        }
         continue;
       }
       rudder_deg = *result;
     }
 
     ++valid_lines;
-    std::cout << line << "\n" << std::flush;
+    if (print_csv) {
+      std::cout << line << "\n" << std::flush;
+    }
 
     const std::string result_line = format_result_line(row->timestamp, rudder_deg);
     if (!serial.write_line(result_line)) {

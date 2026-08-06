@@ -18,10 +18,12 @@ timestamp,lat,lon,calc_deg_servo_1,calc_deg_servo_2,yaw,gyro_z,yaw_rate
 
 | Data | Tujuan | Tampil di terminal? |
 |------|--------|---------------------|
-| Baris CSV asli (8 kolom) | **stdout** | Ya |
-| Baris waypoint `[WP] ...` dari Remote | **stdout** | Ya (saat dashboard kirim WP) |
+| Baris CSV asli (8 kolom) | **stdout** | Ya jika `--print all` atau `csv` |
+| Baris waypoint `[WP] ...` dari Remote | **stdout** | Ya jika `--print all` atau `wp` |
 | Baris `timestamp,result` | **serial TX** (ke ESP32) | **Tidak** |
 | Pesan info/error | **stderr** | Ya |
+
+`--print` hanya memfilter **stdout**. Hitung rudder + heartbeat + tulis serial tetap berjalan.
 
 ### Contoh
 
@@ -86,6 +88,11 @@ cmake --build build --config Release
 .\read_write_serial.exe --op mul --field-a yaw_rate --field-b calc_deg_servo_1
 cd "Cpp_Files\Cpp_ReadWriteSerial"
 .\read_write_serial.exe --port COM16 --baud 115200 --rudder-mode yawrate2
+
+# Filter stdout
+.\read_write_serial.exe --port COM16 --print all
+.\read_write_serial.exe --port COM16 --print csv
+.\read_write_serial.exe --port COM16 --print wp
 ```
 
 ```bash
@@ -95,7 +102,7 @@ cd "Cpp_Files\Cpp_ReadWriteSerial"
 Simpan log CSV asli ke file (tanpa baris result):
 
 ```powershell
-.\read_write_serial.exe --port COM16 2>nul > telemetry.csv
+.\read_write_serial.exe --port COM16 --print csv 2>nul > telemetry.csv
 ```
 
 ### Opsi CLI
@@ -105,6 +112,7 @@ Simpan log CSV asli ke file (tanpa baris result):
 | `--port` | `COM16` / `/dev/ttyUSB0` | Port serial |
 | `--baud` | `115200` | Baud rate |
 | `--timeout` | `1000` | Timeout baca baris (ms) |
+| `--print` | `all` | `all` (CSV+WP), `csv`, `wp` |
 | `--rudder-mode` | `zero` | `zero`, `yawrate2`, `demo` |
 | `--op` | `sub` | `add`, `sub`, `mul`, `div` (hanya mode `demo`) |
 | `--field-a` | `calc_deg_servo_1` | Field operand pertama (mode `demo`) |
