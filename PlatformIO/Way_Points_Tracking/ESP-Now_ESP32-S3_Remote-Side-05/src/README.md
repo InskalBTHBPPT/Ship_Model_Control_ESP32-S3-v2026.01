@@ -1,4 +1,4 @@
-﻿# ESP-Now_ESP32-S3_Remote-Side-05
+# ESP-Now_ESP32-S3_Remote-Side-05
 
 Firmware sisi kapal (Remote-Side) untuk sistem **Way Points Tracking**.
 
@@ -19,6 +19,7 @@ Mengumpulkan data sensor dan actuator, menjalankan kontrol rudder/propeller, men
 - Monitoring tegangan baterai (2 channel ADC)
 - **Terima waypoint** dari User-Side (`waypoints_payload`, msg `0xA1`)
 - **Echo waypoint ke mini PC** — baris `[WP] ...` di USB Serial (sama port dengan CSV)
+- **Forward `$SHUTDOWN`** ke mini PC saat ESP-NOW `0xA2` diterima
 - **Kirim telemetry** `DatatoSend` (64 byte) ke User-Side via ESP-NOW
 - **Debug CSV** ke mini PC @ 10 Hz (8 kolom, hanya saat RC auto)
 - **Mini PC serial:** terima `$HB` + `timestamp,result` (rudder deg)
@@ -30,7 +31,8 @@ Mengumpulkan data sensor dan actuator, menjalankan kontrol rudder/propeller, men
 | Arah | Format | Keterangan |
 |------|--------|------------|
 | ESP32 → PC | CSV 8 kolom | Hanya saat CH6 auto |
-| ESP32 → PC | `[WP] ...` | Saat waypoint `0xA1` diterima; dibaca/print oleh `Cpp_ReadWriteSerial` (`--print all\|wp`) |
+| ESP32 → PC | `[WP] ...` | Saat waypoint `0xA1` diterima; dibaca/print oleh `Cpp_ReadWriteSerial-1.0` (`--print all\|wp`) |
+| ESP32 → PC | `$SHUTDOWN` | Saat perintah `0xA2` SHUTDOWN; mini PC menjalankan shutdown OS |
 | PC → ESP32 | `$HB` | Heartbeat ~1 Hz (manual/auto) |
 | PC → ESP32 | `timestamp,result` | `result` = rudder offset (°), timestamp harus sama dengan baris CSV input |
 
@@ -41,8 +43,17 @@ Field telemetry ESP-NOW tambahan: `mini_pc_link` (kolom 24) — `1` jika heartbe
 ```text
 Dashboard ($WPSET) → User-Side-05 → ESP-NOW 0xA1 → Remote-Side-05
   → simpan g_lastWaypoints + printWaypoints() → USB Serial [WP]
-  → Cpp_ReadWriteSerial (stdout, filter --print)
+  → Cpp_ReadWriteSerial-1.0 (stdout, filter --print)
 ```
+
+**Alur shutdown mini PC (tanpa Wi‑Fi laptop↔mini PC):**
+
+```text
+Dashboard ($SHUTDOWN) → User-Side-05 → ESP-NOW 0xA2 → Remote-Side-05
+  → Serial.println("$SHUTDOWN") → Cpp_ReadWriteSerial-1.0 → shutdown OS
+```
+
+User-Side membalas dashboard dengan `$SACK,OK` / `$SACK,ERR,...` (sukses forward ESP-NOW).
 
 ---
 

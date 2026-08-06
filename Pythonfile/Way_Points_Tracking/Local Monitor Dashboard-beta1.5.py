@@ -1,4 +1,4 @@
-﻿"""
+"""
 Local Monitor Dashboard beta 1.5
 
 Ringkasan:
@@ -21,8 +21,14 @@ Send Way Points (tab Map Points):
   $WPSET,<home_lat>,<home_lon>,<wp_count>,<lat1>,<lon1>,...,<latN>,<lonN>
 - User-Side membalas $WACK,OK / $WACK,ERR,...
 - User-Side meneruskan ke Remote sebagai ESP-NOW waypoints_payload (0xA1).
-- Remote mencetak [WP] ... ke USB Serial mini PC; Cpp_ReadWriteSerial dapat
+- Remote mencetak [WP] ... ke USB Serial mini PC; Cpp_ReadWriteSerial-1.0 dapat
   menampilkan baris itu (--print all|wp). Dashboard tidak bicara langsung ke mini PC.
+
+Shutdown Mini PC (tab Live, sebelah status Mini PC):
+- Tombol aktif hanya jika serial Connect + mini_pc_link == 1.
+- Mengirim $SHUTDOWN ke User-Side → ESP-NOW 0xA2 → Remote → Serial "$SHUTDOWN"
+  → Cpp_ReadWriteSerial-1.0 menjalankan shutdown OS.
+- User-Side membalas $SACK,OK / $SACK,ERR,... (forward ESP-NOW sukses/gagal).
 
 Catatan pengolahan:
 - Parser memproses baris utuh yang diakhiri newline dan memvalidasi
@@ -1913,8 +1919,24 @@ class MainWindow(QMainWindow):
         self.mode_label = QLabel("Manual", self)
         self.mode_label.setStyleSheet("color: #10b981; font-weight: bold; font-size: 13pt; text-align: center;")
 
-        self.mini_pc_link_label = QLabel("Mini PC: —", self)
+        self.mini_pc_link_label = QLabel("—", self)
         self.mini_pc_link_label.setStyleSheet("color: #9ca3af; font-weight: bold; font-size: 11pt; text-align: center;")
+        self._mini_pc_link = 0
+
+        self.shutdown_mini_pc_btn = QPushButton("Shutdown", self)
+        self.shutdown_mini_pc_btn.setEnabled(False)
+        self.shutdown_mini_pc_btn.setToolTip(
+            "Matikan mini PC di kapal via ESP-NOW.\n"
+            "Aktif hanya jika Mini PC CONNECTED (heartbeat OK).\n"
+            "Tidak dapat dihidupkan lagi dari dashboard."
+        )
+        self.shutdown_mini_pc_btn.clicked.connect(self.on_shutdown_mini_pc_clicked)
+
+        self._shutdown_pending = False
+        self._shutdown_timeout_timer = QTimer(self)
+        self._shutdown_timeout_timer.setSingleShot(True)
+        self._shutdown_timeout_timer.setInterval(2000)
+        self._shutdown_timeout_timer.timeout.connect(self._on_shutdown_timeout)
 
         self.auto_warn_label = QLabel("", self)
         self.auto_warn_label.setStyleSheet("color: #f59e0b; font-weight: bold; font-size: 10pt; text-align: center;")
@@ -1964,8 +1986,16 @@ class MainWindow(QMainWindow):
         # Baris 1: Mode
         _add_indicator_row([_make_live_stat_cell(self, "Mode", self.mode_label)])
 
-        # Baris 1b: Mini PC link + auto warning
-        _add_indicator_row([_make_live_stat_cell(self, "Mini PC", self.mini_pc_link_label)])
+        # Baris 1b: Mini PC link + Shutdown + auto warning
+        mini_pc_row = QWidget(self)
+        mini_pc_row_layout = QHBoxLayout(mini_pc_row)
+        mini_pc_row_layout.setContentsMargins(0, 0, 0, 0)
+        mini_pc_row_layout.setSpacing(6)
+        mini_pc_row_layout.addWidget(
+            _make_live_stat_cell(self, "Mini PC", self.mini_pc_link_label), 2
+        )
+        mini_pc_row_layout.addWidget(self.shutdown_mini_pc_btn, 1)
+        indicator.layout().addWidget(mini_pc_row)
         indicator.layout().addWidget(self.auto_warn_label)
 
         # Baris 2: GPS Speed
@@ -2973,7 +3003,8 @@ class MainWindow(QMainWindow):
             pass
 
         try:
-            if int(mini_pc_link) == 1:
+            self._mini_pc_link = int(mini_pc_link)
+            if self._mini_pc_link == 1:
                 self.mini_pc_link_label.setText("CONNECTED")
                 self.mini_pc_link_label.setStyleSheet(
                     "color: #10b981; font-weight: bold; font-size: 11pt; text-align: center;")
@@ -2981,6 +3012,7 @@ class MainWindow(QMainWindow):
                 self.mini_pc_link_label.setText("DISCONNECTED")
                 self.mini_pc_link_label.setStyleSheet(
                     "color: #ef4444; font-weight: bold; font-size: 11pt; text-align: center;")
+            self._update_shutdown_mini_pc_btn_state()
         except Exception:
             pass
 
@@ -2992,6 +3024,92 @@ class MainWindow(QMainWindow):
                 self.auto_warn_label.setText("")
         except Exception:
             pass
+
+    def _update_shutdown_mini_pc_btn_state(self) -> None:
+        """Enable Shutdown hanya jika serial Connect + mini_pc_link==1 + tidak pending."""
+        if not hasattr(self, "shutdown_mini_pc_btn"):
+            return
+        enable = (
+            self.is_connected()
+            and int(getattr(self, "_mini_pc_link", 0)) == 1
+            and not getattr(self, "_shutdown_pending", False)
+        )
+        self.shutdown_mini_pc_btn.setEnabled(enable)
+
+    def on_shutdown_mini_pc_clicked(self) -> None:
+        """Kirim $SHUTDOWN ke User-Side (forward ESP-NOW ke Remote → mini PC)."""
+        if not self.is_connected():
+            QMessageBox.warning(self, "Shutdown Mini PC", "Serial belum terkoneksi.")
+            return
+        if int(getattr(self, "_mini_pc_link", 0)) != 1:
+            QMessageBox.warning(
+                self,
+                "Shutdown Mini PC",
+                "Mini PC tidak CONNECTED (heartbeat timeout).",
+            )
+            return
+
+        reply = QMessageBox.question(
+            self,
+            "Shutdown Mini PC",
+            "Matikan mini PC di kapal sekarang?\n\n"
+            "Perintah dikirim via ESP-NOW (tanpa Wi‑Fi laptop↔mini PC).\n"
+            "Setelah mati, mini PC tidak bisa dihidupkan dari dashboard.",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.No,
+        )
+        if reply != QMessageBox.Yes:
+            return
+
+        try:
+            self.ser.write(b"$SHUTDOWN\n")
+            self.ser.flush()
+        except Exception as e:
+            QMessageBox.critical(self, "Shutdown Mini PC", f"Gagal kirim serial:\n{e}")
+            return
+
+        self._shutdown_pending = True
+        self._update_shutdown_mini_pc_btn_state()
+        self._shutdown_timeout_timer.start()
+        print("[SHUTDOWN] $SHUTDOWN sent — menunggu $SACK")
+
+    def _on_shutdown_timeout(self) -> None:
+        if not getattr(self, "_shutdown_pending", False):
+            return
+        self._shutdown_pending = False
+        self._update_shutdown_mini_pc_btn_state()
+        QMessageBox.warning(
+            self,
+            "Shutdown Mini PC",
+            "TIMEOUT: tidak ada $SACK dari User-Side.",
+        )
+
+    def _handle_shutdown_response(self, text: str) -> None:
+        """Handle $SACK,OK / $SACK,ERR,... dari User-Side."""
+        if self._shutdown_timeout_timer.isActive():
+            self._shutdown_timeout_timer.stop()
+        self._shutdown_pending = False
+        self._update_shutdown_mini_pc_btn_state()
+
+        parts = [p.strip() for p in text.split(",")]
+        if len(parts) >= 2 and parts[1] == "OK":
+            QMessageBox.information(
+                self,
+                "Shutdown Mini PC",
+                "Perintah diteruskan ke Remote (ESP-NOW OK).\n"
+                "Mini PC akan shutdown jika Cpp_ReadWriteSerial-1.0 menerima $SHUTDOWN.",
+            )
+            print(f"[SHUTDOWN] {text}")
+        elif len(parts) >= 3 and parts[1] == "ERR":
+            reason = ",".join(parts[2:])
+            QMessageBox.critical(
+                self,
+                "Shutdown Mini PC",
+                f"Gagal forward ESP-NOW:\n{reason}",
+            )
+            print(f"[SHUTDOWN] {text}")
+        else:
+            QMessageBox.warning(self, "Shutdown Mini PC", f"Respons tidak dikenal:\n{text}")
 
     def clear_all_plots(self):
         """Clear semua plot data pada tab Live."""
@@ -3520,6 +3638,8 @@ class MainWindow(QMainWindow):
             if hasattr(self, 'set_param_btn'):
                 self.set_param_btn.setEnabled(True)
 
+            self._update_shutdown_mini_pc_btn_state()
+
             return True
         except Exception as e:
             print(f"[SERIAL] Connect failed: {e}")
@@ -3577,6 +3697,19 @@ class MainWindow(QMainWindow):
                 if hasattr(self, '_set_param_timeout_timer') and self._set_param_timeout_timer.isActive():
                     self._set_param_timeout_timer.stop()
                 self._set_param_pending = False
+            except Exception:
+                pass
+            # Reset shutdown mini PC state
+            try:
+                if hasattr(self, "_shutdown_timeout_timer") and self._shutdown_timeout_timer.isActive():
+                    self._shutdown_timeout_timer.stop()
+                self._shutdown_pending = False
+                self._mini_pc_link = 0
+                if hasattr(self, "mini_pc_link_label"):
+                    self.mini_pc_link_label.setText("—")
+                    self.mini_pc_link_label.setStyleSheet(
+                        "color: #9ca3af; font-weight: bold; font-size: 11pt; text-align: center;")
+                self._update_shutdown_mini_pc_btn_state()
             except Exception:
                 pass
             # Reset status label ke idle saat disconnect
@@ -3649,6 +3782,9 @@ class MainWindow(QMainWindow):
                 #             di-handle untuk backward compatibility singkat).
                 if text.startswith("$WACK") or text.startswith("$PACK"):
                     self._handle_set_param_response(text)
+                    continue
+                if text.startswith("$SACK"):
+                    self._handle_shutdown_response(text)
                     continue
                 # Format target: 1854.900,-7.286621,112.796040,1.53,-3.95,7.07,3.18,62.33,98.57,0.00,463.38,2880.63,10.54,11.88
                 parts = [p.strip() for p in text.split(',')]

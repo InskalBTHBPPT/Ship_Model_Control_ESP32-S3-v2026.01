@@ -1,4 +1,4 @@
-﻿/*
+/*
   ESP32-S3 User-Side-05 (gateway USB <-> ESP-NOW)
 
   Peran:
@@ -7,19 +7,20 @@
   - Menerima command "$WPSET,..." dari PC (dashboard PySide6) via Serial
     dan meneruskannya ke Remote-Side via ESP-NOW dalam bentuk
     struct waypoints_payload (msg_type 0xA1).
+  - Menerima "$SHUTDOWN" dari PC → ESP-NOW pc_command_payload (0xA2) ke Remote
+    → Remote menulis "$SHUTDOWN" ke USB Serial mini PC.
 
   Protokol kontrol PC -> User-Side (ASCII, diakhiri '\n'):
     $WPSET,<home_lat>,<home_lon>,<wp_count>,<lat1>,<lon1>,...,<latN>,<lonN>
+    $SHUTDOWN
 
   Balasan User-Side -> PC:
-    $WACK,OK
-    $WACK,ERR,<reason>
+    $WACK,OK / $WACK,ERR,<reason>     (untuk $WPSET)
+    $SACK,OK / $SACK,ERR,<reason>     (untuk $SHUTDOWN; berarti sudah di-forward ESP-NOW)
 
-  Catatan rantai waypoint ke mini PC (di kapal):
-    Setelah Remote menerima 0xA1, Remote mencetak baris "[WP] ..." ke USB
-    Serial-nya. Program Cpp_ReadWriteSerial di mini PC dapat menampilkan
-    baris itu (--print all|wp). User-Side sendiri tidak bicara langsung ke
-    mini PC.
+  Catatan rantai ke mini PC (di kapal):
+    User-Side tidak bicara langsung ke mini PC. Remote yang echo [WP] / $SHUTDOWN
+    ke USB Serial Cpp_ReadWriteSerial-1.0.
 */
 
 #include <Arduino.h>
@@ -93,6 +94,19 @@ typedef struct waypoints_payload {
 } waypoints_payload;
 
 waypoints_payload myWaypointsPayload;
+
+// =====================================================================
+// Perintah mini PC (shutdown, dll.). HARUS sama dengan Remote-Side-05.
+// msg_type 0xA2, ukuran 4 byte (beda dari WP 180 / telemetry 64).
+// =====================================================================
+#define PC_CMD_MSG_TYPE   0xA2
+#define PC_CMD_SHUTDOWN   1
+
+typedef struct pc_command_payload {
+  uint8_t msg_type;
+  uint8_t cmd;
+  uint8_t reserved[2];
+} pc_command_payload;
 
 esp_now_peer_info_t peerInfo;
 
@@ -203,7 +217,29 @@ static int tokenizeByComma(const String& payload, String tokens[], int maxTokens
   return count;
 }
 
+static void processShutdownCommand() {
+  pc_command_payload cmd{};
+  cmd.msg_type = PC_CMD_MSG_TYPE;
+  cmd.cmd = PC_CMD_SHUTDOWN;
+
+  esp_err_t result = esp_now_send(
+      remote_side_Address,
+      (uint8_t *)&cmd,
+      sizeof(cmd));
+
+  if (result == ESP_OK) {
+    Serial.println("$SACK,OK");
+  } else {
+    Serial.println("$SACK,ERR,SEND_FAIL");
+  }
+}
+
 static void processSerialLine(const String& line) {
+  if (line == "$SHUTDOWN") {
+    processShutdownCommand();
+    return;
+  }
+
   if (!line.startsWith("$WPSET,")) {
     return;  // baris non-protokol diabaikan tanpa balasan
   }

@@ -1,4 +1,4 @@
-﻿# ESP-Now_ESP32-S3_User-Side-05
+# ESP-Now_ESP32-S3_User-Side-05
 
 Firmware **gateway USB ↔ ESP-NOW** di sisi darat (User-Side) untuk sistem **Way Points Tracking**.
 
@@ -14,8 +14,9 @@ Firmware **gateway USB ↔ ESP-NOW** di sisi darat (User-Side) untuk sistem **Wa
 |------|--------|
 | Remote → User → PC | Telemetry CSV **24 kolom** @ ~10 Hz (Serial 115200) |
 | PC → User → Remote | Perintah `$WPSET,...` → ESP-NOW `waypoints_payload` (`msg_type` `0xA1`) |
+| PC → User → Remote | Perintah `$SHUTDOWN` → ESP-NOW `pc_command_payload` (`msg_type` `0xA2`) |
 
-User-Side **tidak** terhubung ke mini PC di kapal. Setelah Remote menerima waypoint, Remote yang mencetak `[WP] ...` ke USB Serial mini PC (`Cpp_ReadWriteSerial`).
+User-Side **tidak** terhubung ke mini PC di kapal. Setelah Remote menerima waypoint/shutdown, Remote menulis ke USB Serial mini PC (`Cpp_ReadWriteSerial-1.0`).
 
 ---
 
@@ -31,12 +32,27 @@ Satu baris CSV 24 kolom (fixed-point, sama urutan `DatatoSend` / dashboard beta 
 $WPSET,<home_lat>,<home_lon>,<wp_count>,<lat1>,<lon1>,...,<latN>,<lonN>
 ```
 
-### Balasan (User → PC)
+### Balasan waypoint (User → PC)
 
 ```text
 $WACK,OK
 $WACK,ERR,<reason>
 ```
+
+### Shutdown mini PC (PC → User)
+
+```text
+$SHUTDOWN
+```
+
+### Balasan shutdown (User → PC)
+
+```text
+$SACK,OK
+$SACK,ERR,<reason>
+```
+
+`$SACK,OK` berarti paket `0xA2` sudah dikirim ESP-NOW ke Remote (bukan konfirmasi OS sudah mati).
 
 ---
 
@@ -46,10 +62,18 @@ $WACK,ERR,<reason>
 Dashboard (Send Way Points / $WPSET)
   → User-Side-05 (parse + esp_now_send 0xA1)
   → Remote-Side-05 (simpan + print [WP] ke mini PC)
-  → Cpp_ReadWriteSerial (--print all|wp) menampilkan [WP] di terminal mini PC
+  → Cpp_ReadWriteSerial-1.0 (--print all|wp) menampilkan [WP] di terminal mini PC
 ```
 
-Pengiriman `$WPSET` **tidak** mengganggu stream telemetry 24 kolom ke dashboard.
+## Alur Shutdown Mini PC
+
+```text
+Dashboard (tombol Shutdown di tab Live, hanya jika mini_pc_link=1)
+  → $SHUTDOWN → User-Side-05 → ESP-NOW 0xA2 → Remote-Side-05
+  → Serial "$SHUTDOWN" → Cpp_ReadWriteSerial-1.0 → shutdown OS
+```
+
+Pengiriman `$WPSET` / `$SHUTDOWN` **tidak** mengganggu stream telemetry 24 kolom ke dashboard.
 
 ---
 

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * @file main.cpp
  * @brief ESP32-S3 Remote-Side-05 — Ship Model Control System
  *
@@ -25,7 +25,8 @@
  * Waypoint & mini PC (USB Serial 115200):
  * - Terima waypoints_payload (msg 0xA1) dari User-Side → simpan g_lastWaypoints
  * - printWaypoints() mencetak baris "[WP] ..." ke Serial (dibaca mini PC /
- *   Cpp_ReadWriteSerial; filter --print all|wp)
+ *   Cpp_ReadWriteSerial-1.0; filter --print all|wp)
+ * - Terima pc_command_payload (msg 0xA2, cmd SHUTDOWN) → Serial "$SHUTDOWN"
  * - CSV 8 kolom @ 10 Hz hanya saat RC auto; terima $HB + timestamp,result
  *
  * @author Chandra P - Ship Model Control System
@@ -37,6 +38,7 @@
  * - Data dikirim dalam format fixed-point (× 100) untuk efisiensi
  * - Struct DatatoSend harus sama dengan User-Side-05 (64 byte, 24 field)
  * - Penerimaan waypoint: Dashboard → User-Side ($WPSET) → ESP-NOW → sini
+ * - Shutdown mini PC: Dashboard ($SHUTDOWN) → User → ESP-NOW 0xA2 → sini → Serial
  */
 
 #include <Arduino.h>
@@ -67,6 +69,16 @@ uint8_t user_side_Address[] = {0x80, 0xb5, 0x4e, 0xc1, 0xd5, 0xac};
 // =====================================================================
 #define WP_MAX_COUNT 10
 #define WP_MSG_TYPE  0xA1
+
+// Perintah mini PC dari User-Side (HARUS sama dengan User-Side-05)
+#define PC_CMD_MSG_TYPE  0xA2
+#define PC_CMD_SHUTDOWN  1
+
+typedef struct pc_command_payload {
+  uint8_t msg_type;
+  uint8_t cmd;
+  uint8_t reserved[2];
+} pc_command_payload;
 
 // =====================================================================
 // Pemilihan algoritma auto track (hardcode — ubah sebelum upload)
@@ -164,6 +176,20 @@ void OnDataRecv(const uint8_t *mac, const uint8_t *incomingData, int len) {
     Serial.println(len);
     printWaypoints(g_lastWaypoints);
     Serial.println();
+    return;
+  }
+
+  // Shutdown / perintah mini PC (4 byte, msg 0xA2)
+  if (len == (int)sizeof(pc_command_payload) && incomingData[0] == PC_CMD_MSG_TYPE) {
+    pc_command_payload cmd{};
+    memcpy(&cmd, incomingData, sizeof(cmd));
+    if (cmd.cmd == PC_CMD_SHUTDOWN) {
+      Serial.println("$SHUTDOWN");
+      Serial.println("[INFO] Forward $SHUTDOWN ke mini PC");
+    } else {
+      Serial.print("[WARN] pc_command cmd tidak dikenal: ");
+      Serial.println(cmd.cmd);
+    }
     return;
   }
 
