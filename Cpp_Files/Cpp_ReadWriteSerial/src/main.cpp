@@ -37,7 +37,13 @@ void print_usage(const char *program_name) {
       << "Perilaku:\n"
       << "  - Heartbeat $HB -> ESP32 setiap 1 detik (manual/auto)\n"
       << "  - Baris CSV asli dari ESP32 -> stdout\n"
+      << "  - Baris waypoint [WP] dari ESP32 -> stdout (saat diterima)\n"
       << "  - Baris timestamp,result (rudder deg) -> serial TX saja\n";
+}
+
+bool is_waypoint_line(const std::string &line) {
+  // Remote-Side printWaypoints(): "[WP] ..." ke USB Serial yang sama.
+  return line.size() >= 4 && line.compare(0, 4, "[WP]") == 0;
 }
 
 std::string default_port() {
@@ -141,11 +147,12 @@ int main(int argc, char **argv) {
 
   std::cerr << "[INFO] Port " << port << " @ " << baud << " baud (read + write)\n";
   std::cerr << "[INFO] Heartbeat $HB -> ESP32 setiap 1 detik\n";
-  std::cerr << "[INFO] CSV asli -> stdout | timestamp,result (rudder deg) -> serial TX\n";
+  std::cerr << "[INFO] CSV asli + [WP] -> stdout | timestamp,result -> serial TX\n";
   std::cerr << "[INFO] Rudder mode: " << rudder_mode << "\n";
   std::cerr << "[INFO] Tekan Ctrl+C untuk berhenti\n";
 
   uint64_t valid_lines = 0;
+  uint64_t waypoint_lines = 0;
   uint64_t skipped_lines = 0;
   uint64_t write_errors = 0;
   auto last_hb = std::chrono::steady_clock::now();
@@ -170,7 +177,14 @@ int main(int argc, char **argv) {
     }
 
     if (is_header_line(line)) {
-      std::cout << line << "\n";
+      std::cout << line << "\n" << std::flush;
+      continue;
+    }
+
+    // Waypoint dari Remote (setelah dashboard Send Way Points) — print ke stdout.
+    if (is_waypoint_line(line)) {
+      ++waypoint_lines;
+      std::cout << line << "\n" << std::flush;
       continue;
     }
 
@@ -195,7 +209,7 @@ int main(int argc, char **argv) {
     }
 
     ++valid_lines;
-    std::cout << line << "\n";
+    std::cout << line << "\n" << std::flush;
 
     const std::string result_line = format_result_line(row->timestamp, rudder_deg);
     if (!serial.write_line(result_line)) {
@@ -206,6 +220,7 @@ int main(int argc, char **argv) {
   }
 
   std::cerr << "\n[INFO] Selesai. Baris valid: " << valid_lines
+            << ", waypoint: " << waypoint_lines
             << ", dilewati: " << skipped_lines
             << ", gagal tulis serial: " << write_errors << "\n";
   return 0;

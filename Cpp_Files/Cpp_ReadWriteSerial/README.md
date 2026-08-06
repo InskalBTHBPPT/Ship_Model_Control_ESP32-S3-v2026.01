@@ -19,6 +19,7 @@ timestamp,lat,lon,calc_deg_servo_1,calc_deg_servo_2,yaw,gyro_z,yaw_rate
 | Data | Tujuan | Tampil di terminal? |
 |------|--------|---------------------|
 | Baris CSV asli (8 kolom) | **stdout** | Ya |
+| Baris waypoint `[WP] ...` dari Remote | **stdout** | Ya (saat dashboard kirim WP) |
 | Baris `timestamp,result` | **serial TX** (ke ESP32) | **Tidak** |
 | Pesan info/error | **stderr** | Ya |
 
