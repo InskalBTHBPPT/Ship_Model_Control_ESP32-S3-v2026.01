@@ -80,6 +80,8 @@ cmake --build build --config Release
 # Operasi lain
 .\read_write_serial.exe --op add --field-a yaw --field-b gyro_z
 .\read_write_serial.exe --op mul --field-a yaw_rate --field-b calc_deg_servo_1
+cd "Cpp_Files\Cpp_ReadWriteSerial"
+.\read_write_serial.exe --port COM16 --baud 115200 --rudder-mode yawrate2
 ```
 
 ```bash
