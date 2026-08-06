@@ -1,15 +1,29 @@
 # Cpp_ReadWriteSerial
 
-Program C++ untuk **membaca** telemetry CSV dari **ESP-Now_ESP32-S3_Remote-Side-04**, mengirim heartbeat `$HB`, lalu **menulis balik** baris `timestamp,result` (rudder deg) ke port serial yang sama. Dipakai sebagai mini PC di kapal.
+Program C++ untuk **membaca** data dari **ESP-Now_ESP32-S3_Remote-Side-04** via USB serial, mengirim heartbeat `$HB`, lalu **menulis balik** baris `timestamp,result` (rudder deg). Dipakai sebagai mini PC di kapal.
+
+Pasangan terkait:
+- Firmware: `PlatformIO/.../ESP-Now_ESP32-S3_Remote-Side-04`
+- Dashboard (shore): `Pythonfile/.../Local Monitor Dashboard-beta1.4.py` → User-Side → ESP-NOW → Remote → (baris `[WP]`) → mini PC
 
 ## Format input (dari ESP32)
 
-Hanya format CSV 8 kolom berikut:
+### 1) Telemetry CSV 8 kolom (hanya saat RC auto / CH6)
 
 ```text
 timestamp,lat,lon,calc_deg_servo_1,calc_deg_servo_2,yaw,gyro_z,yaw_rate
 24.783,0.000000,0.000000,-5.67,-20.57,0.00,0.00,0.00
-24.883,0.000000,0.000000,-4.89,-20.63,0.00,0.00,0.00
+```
+
+### 2) Waypoint echo `[WP] ...` (saat dashboard kirim `$WPSET`)
+
+Remote mencetak ke USB Serial yang sama setelah menerima `waypoints_payload` (`0xA1`), misalnya:
+
+```text
+[WP] Bytes received from User-Side: 180
+[WP] msg_type=0xA1 home_valid=1 count=3
+[WP] Home: -6.xxxxxx, 106.xxxxxx
+[WP] #1: ...
 ```
 
 **Baud rate default:** `115200`
@@ -27,10 +41,11 @@ timestamp,lat,lon,calc_deg_servo_1,calc_deg_servo_2,yaw,gyro_z,yaw_rate
 
 ### Contoh
 
-**Terminal (stdout):**
+**Terminal (stdout), `--print all`:**
 ```text
 24.783,0.000000,0.000000,-5.67,-20.57,0.00,0.00,0.00
-24.883,0.000000,0.000000,-4.89,-20.63,0.00,0.00,0.00
+[WP] msg_type=0xA1 home_valid=1 count=3
+[WP] Home: -6.200000, 106.800000
 ```
 
 **Dikirim ke serial (tidak tampil di terminal):**
@@ -77,29 +92,29 @@ cmake --build build --config Release
 ## Penggunaan
 
 ```powershell
-# Default: COM16, operasi sub(calc_deg_servo_1, calc_deg_servo_2)
+# Default: COM16, --rudder-mode zero, --print all
 .\read_write_serial.exe
 
 # Port custom
 .\read_write_serial.exe --port COM16 --baud 115200
 
-# Operasi lain
-.\read_write_serial.exe --op add --field-a yaw --field-b gyro_z
-.\read_write_serial.exe --op mul --field-a yaw_rate --field-b calc_deg_servo_1
-cd "Cpp_Files\Cpp_ReadWriteSerial"
+# Uji integrasi rudder dari yaw_rate
 .\read_write_serial.exe --port COM16 --baud 115200 --rudder-mode yawrate2
 
 # Filter stdout
 .\read_write_serial.exe --port COM16 --print all
 .\read_write_serial.exe --port COM16 --print csv
 .\read_write_serial.exe --port COM16 --print wp
+
+# Mode demo (math antar field)
+.\read_write_serial.exe --rudder-mode demo --op add --field-a yaw --field-b gyro_z
 ```
 
 ```bash
 ./read_write_serial --port /dev/ttyUSB0
 ```
 
-Simpan log CSV asli ke file (tanpa baris result):
+Simpan log CSV asli ke file (tanpa baris result / info):
 
 ```powershell
 .\read_write_serial.exe --port COM16 --print csv 2>nul > telemetry.csv
@@ -141,38 +156,14 @@ Salin dari folder MinGW, misalnya `C:\msys64\ucrt64\bin\` (sesuaikan instalasi g
 
 ## Auto-start di Windows (mini PC)
 
-Gunakan `start_read_write_serial.bat` (edit `COM_PORT` di dalam file). Lalu pilih salah satu cara:
+Lihat panduan lengkap: [`startup_guide.md`](startup_guide.md).
 
-### Opsi 1 — Task Scheduler (disarankan)
-
-Jalankan PowerShell **sebagai Administrator** (sesuaikan path):
-
-```powershell
-$dir = "D:\Pengujian\Ship_Model_Control_ESP32-S3 v2026.01\Cpp_Files\Cpp_ReadWriteSerial"
-$action = New-ScheduledTaskAction -Execute "$dir\start_read_write_serial.bat" -WorkingDirectory $dir
-$trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
-$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1)
-Register-ScheduledTask -TaskName "ShipModel_ReadWriteSerial" -Action $action -Trigger $trigger -Settings $settings -Force
-```
-
-Task Scheduler juga bisa lewat GUI: **Task Scheduler** → Create Task → trigger **At log on** → action **Start a program** → program: `start_read_write_serial.bat`, **Start in**: folder `Cpp_ReadWriteSerial`.
-
-### Opsi 2 — Folder Startup (paling sederhana)
-
-1. `Win+R` → ketik `shell:startup` → Enter
-2. Buat **shortcut** ke `start_read_write_serial.bat`
-3. Reboot / log off-on
-
-### Tips
-
-- Tetapkan **nomor COM tetap** di Device Manager (Properties USB serial → Port Settings → Advanced) agar `COM_PORT` tidak berubah setelah reboot.
-- Batch menunggu 15 detik setelah boot supaya USB serial sempat terdeteksi.
-- Jika program crash, batch otomatis restart setelah 5 detik.
+Ringkas: edit `COM_PORT` / `PRINT_MODE` di `start_read_write_serial.bat`, lalu pasang **shortcut** ke file itu di `shell:startup` (atau Task Scheduler At log on).
 
 ---
 
 ## Catatan
 
 1. Tutup Serial Monitor PlatformIO sebelum menjalankan program — port COM hanya satu aplikasi.
-2. CSV dari Remote hanya keluar saat **mode RC auto**; heartbeat `$HB` dikirim terus (manual/auto).
-3. Program terkait: `Cpp_Files/Cpp_ReadSerial` (baca saja, tanpa write).
+2. CSV dari Remote hanya keluar saat **mode RC auto**; baris `[WP]` muncul saat waypoint diterima (manual/auto); heartbeat `$HB` dikirim terus.
+3. Program terkait baca-saja: `Cpp_Files/Cpp_ReadSerial`.

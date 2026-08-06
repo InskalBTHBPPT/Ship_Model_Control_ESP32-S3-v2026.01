@@ -3,9 +3,9 @@ Local Monitor Dashboard beta 1.4
 
 Ringkasan:
 - Dashboard PySide6 untuk monitoring telemetry kapal secara real-time.
-- Input data berasal dari serial CSV text (UTF-8 compatible).
-- Mendukung map tracking, indikator live, plotting time-series, logging CSV, analyze,
-  serta fitur Home Points dari koordinat serial terbaru.
+- Input data berasal dari serial CSV text (UTF-8) lewat User-Side-04.
+- Mendukung map tracking, indikator live, plotting time-series, logging CSV,
+  analyze, Home Points, serta Send Way Points ke Remote via User-Side.
 
 Format data serial yang dibaca (24 kolom, raw fixed-point dari User-Side-04):
 1) timestamp  2) latitude  3) longitude
@@ -13,11 +13,21 @@ Format data serial yang dibaca (24 kolom, raw fixed-point dari User-Side-04):
 7) yaw (x100)  8) heading_setpoint (x100)  9) heading_error (x100)
 10) rudder_cmd (x100)  11) track_wp_index  12) distance_to_wp (x10, m)
 13-18) accel_x/y/z, gyro_x/y/z (x100) — di-log, tidak di panel live
-19-20) rpm_prop_1/2 (integer RPM langsung, bukan x100)  21-22) battery_1/2 (x100, V)  23) mode_auto  24) mini_pc_link (0/1)
+19-20) rpm_prop_1/2 (integer RPM langsung, bukan x100)
+21-22) battery_1/2 (x100, V)  23) mode_auto  24) mini_pc_link (0/1)
+
+Send Way Points (tab Map Points):
+- Tombol mengirim ASCII:
+  $WPSET,<home_lat>,<home_lon>,<wp_count>,<lat1>,<lon1>,...,<latN>,<lonN>
+- User-Side membalas $WACK,OK / $WACK,ERR,...
+- User-Side meneruskan ke Remote sebagai ESP-NOW waypoints_payload (0xA1).
+- Remote mencetak [WP] ... ke USB Serial mini PC; Cpp_ReadWriteSerial dapat
+  menampilkan baris itu (--print all|wp). Dashboard tidak bicara langsung ke mini PC.
 
 Catatan pengolahan:
-- Parser memproses baris utuh yang diakhiri newline dan memvalidasi jumlah kolom = 23.
-- RPM: nilai mentah dari Remote-Side = putaran/menit langsung (sama seperti beta 1.1 + Receive).
+- Parser memproses baris utuh yang diakhiri newline dan memvalidasi
+  jumlah kolom = TELEMETRY_COL_COUNT (24).
+- RPM: nilai mentah dari Remote-Side = putaran/menit langsung.
 - Data lat/lon tervalidasi range; nilai 0,0 dapat diganti default location.
 - Nilai terbaru lat/lon disimpan untuk fitur Home Points.
 """
@@ -2642,13 +2652,13 @@ class MainWindow(QMainWindow):
            - Total minimal 3 point: 1 Home + minimal 2 waypoint navigasi
              dari self.map_points_webview.click_marker_coords.
            - Tiap koordinat numerik dan dalam rentang lat/lon valid.
-        3. Susun payload protokol baru:
-             $WPSET,<home_lat>,<home_lon>,<wp_count>,<lat1>,<lon1>,...,<latN>,<lonN>\n
-           dengan wp_count = jumlah waypoint navigasi (= len(click_marker_coords)).
-        4. Tulis ke serial.
-        5. Tunggu balasan $WACK,OK / $WACK,ERR,<reason> dari firmware
-           user-side dengan timeout 1.5 detik (lihat poll_serial -> handler
-           akan dipanggil saat respons tiba).
+        3. Susun payload:
+             $WPSET,<home_lat>,<home_lon>,<wp_count>,<lat1>,<lon1>,...,<latN>,<lonN>\\n
+           dengan wp_count = jumlah waypoint navigasi.
+        4. Tulis ke serial User-Side; tunggu $WACK,OK / $WACK,ERR,... (timeout ~1.5 s).
+        5. Di kapal: User-Side → ESP-NOW 0xA1 → Remote menyimpan waypoint dan
+           mencetak [WP] ... ke USB Serial mini PC (Cpp_ReadWriteSerial,
+           --print all|wp). Dashboard tidak bicara langsung ke mini PC.
         """
         if not self.is_connected():
             self._update_set_param_status(

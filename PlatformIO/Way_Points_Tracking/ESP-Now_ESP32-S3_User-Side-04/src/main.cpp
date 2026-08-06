@@ -6,7 +6,7 @@
     meneruskannya ke PC sebagai CSV via Serial (115200 baud).
   - Menerima command "$WPSET,..." dari PC (dashboard PySide6) via Serial
     dan meneruskannya ke Remote-Side via ESP-NOW dalam bentuk
-    struct waypoints_payload.
+    struct waypoints_payload (msg_type 0xA1).
 
   Protokol kontrol PC -> User-Side (ASCII, diakhiri '\n'):
     $WPSET,<home_lat>,<home_lon>,<wp_count>,<lat1>,<lon1>,...,<latN>,<lonN>
@@ -14,6 +14,12 @@
   Balasan User-Side -> PC:
     $WACK,OK
     $WACK,ERR,<reason>
+
+  Catatan rantai waypoint ke mini PC (di kapal):
+    Setelah Remote menerima 0xA1, Remote mencetak baris "[WP] ..." ke USB
+    Serial-nya. Program Cpp_ReadWriteSerial di mini PC dapat menampilkan
+    baris itu (--print all|wp). User-Side sendiri tidak bicara langsung ke
+    mini PC.
 */
 
 #include <Arduino.h>

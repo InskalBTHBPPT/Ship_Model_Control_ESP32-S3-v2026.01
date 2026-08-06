@@ -18,6 +18,7 @@ Mengumpulkan data sensor dan actuator, menjalankan kontrol rudder/propeller, men
 - RPM motor propeller (2× rotary encoder)
 - Monitoring tegangan baterai (2 channel ADC)
 - **Terima waypoint** dari User-Side (`waypoints_payload`, msg `0xA1`)
+- **Echo waypoint ke mini PC** — baris `[WP] ...` di USB Serial (sama port dengan CSV)
 - **Kirim telemetry** `DatatoSend` (64 byte) ke User-Side via ESP-NOW
 - **Debug CSV** ke mini PC @ 10 Hz (8 kolom, hanya saat RC auto)
 - **Mini PC serial:** terima `$HB` + `timestamp,result` (rudder deg)
@@ -29,10 +30,19 @@ Mengumpulkan data sensor dan actuator, menjalankan kontrol rudder/propeller, men
 | Arah | Format | Keterangan |
 |------|--------|------------|
 | ESP32 → PC | CSV 8 kolom | Hanya saat CH6 auto |
+| ESP32 → PC | `[WP] ...` | Saat waypoint `0xA1` diterima; dibaca/print oleh `Cpp_ReadWriteSerial` (`--print all\|wp`) |
 | PC → ESP32 | `$HB` | Heartbeat ~1 Hz (manual/auto) |
 | PC → ESP32 | `timestamp,result` | `result` = rudder offset (°), timestamp harus sama dengan baris CSV input |
 
 Field telemetry ESP-NOW tambahan: `mini_pc_link` (kolom 24) — `1` jika heartbeat OK (< 3 s).
+
+**Alur waypoint ke mini PC:**
+
+```text
+Dashboard ($WPSET) → User-Side-04 → ESP-NOW 0xA1 → Remote-Side-04
+  → simpan g_lastWaypoints + printWaypoints() → USB Serial [WP]
+  → Cpp_ReadWriteSerial (stdout, filter --print)
+```
 
 ---
 
@@ -202,7 +212,20 @@ Contoh baris data:
 
 Baud monitor: **115200** (`platformio.ini`).
 
-Format ini dipakai oleh `Cpp_Files/Cpp_ReadSerial` dan `Cpp_ReadWriteSerial` di PC.
+Format CSV dipakai oleh `Cpp_Files/Cpp_ReadSerial` dan `Cpp_ReadWriteSerial` di PC.
+
+### Echo waypoint `[WP]` (event-driven)
+
+Dipanggil dari `OnDataRecv` → `printWaypoints()` setiap kali paket `waypoints_payload` valid diterima (bukan periodik 10 Hz). Contoh:
+
+```text
+[WP] Bytes received from User-Side: 180
+[WP] msg_type=0xA1 home_valid=1 count=3
+[WP] Home: -6.200000, 106.800000
+[WP] #1: -6.201000, 106.801000
+```
+
+Mini PC (`Cpp_ReadWriteSerial`) mencetak ulang baris yang diawali `[WP]` ke stdout (opsi `--print all` atau `wp`).
 
 ---
 
@@ -257,10 +280,10 @@ Sesuaikan `upload_port` / `monitor_port` di `platformio.ini` (default: `COM14`).
 ## Alur Operasi
 
 1. Power ON → inisialisasi PPM, ADC, LEDC, GNSS (re-baud 115200, 10 Hz), IMU, ESP-NOW
-2. User-Side kirim waypoint via ESP-NOW
+2. User-Side kirim waypoint via ESP-NOW → Remote simpan + cetak `[WP]` ke mini PC
 3. Operator pilih Manual/Auto lewat CH6
 4. Loop 10 Hz: baca sensor → kontrol rudder/propeller → isi `dataToSend` → `esp_now_send`
-5. Serial CSV debug ke PC (opsional logging)
+5. Serial CSV debug ke mini PC saat RC auto; `$HB` / `timestamp,result` dari `Cpp_ReadWriteSerial`
 
 ---
 

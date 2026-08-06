@@ -5,7 +5,7 @@
  * @description
  * Firmware sisi kapal (Remote-Side) yang mengumpulkan data sensor dan
  * actuator, menjalankan kontrol rudder/propeller, lalu mengirim telemetry
- * 23-kolom telemetry ke User-Side via ESP-NOW.
+ * 24-kolom ke User-Side via ESP-NOW.
  *
  * Clone dari ESP_Now_Send_Ver2025_revJan2026.
  *
@@ -22,15 +22,21 @@
  * - Mode Auto alg 1: waypoint + PD rudder (AUTO_TRACK_ALG=1, opsional)
  * - Mode Auto alg 2: rudder dari mini PC via serial timestamp,result (default)
  *
+ * Waypoint & mini PC (USB Serial 115200):
+ * - Terima waypoints_payload (msg 0xA1) dari User-Side → simpan g_lastWaypoints
+ * - printWaypoints() mencetak baris "[WP] ..." ke Serial (dibaca mini PC /
+ *   Cpp_ReadWriteSerial; filter --print all|wp)
+ * - CSV 8 kolom @ 10 Hz hanya saat RC auto; terima $HB + timestamp,result
+ *
  * @author Chandra P - Ship Model Control System
  * @version 1.0 (Remote-Side-04)
  * @date 2026
  *
  * @note
  * - Update rate: 10 Hz (setiap 100ms)
- * - Data dikirim dalam format fixed-point (Ã— 100) untuk efisiensi
- * - Struktur data harus sama dengan ESP-Now_ESP32-S3_User-Side (PENDING: penyesuaian)
- * - Penerimaan waypoint dari User-Side (dashboard -> User-Side -> ESP-NOW)
+ * - Data dikirim dalam format fixed-point (× 100) untuk efisiensi
+ * - Struct DatatoSend harus sama dengan User-Side-04 (64 byte, 24 field)
+ * - Penerimaan waypoint: Dashboard → User-Side ($WPSET) → ESP-NOW → sini
  */
 
 #include <Arduino.h>
@@ -121,6 +127,7 @@ void OnDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
   // Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Delivery Success" : "Delivery Fail");
 }
 
+/** Cetak waypoint ke USB Serial (mini PC / monitor). Prefix "[WP]". */
 static void printWaypoints(const waypoints_payload &wp) {
   Serial.print("[WP] msg_type=0x");
   Serial.print(wp.msg_type, HEX);
