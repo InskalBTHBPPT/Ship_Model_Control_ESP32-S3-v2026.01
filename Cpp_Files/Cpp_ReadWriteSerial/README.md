@@ -130,6 +130,38 @@ Salin dari folder MinGW, misalnya `C:\msys64\ucrt64\bin\` (sesuaikan instalasi g
 
 ---
 
+## Auto-start di Windows (mini PC)
+
+Gunakan `start_read_write_serial.bat` (edit `COM_PORT` di dalam file). Lalu pilih salah satu cara:
+
+### Opsi 1 — Task Scheduler (disarankan)
+
+Jalankan PowerShell **sebagai Administrator** (sesuaikan path):
+
+```powershell
+$dir = "D:\Pengujian\Ship_Model_Control_ESP32-S3 v2026.01\Cpp_Files\Cpp_ReadWriteSerial"
+$action = New-ScheduledTaskAction -Execute "$dir\start_read_write_serial.bat" -WorkingDirectory $dir
+$trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
+$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1)
+Register-ScheduledTask -TaskName "ShipModel_ReadWriteSerial" -Action $action -Trigger $trigger -Settings $settings -Force
+```
+
+Task Scheduler juga bisa lewat GUI: **Task Scheduler** → Create Task → trigger **At log on** → action **Start a program** → program: `start_read_write_serial.bat`, **Start in**: folder `Cpp_ReadWriteSerial`.
+
+### Opsi 2 — Folder Startup (paling sederhana)
+
+1. `Win+R` → ketik `shell:startup` → Enter
+2. Buat **shortcut** ke `start_read_write_serial.bat`
+3. Reboot / log off-on
+
+### Tips
+
+- Tetapkan **nomor COM tetap** di Device Manager (Properties USB serial → Port Settings → Advanced) agar `COM_PORT` tidak berubah setelah reboot.
+- Batch menunggu 15 detik setelah boot supaya USB serial sempat terdeteksi.
+- Jika program crash, batch otomatis restart setelah 5 detik.
+
+---
+
 ## Catatan
 
 1. Tutup Serial Monitor PlatformIO sebelum menjalankan program — port COM hanya satu aplikasi.
