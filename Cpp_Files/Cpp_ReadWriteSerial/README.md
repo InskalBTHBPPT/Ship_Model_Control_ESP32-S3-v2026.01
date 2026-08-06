@@ -1,8 +1,6 @@
 # Cpp_ReadWriteSerial
 
-Program C++ untuk **membaca** telemetry CSV dari **ESP-Now_ESP32-S3_Remote-Side-03**, melakukan operasi matematika ringan, lalu **menulis balik** baris `timestamp,result` ke port serial yang sama.
-
-> **Penting:** Firmware ESP32 saat ini **belum** membaca baris `timestamp,result` — fitur terima di ESP32 **ditunda (pending)**. Program tetap menulis ke serial TX sesuai permintaan.
+Program C++ untuk **membaca** telemetry CSV dari **ESP-Now_ESP32-S3_Remote-Side-04**, mengirim heartbeat `$HB`, lalu **menulis balik** baris `timestamp,result` (rudder deg) ke port serial yang sama. Dipakai sebagai mini PC di kapal.
 
 ## Format input (dari ESP32)
 
@@ -38,7 +36,7 @@ timestamp,lat,lon,calc_deg_servo_1,calc_deg_servo_2,yaw,gyro_z,yaw_rate
 24.883,15.74
 ```
 
-Default operasi: `calc_deg_servo_1 - calc_deg_servo_2` → `(-5.67) - (-20.57) = 14.90`
+Mode default: `--rudder-mode zero` (result = 0°). Untuk uji integrasi mini PC: `--rudder-mode yawrate2` → `result = clamp(yaw_rate × 2, ±10°)`.
 
 ---
 
@@ -46,10 +44,15 @@ Default operasi: `calc_deg_servo_1 - calc_deg_servo_2` → `(-5.67) - (-20.57) =
 
 ### Opsi A — g++ (disarankan)
 
-**Windows:**
+**Windows (dynamic link, butuh DLL saat deploy):**
 ```powershell
 cd "Cpp_Files\Cpp_ReadWriteSerial"
 g++ -std=c++17 -Iinclude src/main.cpp src/serial_port.cpp -o read_write_serial.exe
+```
+
+**Windows (static link, tanpa DLL — disarankan untuk Beelink / mini PC):**
+```powershell
+g++ -std=c++17 -static -static-libgcc -static-libstdc++ -Iinclude src/main.cpp src/serial_port.cpp -o read_write_serial.exe
 ```
 
 **Linux:**
@@ -101,16 +104,34 @@ Simpan log CSV asli ke file (tanpa baris result):
 | `--port` | `COM16` / `/dev/ttyUSB0` | Port serial |
 | `--baud` | `115200` | Baud rate |
 | `--timeout` | `1000` | Timeout baca baris (ms) |
-| `--op` | `sub` | `add`, `sub`, `mul`, `div` |
-| `--field-a` | `calc_deg_servo_1` | Field operand pertama |
-| `--field-b` | `calc_deg_servo_2` | Field operand kedua |
+| `--rudder-mode` | `zero` | `zero`, `yawrate2`, `demo` |
+| `--op` | `sub` | `add`, `sub`, `mul`, `div` (hanya mode `demo`) |
+| `--field-a` | `calc_deg_servo_1` | Field operand pertama (mode `demo`) |
+| `--field-b` | `calc_deg_servo_2` | Field operand kedua (mode `demo`) |
 
 Field yang didukung: `timestamp`, `lat`, `lon`, `calc_deg_servo_1`, `calc_deg_servo_2`, `yaw`, `gyro_z`, `yaw_rate`
+
+---
+
+## Deploy ke PC lain (Windows)
+
+Build dengan g++ MinGW menghasilkan exe yang **bergantung runtime DLL**. Di laptop pengembang DLL bisa sudah ada di PATH; di mini PC (mis. Beelink T5) exe bisa gagal diam-diam atau tidak jalan tanpa file berikut **di folder yang sama** dengan `read_write_serial.exe`:
+
+| File |
+|------|
+| `libgcc_s_seh-1.dll` |
+| `libgomp-1.dll` |
+| `libstdc++-6.dll` |
+| `libwinpthread-1.dll` |
+
+Salin dari folder MinGW, misalnya `C:\msys64\ucrt64\bin\` (sesuaikan instalasi g++ Anda).
+
+**Alternatif:** build ulang dengan flag static (lihat Opsi A di atas) — cukup satu file `read_write_serial.exe`, tanpa DLL.
 
 ---
 
 ## Catatan
 
 1. Tutup Serial Monitor PlatformIO sebelum menjalankan program — port COM hanya satu aplikasi.
-2. Baris `timestamp,result` yang ditulis ke serial **bisa** masuk ke UART ESP32; parser di firmware belum ada (pending).
+2. CSV dari Remote hanya keluar saat **mode RC auto**; heartbeat `$HB` dikirim terus (manual/auto).
 3. Program terkait: `Cpp_Files/Cpp_ReadSerial` (baca saja, tanpa write).
