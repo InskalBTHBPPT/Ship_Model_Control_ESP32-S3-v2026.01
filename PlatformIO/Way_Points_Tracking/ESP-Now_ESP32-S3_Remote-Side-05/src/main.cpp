@@ -7,7 +7,7 @@
  * actuator, menjalankan kontrol rudder/propeller, lalu mengirim telemetry
  * 24-kolom ke User-Side via ESP-NOW.
  *
- * Clone dari ESP_Now_Send_Ver2025_revJan2026.
+ * Clone dari Remote-Side-04 (tambah forward $SHUTDOWN via ESP-NOW 0xA2).
  *
  * Hardware yang digunakan:
  * - Receiver RC (FS-iA6B) dengan output PPM

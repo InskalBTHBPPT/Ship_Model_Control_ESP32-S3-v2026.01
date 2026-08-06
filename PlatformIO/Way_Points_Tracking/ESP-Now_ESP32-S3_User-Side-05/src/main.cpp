@@ -1,14 +1,15 @@
 /*
   ESP32-S3 User-Side-05 (gateway USB <-> ESP-NOW)
 
+  Clone dari User-Side-04 + perintah $SHUTDOWN (ESP-NOW 0xA2 ke Remote).
+
   Peran:
   - Menerima telemetry 24-kolom dari Remote-Side-05 via ESP-NOW dan
     meneruskannya ke PC sebagai CSV via Serial (115200 baud).
-  - Menerima command "$WPSET,..." dari PC (dashboard PySide6) via Serial
-    dan meneruskannya ke Remote-Side via ESP-NOW dalam bentuk
-    struct waypoints_payload (msg_type 0xA1).
+  - Menerima "$WPSET,..." dari PC (dashboard beta 1.5) → ESP-NOW
+    waypoints_payload (msg_type 0xA1) ke Remote.
   - Menerima "$SHUTDOWN" dari PC → ESP-NOW pc_command_payload (0xA2) ke Remote
-    → Remote menulis "$SHUTDOWN" ke USB Serial mini PC.
+    → Remote menulis "$SHUTDOWN" ke USB Serial mini PC (Cpp_ReadWriteSerial-1.0).
 
   Protokol kontrol PC -> User-Side (ASCII, diakhiri '\n'):
     $WPSET,<home_lat>,<home_lon>,<wp_count>,<lat1>,<lon1>,...,<latN>,<lonN>
@@ -16,11 +17,11 @@
 
   Balasan User-Side -> PC:
     $WACK,OK / $WACK,ERR,<reason>     (untuk $WPSET)
-    $SACK,OK / $SACK,ERR,<reason>     (untuk $SHUTDOWN; berarti sudah di-forward ESP-NOW)
+    $SACK,OK / $SACK,ERR,<reason>     (untuk $SHUTDOWN; forward ESP-NOW saja)
 
-  Catatan rantai ke mini PC (di kapal):
-    User-Side tidak bicara langsung ke mini PC. Remote yang echo [WP] / $SHUTDOWN
-    ke USB Serial Cpp_ReadWriteSerial-1.0.
+  Catatan:
+    User-Side tidak bicara langsung ke mini PC. Remote yang echo [WP] /
+    $SHUTDOWN ke USB Serial. Pasangan: Remote-Side-05 + Dashboard beta 1.5.
 */
 
 #include <Arduino.h>

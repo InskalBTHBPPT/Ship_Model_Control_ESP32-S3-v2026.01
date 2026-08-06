@@ -2,9 +2,16 @@
 
 Firmware sisi kapal (Remote-Side) untuk sistem **Way Points Tracking**.
 
+Clone dari **Remote-Side-04** dengan tambahan forward perintah **`$SHUTDOWN`** ke mini PC (ESP-NOW `0xA2`).
+
 Mengumpulkan data sensor dan actuator, menjalankan kontrol rudder/propeller, menerima waypoint dari User-Side via ESP-NOW, lalu mengirim telemetry **24 kolom** ke User-Side @ 10 Hz.
 
-**Pasangan User-Side:** `ESP-Now_ESP32-S3_User-Side-05` (struct telemetry harus identik).
+**Pasangan:**
+| Komponen | Path |
+|----------|------|
+| User-Side | `ESP-Now_ESP32-S3_User-Side-05` |
+| Dashboard | `Local Monitor Dashboard-beta1.5.py` |
+| Mini PC | `Cpp_Files/Cpp_ReadWriteSerial-1.0` |
 
 ---
 
@@ -294,7 +301,8 @@ Sesuaikan `upload_port` / `monitor_port` di `platformio.ini` (default: `COM14`).
 2. User-Side kirim waypoint via ESP-NOW → Remote simpan + cetak `[WP]` ke mini PC
 3. Operator pilih Manual/Auto lewat CH6
 4. Loop 10 Hz: baca sensor → kontrol rudder/propeller → isi `dataToSend` → `esp_now_send`
-5. Serial CSV debug ke mini PC saat RC auto; `$HB` / `timestamp,result` dari `Cpp_ReadWriteSerial`
+5. Serial CSV debug ke mini PC saat RC auto; `$HB` / `timestamp,result` dari `Cpp_ReadWriteSerial-1.0`
+6. Opsional: dashboard Shutdown → `$SHUTDOWN` ke mini PC
 
 ---
 
@@ -307,6 +315,7 @@ Sesuaikan `upload_port` / `monitor_port` di `platformio.ini` (default: `COM14`).
 | Auto tidak gerak | CH6 ≥1750, GPS valid, waypoint sudah diterima (`[WP]` di serial) |
 | ESP-NOW gagal | MAC User-Side benar, jarak, mode WIFI_STA |
 | RPM 0 | Koneksi encoder GPIO 9/10, motor berputar |
+| `$SHUTDOWN` tidak sampai mini PC | Flash pasangan 05; `Cpp_ReadWriteSerial-1.0` jalan; cek `$SACK,OK` di dashboard |
 
 ---
 
@@ -314,15 +323,16 @@ Sesuaikan `upload_port` / `monitor_port` di `platformio.ini` (default: `COM14`).
 
 1. Interval utama: **100 ms (10 Hz)**
 2. `AUTO_TRACK_ALG` dipilih **compile-time**, bukan runtime
-3. Auto alg 2 (NMPC/dll.) masih stub — siap untuk pengembangan lanjut
-4. Penerimaan baris `timestamp,result` dari PC (**ReadWriteSerial**) di firmware ESP32: **belum diimplementasi (pending)**
+3. Auto alg 2 default = mini PC (`timestamp,result`); alg 1 = waypoint PD
+4. `msg_type 0xA2` = perintah mini PC (shutdown), **bukan** tuning NVS lama
+5. Struct `DatatoSend` 64 byte / 24 field harus identik dengan User-Side-05
 
 ---
 
 ## Author & Versi
 
 - **Author:** Chandra P — Ship Model Control System
-- **Version:** 1.0 (Remote-Side-05)
-- **Last update:** 2026
+- **Version:** 1.0 (Remote-Side-05) — dari Remote-Side-04
+- **Last update:** 2026-08
 - **Board:** ESP32-S3 DevKitC1-N16R8
 - **Framework:** Arduino / PlatformIO

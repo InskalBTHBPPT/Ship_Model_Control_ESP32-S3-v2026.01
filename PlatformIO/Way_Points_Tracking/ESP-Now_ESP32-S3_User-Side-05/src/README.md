@@ -2,9 +2,13 @@
 
 Firmware **gateway USB ↔ ESP-NOW** di sisi darat (User-Side) untuk sistem **Way Points Tracking**.
 
-**Pasangan Remote-Side:** `ESP-Now_ESP32-S3_Remote-Side-05` (struct telemetry 24 field / 64 byte harus identik).
+Clone dari **User-Side-04** dengan tambahan perintah **`$SHUTDOWN`** (ESP-NOW `pc_command_payload` / `0xA2`).
 
-**Dashboard PC:** `Pythonfile/Way_Points_Tracking/Local Monitor Dashboard-beta1.5.py`
+| Pasangan | Path |
+|----------|------|
+| Remote-Side | `ESP-Now_ESP32-S3_Remote-Side-05` (struct 24 field / 64 byte identik) |
+| Dashboard | `Local Monitor Dashboard-beta1.5.py` |
+| Mini PC | `Cpp_Files/Cpp_ReadWriteSerial-1.0` (via Remote USB Serial) |
 
 ---
 
@@ -13,10 +17,10 @@ Firmware **gateway USB ↔ ESP-NOW** di sisi darat (User-Side) untuk sistem **Wa
 | Arah | Fungsi |
 |------|--------|
 | Remote → User → PC | Telemetry CSV **24 kolom** @ ~10 Hz (Serial 115200) |
-| PC → User → Remote | Perintah `$WPSET,...` → ESP-NOW `waypoints_payload` (`msg_type` `0xA1`) |
-| PC → User → Remote | Perintah `$SHUTDOWN` → ESP-NOW `pc_command_payload` (`msg_type` `0xA2`) |
+| PC → User → Remote | `$WPSET,...` → ESP-NOW `waypoints_payload` (`0xA1`) |
+| PC → User → Remote | `$SHUTDOWN` → ESP-NOW `pc_command_payload` (`0xA2`) |
 
-User-Side **tidak** terhubung ke mini PC di kapal. Setelah Remote menerima waypoint/shutdown, Remote menulis ke USB Serial mini PC (`Cpp_ReadWriteSerial-1.0`).
+User-Side **tidak** terhubung ke mini PC. Remote yang menulis `[WP]` / `$SHUTDOWN` ke USB Serial mini PC.
 
 ---
 
@@ -24,56 +28,46 @@ User-Side **tidak** terhubung ke mini PC di kapal. Setelah Remote menerima waypo
 
 ### Telemetry (User → PC)
 
-Satu baris CSV 24 kolom (fixed-point, sama urutan `DatatoSend` / dashboard beta 1.5). Termasuk `mode_auto` dan `mini_pc_link`.
+CSV 24 kolom (fixed-point), termasuk `mode_auto` dan `mini_pc_link`.
 
-### Kirim waypoint (PC → User)
+### Waypoint
 
 ```text
 $WPSET,<home_lat>,<home_lon>,<wp_count>,<lat1>,<lon1>,...,<latN>,<lonN>
-```
-
-### Balasan waypoint (User → PC)
-
-```text
 $WACK,OK
 $WACK,ERR,<reason>
 ```
 
-### Shutdown mini PC (PC → User)
+### Shutdown mini PC
 
 ```text
 $SHUTDOWN
-```
-
-### Balasan shutdown (User → PC)
-
-```text
 $SACK,OK
 $SACK,ERR,<reason>
 ```
 
-`$SACK,OK` berarti paket `0xA2` sudah dikirim ESP-NOW ke Remote (bukan konfirmasi OS sudah mati).
+`$SACK,OK` = paket `0xA2` sudah dikirim ESP-NOW (bukan konfirmasi OS sudah mati).
 
 ---
 
-## Alur Send Way Points
+## Alur
+
+**Send Way Points**
 
 ```text
-Dashboard (Send Way Points / $WPSET)
-  → User-Side-05 (parse + esp_now_send 0xA1)
-  → Remote-Side-05 (simpan + print [WP] ke mini PC)
-  → Cpp_ReadWriteSerial-1.0 (--print all|wp) menampilkan [WP] di terminal mini PC
+Dashboard ($WPSET) → User-Side-05 → ESP-NOW 0xA1 → Remote-Side-05
+  → [WP] di USB Serial → Cpp_ReadWriteSerial-1.0 (--print all|wp)
 ```
 
-## Alur Shutdown Mini PC
+**Shutdown Mini PC** (tanpa Wi‑Fi laptop↔mini PC)
 
 ```text
-Dashboard (tombol Shutdown di tab Live, hanya jika mini_pc_link=1)
+Dashboard (tombol Live, hanya jika mini_pc_link=1)
   → $SHUTDOWN → User-Side-05 → ESP-NOW 0xA2 → Remote-Side-05
   → Serial "$SHUTDOWN" → Cpp_ReadWriteSerial-1.0 → shutdown OS
 ```
 
-Pengiriman `$WPSET` / `$SHUTDOWN` **tidak** mengganggu stream telemetry 24 kolom ke dashboard.
+`$WPSET` / `$SHUTDOWN` tidak mengganggu stream telemetry 24 kolom.
 
 ---
 

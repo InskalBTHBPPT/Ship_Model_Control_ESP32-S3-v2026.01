@@ -4,6 +4,153 @@ Catatan perubahan utama antar versi firmware dan dashboard **Way Points Tracking
 
 ---
 
+## [Remote-Side-05] — dari `ESP-Now_ESP32-S3_Remote-Side-04`
+
+### Ringkasan
+
+Remote-Side-05 menambahkan forward perintah **shutdown mini PC** lewat ESP-NOW (`msg_type 0xA2`) ke USB Serial, tanpa mengubah telemetry 24 kolom atau protokol waypoint `0xA1`.
+
+### Protokol baru
+
+| Arah | Format | Keterangan |
+|------|--------|------------|
+| User → Remote | `pc_command_payload` (4 byte, `0xA2`, `cmd=1`) | Perintah shutdown |
+| Remote → Mini PC | `$SHUTDOWN` | Baris ASCII di USB Serial |
+
+### Perubahan kode utama (`src/main.cpp`)
+
+- `#define PC_CMD_MSG_TYPE 0xA2`, `PC_CMD_SHUTDOWN`, struct `pc_command_payload`
+- `OnDataRecv`: handle paket 4 byte `0xA2` → `Serial.println("$SHUTDOWN")`
+- Header/doc: pasangan User-Side-05 + `Cpp_ReadWriteSerial-1.0`
+
+### Dokumentasi
+
+- `src/README.md`: alur shutdown, pasangan 05 / dashboard 1.5 / Cpp 1.0
+
+### Tidak berubah dari 04
+
+- Telemetry 24 field / 64 byte, CSV 8 kolom, `$HB` + `timestamp,result`, `[WP]` echo, `AUTO_TRACK_ALG` default 2
+
+---
+
+## [User-Side-05] — dari `ESP-Now_ESP32-S3_User-Side-04`
+
+### Ringkasan
+
+User-Side-05 (dari **User-Side-04**) menambahkan perintah serial **`$SHUTDOWN`** yang di-forward sebagai ESP-NOW `0xA2` ke Remote, dengan balasan **`$SACK`**.
+
+### Protokol baru
+
+| Arah | Format |
+|------|--------|
+| PC → User | `$SHUTDOWN` |
+| User → PC | `$SACK,OK` / `$SACK,ERR,<reason>` |
+| User → Remote | `pc_command_payload` (`0xA2`) |
+
+`$SACK,OK` = sukses kirim ESP-NOW (bukan konfirmasi OS mini PC sudah mati).
+
+### Perubahan kode utama (`src/main.cpp`)
+
+- Struct `pc_command_payload` + `processShutdownCommand()`
+- `processSerialLine`: cabang `$SHUTDOWN` sebelum `$WPSET`
+- Banner: `ESP32-S3 User-Side-05`
+
+### Dokumentasi
+
+- `src/README.md` diperbarui untuk pasangan 05 / beta 1.5 / Cpp 1.0
+
+### Tidak berubah dari 04
+
+- CSV telemetry 24 kolom, `$WPSET` / `$WACK`, struct `receivedfromremoteside`
+
+### Pasangan firmware
+
+| Komponen | Versi |
+|----------|-------|
+| Remote-Side | `ESP-Now_ESP32-S3_Remote-Side-05` |
+| User-Side | `ESP-Now_ESP32-S3_User-Side-05` |
+| Dashboard | `Local Monitor Dashboard-beta1.5.py` |
+| Mini PC | `Cpp_ReadWriteSerial-1.0` |
+
+---
+
+## [Dashboard beta 1.5] — dari `Local Monitor Dashboard-beta1.4.py`
+
+### Ringkasan
+
+Beta 1.5 menambahkan **Shutdown Mini PC** di tab Live (sebelah status Mini PC), lewat rantai ESP-NOW tanpa Wi‑Fi laptop↔mini PC.
+
+### UI Live
+
+- Tombol **Shutdown** di baris indikator Mini PC
+- Enable hanya jika: serial **Connect** + `mini_pc_link == 1` (CONNECTED)
+- Dialog konfirmasi sebelum kirim
+- Reset state saat disconnect
+
+### Protokol
+
+- Kirim: `$SHUTDOWN\n`
+- Terima: `$SACK,OK` / `$SACK,ERR,...` (timeout ~2 s)
+- Tidak mengubah `$WPSET` / `$WACK` / parser telemetry 24 kolom
+
+### Pasangan
+
+- User-Side-05, Remote-Side-05, `Cpp_ReadWriteSerial-1.0`
+- Judul window: `Ship Model Local Dashboard — beta 1.5`
+
+---
+
+## [Cpp_ReadWriteSerial-1.0] — dari `Cpp_Files/Cpp_ReadWriteSerial`
+
+### Ringkasan
+
+Clone folder dengan handler **`$SHUTDOWN`**: menutup port serial lalu menjalankan shutdown OS (Windows: `shutdown /s /t 5`).
+
+### Perilaku baru
+
+| Input serial | Aksi |
+|--------------|------|
+| `$SHUTDOWN` | Print ke stdout, `shutdown` OS, keluar loop |
+
+### Tetap dari versi sebelumnya
+
+- `$HB`, CSV 8 kolom, `[WP]` print (`--print all|csv|wp`), `timestamp,result`, `--rudder-mode`
+
+### Pasangan
+
+- Remote-Side-05 (sumber `$SHUTDOWN` / CSV / `[WP]`)
+- Dashboard beta 1.5 (tombol Shutdown)
+
+---
+
+## Diagram alur (versi 05 / 1.5 / 1.0)
+
+```text
+┌──────────────────┐  $WPSET / $SHUTDOWN  ┌──────────────┐  0xA1 / 0xA2  ┌───────────────┐
+│ Dashboard beta   │ ───────────────────► │ User-Side-05 │ ────────────► │ Remote-Side-05│
+│ 1.5              │ ◄─────────────────── │              │ ◄──────────── │               │
+└──────────────────┘  CSV24 /$WACK/$SACK  └──────────────┘  telemetry 24 └───────┬───────┘
+                                                                                  │ USB
+                                                                                  ▼
+                                                                          ┌───────────────┐
+                                                                          │ Mini PC       │
+                                                                          │ ReadWrite     │
+                                                                          │ Serial-1.0    │
+                                                                          └───────────────┘
+```
+
+---
+
+## Migrasi dari versi 04 → 05
+
+1. Flash **Remote-Side-05** dan **User-Side-05** berpasangan.
+2. Gunakan **Dashboard beta 1.5**.
+3. Di mini PC jalankan **`Cpp_ReadWriteSerial-1.0`** (bukan folder lama tanpa `$SHUTDOWN`).
+4. Uji: Mini PC CONNECTED → tombol Shutdown → `$SACK,OK` → OS mati ~5 detik.
+5. Waypoint / telemetry / rudder auto tetap seperti alur 04.
+
+---
+
 ## [Remote-Side-04] — dari `ESP-Now_ESP32-S3_Remote-Side-03`
 
 ### Ringkasan

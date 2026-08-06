@@ -1,41 +1,45 @@
 """
 Local Monitor Dashboard beta 1.5
 
+Clone dari beta 1.4 dengan tombol Shutdown Mini PC (ESP-NOW, tanpa Wi-Fi
+laptop\leftrightarrow mini PC).
+
 Ringkasan:
 - Dashboard PySide6 untuk monitoring telemetry kapal secara real-time.
-- Input data berasal dari serial CSV text (UTF-8) lewat User-Side-05.
-- Mendukung map tracking, indikator live, plotting time-series, logging CSV,
-  analyze, Home Points, serta Send Way Points ke Remote via User-Side.
+- Input data dari serial CSV (UTF-8) lewat User-Side-05.
+- Fitur: map tracking, live indicators, time-series, logging CSV, analyze,
+  Home Points, Send Way Points, Shutdown Mini PC.
 
-Format data serial yang dibaca (24 kolom, raw fixed-point dari User-Side-05):
+Pasangan firmware / mini PC:
+- User-Side: ESP-Now_ESP32-S3_User-Side-05
+- Remote-Side: ESP-Now_ESP32-S3_Remote-Side-05
+- Mini PC: Cpp_Files/Cpp_ReadWriteSerial-1.0
+
+Format telemetry (24 kolom, raw fixed-point dari User-Side-05):
 1) timestamp  2) latitude  3) longitude
 4) speedMps (x100)  5-6) Calc_deg_servo_1/2 (x100, °)
 7) yaw (x100)  8) heading_setpoint (x100)  9) heading_error (x100)
 10) rudder_cmd (x100)  11) track_wp_index  12) distance_to_wp (x10, m)
 13-18) accel_x/y/z, gyro_x/y/z (x100) — di-log, tidak di panel live
-19-20) rpm_prop_1/2 (integer RPM langsung, bukan x100)
-21-22) battery_1/2 (x100, V)  23) mode_auto  24) mini_pc_link (0/1)
+19-20) rpm_prop_1/2 (integer RPM)  21-22) battery_1/2 (x100, V)
+23) mode_auto  24) mini_pc_link (0/1)
 
 Send Way Points (tab Map Points):
-- Tombol mengirim ASCII:
-  $WPSET,<home_lat>,<home_lon>,<wp_count>,<lat1>,<lon1>,...,<latN>,<lonN>
-- User-Side membalas $WACK,OK / $WACK,ERR,...
-- User-Side meneruskan ke Remote sebagai ESP-NOW waypoints_payload (0xA1).
-- Remote mencetak [WP] ... ke USB Serial mini PC; Cpp_ReadWriteSerial-1.0 dapat
-  menampilkan baris itu (--print all|wp). Dashboard tidak bicara langsung ke mini PC.
+- $WPSET,<home_lat>,<home_lon>,<wp_count>,<lat1>,<lon1>,...
+- User-Side: $WACK,OK / $WACK,ERR,... lalu ESP-NOW 0xA1 ke Remote
+- Remote echo [WP] ... ke USB Serial mini PC (Cpp_ReadWriteSerial-1.0)
 
-Shutdown Mini PC (tab Live, sebelah status Mini PC):
-- Tombol aktif hanya jika serial Connect + mini_pc_link == 1.
-- Mengirim $SHUTDOWN ke User-Side → ESP-NOW 0xA2 → Remote → Serial "$SHUTDOWN"
-  → Cpp_ReadWriteSerial-1.0 menjalankan shutdown OS.
-- User-Side membalas $SACK,OK / $SACK,ERR,... (forward ESP-NOW sukses/gagal).
+Shutdown Mini PC (tab Live, sebelah label Mini PC):
+- Enable hanya jika serial Connect + mini_pc_link == 1 (CONNECTED)
+- Kirim $SHUTDOWN → User → ESP-NOW 0xA2 → Remote → Serial "$SHUTDOWN"
+  → Cpp_ReadWriteSerial-1.0 → shutdown OS (~5 s)
+- User-Side balas $SACK,OK / $SACK,ERR,... (forward ESP-NOW saja)
+- Konfirmasi dialog sebelum kirim; setelah mati tidak bisa power-on dari UI
 
-Catatan pengolahan:
-- Parser memproses baris utuh yang diakhiri newline dan memvalidasi
-  jumlah kolom = TELEMETRY_COL_COUNT (24).
-- RPM: nilai mentah dari Remote-Side = putaran/menit langsung.
-- Data lat/lon tervalidasi range; nilai 0,0 dapat diganti default location.
-- Nilai terbaru lat/lon disimpan untuk fitur Home Points.
+Catatan:
+- Parser validasi kolom = TELEMETRY_COL_COUNT (24); juga terima 23 (legacy).
+- RPM = putaran/menit langsung dari Remote.
+- Lat/lon 0,0 dapat diganti default location; nilai terbaru untuk Home Points.
 """
 
 import csv
