@@ -14,8 +14,8 @@ cd /d "D:\path\to\folder"
 **C++ exe (ini):** tidak perlu path Python — langsung panggil `.exe` + argumen CLI.
 ```batch
 @echo off
-cd /d "D:\path\to\Cpp_ReadWriteSerial"
-read_write_serial.exe --port COM16 --baud 115200 --rudder-mode yawrate2
+cd /d "D:\path\to\Cpp_ReadWriteSerial-1.0"
+read_write_serial.exe --port COM16 --baud 115200 --rudder-mode yawrate2 --print none
 ```
 
 ## File batch yang dipakai
@@ -29,9 +29,11 @@ Isi penting (sesuaikan sebelum deploy):
 set COM_PORT=COM16
 set BAUD=115200
 set RUDDER_MODE=yawrate2
+set PRINT_MODE=all
+REM PRINT_MODE: all | csv | wp | none
 
 cd /d "%~dp0"
-read_write_serial.exe --port %COM_PORT% --baud %BAUD% --rudder-mode %RUDDER_MODE%
+read_write_serial.exe --port %COM_PORT% --baud %BAUD% --rudder-mode %RUDDER_MODE% --print %PRINT_MODE%
 ```
 
 | Variabel | Arti | Contoh |
@@ -39,13 +41,15 @@ read_write_serial.exe --port %COM_PORT% --baud %BAUD% --rudder-mode %RUDDER_MODE
 | `COM_PORT` | Port serial USB | `COM16` |
 | `BAUD` | Baud rate | `115200` |
 | `RUDDER_MODE` | Mode rudder | `zero`, `yawrate2`, `demo` |
+| `PRINT_MODE` | Filter stdout | `all`, `csv`, `wp`, `none` |
 
 `%~dp0` = folder tempat file `.bat` berada. Karena itu **biarkan `.bat` tetap di folder program**, jangan dipindah ke Startup tanpa mengubah path.
 
 ### Sintaks CLI lengkap (uji manual)
 
 ```powershell
-.\read_write_serial.exe --port COM16 --baud 115200 --rudder-mode yawrate2
+.\read_write_serial.exe --port COM16 --baud 115200 --rudder-mode yawrate2 --print all
+.\read_write_serial.exe --port COM16 --print none
 ```
 
 Bantuan: `.\read_write_serial.exe --help`
@@ -59,7 +63,7 @@ Bantuan: `.\read_write_serial.exe --help`
 ### Opsi A — Shortcut di Startup (disarankan)
 
 1. Pastikan `start_read_write_serial.bat`, `read_write_serial.exe`, dan DLL (jika ada) satu folder.
-2. Edit `COM_PORT` / `BAUD` / `RUDDER_MODE` di dalam `.bat`.
+2. Edit `COM_PORT` / `BAUD` / `RUDDER_MODE` / `PRINT_MODE` di dalam `.bat`.
 3. `Win+R` → ketik `shell:startup` → Enter.
 4. Buat **shortcut** ke `start_read_write_serial.bat` (klik kanan bat → Send to → Desktop, lalu pindahkan shortcut ke folder Startup; atau drag dengan Alt).
 5. Log off/on atau reboot untuk uji.

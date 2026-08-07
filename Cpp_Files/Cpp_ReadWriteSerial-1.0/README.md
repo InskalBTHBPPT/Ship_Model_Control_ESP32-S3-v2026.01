@@ -46,11 +46,11 @@ Dashboard ($SHUTDOWN) → User-Side-05 → ESP-NOW 0xA2 → Remote-Side-05
 |------|--------|---------------------|
 | Baris CSV asli (8 kolom) | **stdout** | Ya jika `--print all` atau `csv` |
 | Baris waypoint `[WP] ...` | **stdout** | Ya jika `--print all` atau `wp` |
-| Baris `$SHUTDOWN` | **stdout** + aksi OS | Ya — `shutdown /s /t 5` (Windows) |
+| Baris `$SHUTDOWN` | **stdout** + aksi OS | Stdout jika bukan `--print none`; aksi OS selalu |
 | Baris `timestamp,result` | **serial TX** (ke ESP32) | **Tidak** |
 | Pesan info/error | **stderr** | Ya |
 
-`--print` hanya memfilter **stdout** untuk CSV/[WP]. Hitung rudder + `$HB` + tulis serial tetap jalan. `$SHUTDOWN` **selalu** diproses.
+`--print` hanya memfilter **stdout** untuk CSV/[WP]/`$SHUTDOWN`]. Hitung rudder + `$HB` + tulis serial tetap jalan. `$SHUTDOWN` **selalu** memicu shutdown OS. `--print none` = tidak ada output ke stdout.
 
 ### Contoh stdout (`--print all`)
 
@@ -83,6 +83,7 @@ cd "Cpp_Files\Cpp_ReadWriteSerial-1.0"
 .\read_write_serial.exe --port COM16 --baud 115200 --rudder-mode yawrate2 --print all
 .\read_write_serial.exe --port COM16 --print csv
 .\read_write_serial.exe --port COM16 --print wp
+.\read_write_serial.exe --port COM16 --print none
 ```
 
 ### Opsi CLI
@@ -92,9 +93,10 @@ cd "Cpp_Files\Cpp_ReadWriteSerial-1.0"
 | `--port` | `COM16` | Port serial |
 | `--baud` | `115200` | Baud rate |
 | `--timeout` | `1000` | Timeout baca (ms) |
-| `--print` | `all` | `all` / `csv` / `wp` |
+| `--print` | `all` | `all` / `csv` / `wp` / `none` |
 | `--rudder-mode` | `zero` | `zero`, `yawrate2`, `demo` |
 | `--op` / `--field-a` / `--field-b` | — | Hanya mode `demo` |
+| `--help` / `-h` | — | Tampilkan bantuan |
 
 ---
 

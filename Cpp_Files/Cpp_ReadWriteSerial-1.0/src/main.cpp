@@ -24,10 +24,11 @@ void print_usage(const char *program_name) {
       << "  --port <nama_port>       Port serial (default: COM16 / /dev/ttyUSB0)\n"
       << "  --baud <rate>            Baud rate (default: 115200)\n"
       << "  --timeout <ms>           Timeout baca baris (default: 1000)\n"
-      << "  --print <all|csv|wp>     Filter stdout (default: all)\n"
+      << "  --print <all|csv|wp|none> Filter stdout (default: all)\n"
       << "                         all=CSV 8 kolom + [WP]\n"
       << "                         csv=hanya CSV / header\n"
       << "                         wp=hanya baris [WP]\n"
+      << "                         none=tidak print ke stdout\n"
       << "  --op <add|sub|mul|div>   Operasi demo (default: sub)\n"
       << "  --field-a <nama_field>   Field pertama (default: calc_deg_servo_1)\n"
       << "  --field-b <nama_field>   Field kedua (default: calc_deg_servo_2)\n"
@@ -79,6 +80,11 @@ bool parse_print_mode(const std::string &value, bool &print_csv, bool &print_wp)
   if (value == "wp") {
     print_csv = false;
     print_wp = true;
+    return true;
+  }
+  if (value == "none") {
+    print_csv = false;
+    print_wp = false;
     return true;
   }
   return false;
@@ -137,7 +143,7 @@ int main(int argc, char **argv) {
     if (arg == "--print" && i + 1 < argc) {
       print_mode = argv[++i];
       if (!parse_print_mode(print_mode, print_csv, print_wp)) {
-        std::cerr << "[ERROR] --print tidak dikenal. Gunakan: all, csv, wp\n";
+        std::cerr << "[ERROR] --print tidak dikenal. Gunakan: all, csv, wp, none\n";
         return 1;
       }
       continue;
@@ -246,7 +252,9 @@ int main(int argc, char **argv) {
     if (is_shutdown_line(line)) {
       std::cerr << "[INFO] Perintah $SHUTDOWN diterima — mematikan sistem dalam ~5 detik\n"
                 << std::flush;
-      std::cout << line << "\n" << std::flush;
+      if (print_csv || print_wp) {
+        std::cout << line << "\n" << std::flush;
+      }
       serial.close();
       request_os_shutdown();
       g_running = 0;

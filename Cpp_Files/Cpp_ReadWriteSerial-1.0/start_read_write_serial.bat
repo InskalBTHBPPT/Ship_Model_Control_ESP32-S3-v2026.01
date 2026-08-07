@@ -3,8 +3,8 @@ REM Auto-start helper: sesuaikan COM_PORT sebelum deploy ke mini PC.
 set COM_PORT=COM16
 set BAUD=115200
 set RUDDER_MODE=yawrate2
-# stdout: all | csv | wp  (lihat README --print)
-set PRINT_MODE=all
+REM stdout: all | csv | wp | none  (lihat README --print)
+set PRINT_MODE=none
 REM Tunggu USB serial siap setelah boot (detik)
 set USB_WAIT_SEC=15
 

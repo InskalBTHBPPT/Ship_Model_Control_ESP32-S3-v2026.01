@@ -114,7 +114,11 @@ Clone folder dengan handler **`$SHUTDOWN`**: menutup port serial lalu menjalanka
 
 ### Tetap dari versi sebelumnya
 
-- `$HB`, CSV 8 kolom, `[WP]` print (`--print all|csv|wp`), `timestamp,result`, `--rudder-mode`
+- `$HB`, CSV 8 kolom, `[WP]` print (`--print all|csv|wp|none`), `timestamp,result`, `--rudder-mode`
+
+### Tambahan CLI (1.0)
+
+- `--print none` — tidak ada output ke stdout (rudder / `$HB` / `$SHUTDOWN` OS tetap jalan)
 
 ### Pasangan
 
