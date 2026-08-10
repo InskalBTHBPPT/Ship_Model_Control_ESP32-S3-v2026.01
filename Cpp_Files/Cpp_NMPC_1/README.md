@@ -79,26 +79,26 @@ Di `main.cpp`, pemanggilan tidak mengisi input dari luar — semua disiapkan di 
 
 ### Dinamika kapal (nondimensional)
 
-\[
+$$
 \begin{bmatrix}\dot v \\ \dot r\end{bmatrix}
 = A_{\mathrm{sys}}
 \begin{bmatrix}v \\ r\end{bmatrix}
 + B_{\mathrm{sys}}\, u
-\]
+$$
 
-\[
+$$
 \dot x = u_{0,\mathrm{nd}}\cos\psi - v\sin\psi,\quad
 \dot y = u_{0,\mathrm{nd}}\sin\psi + v\cos\psi,\quad
 \dot\psi = r
-\]
+$$
 
-Propagasi Euler: \( s_{k+1} = s_k + dt_{\mathrm{nd}}\, f(s_k, u_k) \).
+Propagasi Euler: $s_{k+1} = s_k + dt_{\mathrm{nd}}\, f(s_k, u_k)$.
 
 ### Masalah optimasi NMPC
 
-Cari \( U = [u_1,\ldots,u_N] \) yang meminimalkan
+Cari $U = [u_1,\ldots,u_N]$ yang meminimalkan
 
-\[
+$$
 J(U) = \sum_{i=1}^{N}
 \Bigl(
 e_i^\top Q\, e_i + R\, u_i^2
@@ -109,21 +109,21 @@ x_i - x_{\mathrm{ref},i} \\
 y_i - y_{\mathrm{ref},i} \\
 \psi_i - \psi_{\mathrm{ref},i}
 \end{bmatrix}
-\]
+$$
 
 dengan kendala:
 
 | Jenis | Formula |
 |-------|---------|
-| Batas rudder | \( \|u_i\| \le u_{\mathrm{limit}} \) |
-| Laju rudder | \( \|u_1 - u_{\mathrm{prev}}\| \le du_{\max} \), \( \|u_i - u_{i-1}\| \le du_{\max} \) |
-| Yaw rate | \( \|r_i\| \le r_{\mathrm{limit,nd}} \) (nonlinear, lewat `nonlcon`) |
+| Batas rudder | $\|u_i\| \le u_{\mathrm{limit}}$ |
+| Laju rudder | $\|u_1 - u_{\mathrm{prev}}\| \le du_{\max}$, $\|u_i - u_{i-1}\| \le du_{\max}$ |
+| Yaw rate | $\|r_i\| \le r_{\mathrm{limit,nd}}$ (nonlinear, lewat `nonlcon`) |
 
 Solver: `fmincon` (algoritma SQP, codegen MATLAB).
 
 ### Receding horizon (setelah solve)
 
-Hanya \( u_{\mathrm{applied}} = U_{\mathrm{opt}}(1) \) yang diterapkan; state di-update satu langkah Euler `dt = 1 s`. Jika `exitflag ≤ 0`, dipakai fallback `U = U0` (`u_prev`).
+Hanya $u_{\mathrm{applied}} = U_{\mathrm{opt}}(1)$ yang diterapkan; state di-update satu langkah Euler `dt = 1 s`. Jika `exitflag ≤ 0`, dipakai fallback $U = U_0$ (`u_prev`).
 
 ## Output
 
