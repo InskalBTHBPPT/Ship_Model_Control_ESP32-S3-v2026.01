@@ -1,0 +1,6 @@
+nmpc_1.exe
+*.o
+*.obj
+build/
+CMakeFiles/
+cmake-build-*/
