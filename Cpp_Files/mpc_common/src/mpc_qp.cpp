@@ -1,8 +1,8 @@
 #include "mpc_qp.hpp"
 
+#include "qp_osqp.hpp"
 #include "qp_solver.hpp"
 
-#include <algorithm>
 #include <cmath>
 #include <limits>
 
@@ -131,16 +131,17 @@ MPCQPProblem build_mpc_qp_problem(const LinearShipModel &model, int np_steps,
     }
   }
   for (int i = 1; i <= np_steps; ++i) {
-  for (int r = 0; r < n_state; ++r) {
-    for (int c = 0; c < n_state; ++c) {
-      problem.a_eq[static_cast<size_t>(i * n_state + r) * n_var +
-                   ((i - 1) * n_state + c)] -= model.ad[static_cast<size_t>(r) * n_state + c];
+    for (int r = 0; r < n_state; ++r) {
+      for (int c = 0; c < n_state; ++c) {
+        problem.a_eq[static_cast<size_t>(i * n_state + r) * n_var +
+                     ((i - 1) * n_state + c)] -=
+            model.ad[static_cast<size_t>(r) * n_state + c];
+      }
     }
-  }
-  for (int r = 0; r < n_state; ++r) {
-    problem.a_eq[static_cast<size_t>(i * n_state + r) * n_var +
-                 (problem.idx_u0 + (i - 1))] -= model.bd[r];
-  }
+    for (int r = 0; r < n_state; ++r) {
+      problem.a_eq[static_cast<size_t>(i * n_state + r) * n_var +
+                   (problem.idx_u0 + (i - 1))] -= model.bd[r];
+    }
   }
 
   problem.b_eq_base.assign(meq, 0.0);
@@ -221,7 +222,7 @@ MPCQPProblem build_mpc_qp_problem(const LinearShipModel &model, int np_steps,
   mat_transpose_mul(problem.Y, n_var, problem.n_red, problem.H, n_var, YtH);
   mat_mul(YtH, problem.n_red, n_var, problem.Y, problem.n_red, problem.H_red);
 
-  return problem;
+  return std::move(problem);
 }
 
 void build_reference_vector(const MPCQPProblem &problem, double t,
@@ -270,7 +271,7 @@ bool solve_mpc_step(const MPCQPProblem &problem, const std::vector<double> &f,
                     const std::vector<double> &b_eq,
                     const std::vector<double> &b_ineq, std::vector<double> &z_opt,
                     std::string &status, const std::vector<double> *z_warm,
-                    std::vector<double> *z_red_out) {
+                    std::vector<double> *z_warm_out) {
   const int n = problem.n_var;
   const int meq = static_cast<int>(b_eq.size());
   const int m_ineq = static_cast<int>(problem.a_ineq.size()) / n;
@@ -360,9 +361,8 @@ bool solve_mpc_step(const MPCQPProblem &problem, const std::vector<double> &f,
     z = *z_warm;
   }
 
-  if (!solve_qp_active_set(problem.H_red, n_red, f_red, G_flat, m_total, h, z,
-                           80)) {
-    status = "fail:active_set";
+  if (!solve_qp_osqp_reduced(problem.H_red, n_red, f_red, G_flat, m_total, h, z,
+                             status)) {
     z_opt.assign(n, 0.0);
     return false;
   }
@@ -374,9 +374,8 @@ bool solve_mpc_step(const MPCQPProblem &problem, const std::vector<double> &f,
     }
   }
 
-  status = "ok";
-  if (z_red_out) {
-    *z_red_out = z;
+  if (z_warm_out) {
+    *z_warm_out = z;
   }
   return true;
 }

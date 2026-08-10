@@ -72,9 +72,9 @@ LinearShipModel build_linear_ship_model(const ShipParams &ship,
   model.a_lin[1] = a_sys[1];
   model.a_lin[5] = a_sys[2];
   model.a_lin[6] = a_sys[3];
-  model.a_lin[13] = 1.0;
-  model.a_lin[19] = ship.u_0_nd;
-  model.a_lin[24] = 1.0;
+  model.a_lin[15] = 1.0;   // y_dot from v  (A_lin(4,1))
+  model.a_lin[19] = ship.u_0_nd;  // y_dot from psi (A_lin(4,5))
+  model.a_lin[21] = 1.0;   // psi_dot from r (A_lin(5,2))
 
   model.b_lin.assign(5, 0.0);
   model.b_lin[0] = b_sys[0];

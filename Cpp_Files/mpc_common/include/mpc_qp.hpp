@@ -23,9 +23,15 @@ struct MPCQPProblem {
   std::vector<double> lb;
   std::vector<double> ub;
 
-  std::vector<double> M_chol;  // meq x meq lower chol of A A'
-  std::vector<double> Y;       // n x n_red null-space basis
-  std::vector<double> H_red;   // n_red x n_red
+  std::vector<double> M_chol;
+  std::vector<double> Y;
+  std::vector<double> H_red;
+
+  MPCQPProblem() = default;
+  MPCQPProblem(MPCQPProblem &&) = default;
+  MPCQPProblem &operator=(MPCQPProblem &&) = default;
+  MPCQPProblem(const MPCQPProblem &) = delete;
+  MPCQPProblem &operator=(const MPCQPProblem &) = delete;
 };
 
 MPCQPProblem build_mpc_qp_problem(const LinearShipModel &model, int np_steps,
@@ -48,6 +54,6 @@ bool solve_mpc_step(const MPCQPProblem &problem, const std::vector<double> &f,
                     const std::vector<double> &b_eq,
                     const std::vector<double> &b_ineq, std::vector<double> &z_opt,
                     std::string &status, const std::vector<double> *z_warm,
-                    std::vector<double> *z_red_out);
+                    std::vector<double> *z_warm_out);
 
 }  // namespace mpc
