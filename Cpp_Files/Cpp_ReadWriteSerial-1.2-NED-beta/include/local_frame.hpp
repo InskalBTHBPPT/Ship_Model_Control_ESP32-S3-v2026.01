@@ -1,3 +1,10 @@
+/**
+ * @file local_frame.hpp
+ * @brief Konversi lat/lon → koordinat lokal meter (ENU atau NED).
+ *
+ * Folder ini: kLocalFrame = Ned (X=North, Y=East). Dipakai 1.2 bersama
+ * ned_velocity.hpp untuk Ẋ,Ẏ,u,v. Origin default atau [WP] Home.
+ */
 #pragma once
 
 #include <cmath>

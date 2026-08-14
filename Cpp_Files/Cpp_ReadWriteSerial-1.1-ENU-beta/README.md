@@ -11,6 +11,7 @@ Program C++ untuk **membaca** data dari **ESP-Now_ESP32-S3_Remote-Side-05** via 
 | Dashboard | `Pythonfile/Way_Points_Tracking/Local Monitor Dashboard-beta1.5.py` |
 | Versi sebelumnya | `Cpp_Files/Cpp_ReadWriteSerial-1.0` |
 | Varian NED | `Cpp_Files/Cpp_ReadWriteSerial-1.1-NED-beta` |
+| Penerus NED | `Cpp_Files/Cpp_ReadWriteSerial-1.2-NED-beta` |
 
 ## Format input (dari ESP32 Remote)
 
@@ -20,6 +21,8 @@ Program C++ untuk **membaca** data dari **ESP-Now_ESP32-S3_Remote-Side-05** via 
 timestamp,lat,lon,calc_deg_servo_1,calc_deg_servo_2,yaw,gyro_z,yaw_rate
 24.783,0.000000,0.000000,-5.67,-20.57,0.00,0.00,0.00
 ```
+
+`calc_deg_servo_1/2` dari Remote-Side-05 sudah lewat `RUDDER_DEG_FILTER` (default oversample). Bridge ini tidak memfilter ulang sudut.
 
 ### 2) Waypoint echo `[WP] ...` (saat dashboard kirim `$WPSET`)
 

@@ -1,3 +1,10 @@
+/**
+ * @file local_frame.hpp
+ * @brief Konversi lat/lon → koordinat lokal meter (ENU atau NED).
+ *
+ * Folder ini: kLocalFrame = Enu (X=East, Y=North). Origin default atau
+ * [WP] Home. Tidak dikirim ke serial / stdout CSV.
+ */
 #pragma once
 
 #include <cmath>

@@ -1,3 +1,11 @@
+/**
+ * @file main.cpp
+ * @brief Cpp_ReadWriteSerial-1.2-NED-beta — NED posisi + kecepatan u,v
+ *
+ * Clone 1.1-NED-beta. Internal: X,Y (m), Ẋ,Ẏ (m/s), surge u / sway v (m/s).
+ * CSV stdout dan serial TX tidak berubah. Rudder belum memakai NMPC.
+ */
+
 #include "local_frame.hpp"
 #include "ned_velocity.hpp"
 #include "processor.hpp"

@@ -1,3 +1,12 @@
+/**
+ * @file main.cpp
+ * @brief Cpp_ReadWriteSerial-1.1-ENU-beta — serial bridge + lat/lon → ENU
+ *
+ * Clone 1.0. Transformasi GPS ke East/North (m) relatif origin (home [WP]
+ * atau default) hanya internal (stderr). Stdout CSV dan serial TX sama
+ * seperti 1.0. Varian NED: Cpp_ReadWriteSerial-1.1-NED-beta.
+ */
+
 #include "local_frame.hpp"
 #include "processor.hpp"
 #include "serial_port.hpp"

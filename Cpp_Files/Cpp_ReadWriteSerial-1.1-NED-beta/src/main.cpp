@@ -1,3 +1,11 @@
+/**
+ * @file main.cpp
+ * @brief Cpp_ReadWriteSerial-1.1-NED-beta — serial bridge + lat/lon → NED
+ *
+ * Clone 1.1-ENU-beta. Frame lokal X=North, Y=East (m), hanya internal.
+ * Penerus: 1.2-NED-beta (tambah kecepatan Ẋ,Ẏ,u,v).
+ */
+
 #include "local_frame.hpp"
 #include "processor.hpp"
 #include "serial_port.hpp"

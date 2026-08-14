@@ -1,3 +1,15 @@
+/**
+ * @file main.cpp
+ * @brief Cpp_ReadWriteSerial-1.0 — mini-PC serial bridge
+ *
+ * Baca CSV 8 kolom / [WP] / $SHUTDOWN dari Remote-Side-05 via USB serial,
+ * kirim $HB, tulis balik timestamp,result (rudder deg). Tambahan vs folder
+ * Cpp_ReadWriteSerial: handler $SHUTDOWN (matikan OS).
+ *
+ * Pasangan: Remote-Side-05, User-Side-05, Dashboard beta 1.5.
+ * Penerus: 1.1-ENU-beta, 1.1-NED-beta, 1.2-NED-beta.
+ */
+
 #include "processor.hpp"
 #include "serial_port.hpp"
 #include "telemetry_parser.hpp"

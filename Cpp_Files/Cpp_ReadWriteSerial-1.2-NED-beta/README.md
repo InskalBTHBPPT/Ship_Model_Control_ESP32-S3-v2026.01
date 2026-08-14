@@ -13,6 +13,8 @@ Program C++ mini-PC: baca telemetry USB dari **ESP-Now_ESP32-S3_Remote-Side-05**
 
 **Firmware Remote tidak diubah.** CSV stdout dan serial TX sama seperti 1.1.
 
+Kolom `calc_deg_servo_1/2` dari Remote-Side-05 sudah lewat `RUDDER_DEG_FILTER` (default oversample). Bridge 1.2 tidak memfilter ulang sudut rudder.
+
 ---
 
 ## `u` dan `v` itu kecepatan, bukan perpindahan

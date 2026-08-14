@@ -1,3 +1,10 @@
+/**
+ * @file ned_velocity.hpp
+ * @brief Kinematika NED: posisi X,Y (m) → Ẋ,Ẏ, |V|, surge u, sway v (m/s).
+ *
+ * u,v = kecepatan badan, bukan perpindahan. Low-pass α=0.70 pada Ẋ,Ẏ.
+ * Hanya internal (stderr [KIN]); tidak ke CSV stdout / serial TX.
+ */
 #pragma once
 
 #include "local_frame.hpp"
