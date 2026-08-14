@@ -2,7 +2,7 @@
 
 Firmware sisi kapal (Remote-Side) untuk sistem **Way Points Tracking**.
 
-Clone dari **Remote-Side-04** dengan tambahan forward perintah **`$SHUTDOWN`** ke mini PC (ESP-NOW `0xA2`).
+Clone dari **Remote-Side-04** dengan tambahan forward perintah **`$SHUTDOWN`** ke mini PC (ESP-NOW `0xA2`) dan **filter compile-time** untuk feedback sudut servo rudder (`RUDDER_DEG_FILTER`, default oversample).
 
 Mengumpulkan data sensor dan actuator, menjalankan kontrol rudder/propeller, menerima waypoint dari User-Side via ESP-NOW, lalu mengirim telemetry **24 kolom** ke User-Side @ 10 Hz.
 
@@ -24,6 +24,7 @@ Mengumpulkan data sensor dan actuator, menjalankan kontrol rudder/propeller, men
 - IMU HWT905TTL / JY901 @ 115200 baud
 - RPM motor propeller (2× rotary encoder)
 - Monitoring tegangan baterai (2 channel ADC)
+- **Filter sudut rudder** (`RUDDER_DEG_FILTER`, default `1` = oversample 8× ADC) — hanya telemetry `Calc_deg_servo_1/2`
 - **Terima waypoint** dari User-Side (`waypoints_payload`, msg `0xA1`)
 - **Echo waypoint ke mini PC** — baris `[WP] ...` di USB Serial (sama port dengan CSV)
 - **Forward `$SHUTDOWN`** ke mini PC saat ESP-NOW `0xA2` diterima
@@ -89,6 +90,28 @@ Parameter (default):
 ```
 
 Auto alg 2: jika `mini_pc_link=0` saat RC auto → rudder netral + `[WARN]` serial. Tidak fallback ke PD.
+
+### `RUDDER_DEG_FILTER` (ubah di `main.cpp` sebelum upload)
+
+Hanya `Calc_deg_servo_1/2` (ADC → derajat, telemetry/CSV). Perintah PWM rudder **tidak** difilter.
+
+| Nilai | Filter | Lag kasar @ 10 Hz |
+|------:|--------|-------------------|
+| `0` | Mentah (1 sample ADC / tick) | 0 |
+| `1` | **Oversample** 8× ADC dalam 1 tick (**default**) | ~0 (waktu baca 1–5 ms) |
+| `2` | EMA, `RUDDER_EMA_ALPHA` = 0.45 | ~100 ms |
+| `3` | SMA, `RUDDER_SMA_N` = 5 | ~200 ms |
+| `4` | Median 3 | ~100 ms (tahan outlier) |
+
+```cpp
+#define RUDDER_DEG_FILTER     1
+#define RUDDER_OVERSAMPLE_N   8
+#define RUDDER_EMA_ALPHA      0.45f
+#define RUDDER_SMA_N          5
+#define RUDDER_MEDIAN_N       3
+```
+
+Oversample merata-ratakan **millivolt** dulu, baru konversi ke derajat. SMA/EMA/median memakai sampel antar-tick (ada group delay). RPM propeller tetap SMA 10 terpisah.
 
 ---
 
@@ -177,7 +200,7 @@ struct DatatoSend {
   double latitude;            // derajat
   double longitude;           // derajat
   uint16_t speedMps;          // m/s × 100
-  int16_t Calc_deg_servo_1;   // ° × 100 (feedback ADC)
+  int16_t Calc_deg_servo_1;   // ° × 100 (feedback ADC, setelah filter)
   int16_t Calc_deg_servo_2;   // ° × 100
   uint16_t yaw;               // ° × 100 (0–360)
   uint16_t heading_setpoint;  // bearing ke WP aktif, ° × 100
@@ -223,7 +246,7 @@ Contoh baris data:
 |-------|--------|
 | `timestamp` | `millis()/1000` |
 | `lat`, `lon` | GNSS |
-| `calc_deg_servo_1/2` | ADC feedback (°) |
+| `calc_deg_servo_1/2` | ADC feedback (°) setelah `RUDDER_DEG_FILTER` |
 | `yaw` | IMU (°) |
 | `gyro_z` | IMU (°/s) |
 | `yaw_rate` | Δyaw/Δt lokal (°/s), **tidak** masuk struct ESP-NOW |
@@ -250,8 +273,13 @@ Mini PC (`Cpp_ReadWriteSerial`) mencetak ulang baris yang diawali `[WP]` ke stdo
 ## Kalibrasi & Rumus
 
 ### Feedback servo (ADC → derajat)
-- Servo 1: `deg = (mV × 0.0595) − 98.848`
-- Servo 2: `deg = (mV × 0.0594) − 98.801`
+
+1. Baca ADC (mV); jika filter `1`, rata-rata `RUDDER_OVERSAMPLE_N` bacaan per tick.
+2. Konversi:
+   - Servo 1: `deg = (mV × 0.0595) − 98.848`
+   - Servo 2: `deg = (mV × 0.0594) − 98.801`
+3. Jika filter `2`/`3`/`4`, terapkan EMA / SMA / median pada derajat.
+4. Pack telemetry: `° × 100` → `Calc_deg_servo_1/2`
 
 ### Servo rudder
 - Netral: 90° (duty 307, 1.5 ms @ 50 Hz)
@@ -300,7 +328,7 @@ Sesuaikan `upload_port` / `monitor_port` di `platformio.ini` (default: `COM14`).
 1. Power ON → inisialisasi PPM, ADC, LEDC, GNSS (re-baud 115200, 10 Hz), IMU, ESP-NOW
 2. User-Side kirim waypoint via ESP-NOW → Remote simpan + cetak `[WP]` ke mini PC
 3. Operator pilih Manual/Auto lewat CH6
-4. Loop 10 Hz: baca sensor → kontrol rudder/propeller → isi `dataToSend` → `esp_now_send`
+4. Loop 10 Hz: baca sensor (ADC rudder + filter) → kontrol rudder/propeller → isi `dataToSend` → `esp_now_send`
 5. Serial CSV debug ke mini PC saat RC auto; `$HB` / `timestamp,result` dari `Cpp_ReadWriteSerial-1.0`
 6. Opsional: dashboard Shutdown → `$SHUTDOWN` ke mini PC
 
@@ -324,15 +352,16 @@ Sesuaikan `upload_port` / `monitor_port` di `platformio.ini` (default: `COM14`).
 1. Interval utama: **100 ms (10 Hz)**
 2. `AUTO_TRACK_ALG` dipilih **compile-time**, bukan runtime
 3. Auto alg 2 default = mini PC (`timestamp,result`); alg 1 = waypoint PD
-4. `msg_type 0xA2` = perintah mini PC (shutdown), **bukan** tuning NVS lama
-5. Struct `DatatoSend` 64 byte / 24 field harus identik dengan User-Side-05
+4. `RUDDER_DEG_FILTER` dipilih **compile-time** (default `1` oversample); PWM rudder tidak difilter
+5. `msg_type 0xA2` = perintah mini PC (shutdown), **bukan** tuning NVS lama
+6. Struct `DatatoSend` 64 byte / 24 field harus identik dengan User-Side-05
 
 ---
 
 ## Author & Versi
 
 - **Author:** Chandra P — Ship Model Control System
-- **Version:** 1.0 (Remote-Side-05) — dari Remote-Side-04
-- **Last update:** 2026-08
+- **Version:** 1.0 (Remote-Side-05) — dari Remote-Side-04; filter sudut rudder
+- **Last update:** 2026-08-14
 - **Board:** ESP32-S3 DevKitC1-N16R8
 - **Framework:** Arduino / PlatformIO

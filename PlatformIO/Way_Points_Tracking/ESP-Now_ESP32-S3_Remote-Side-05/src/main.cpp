@@ -8,6 +8,8 @@
  * 24-kolom ke User-Side via ESP-NOW.
  *
  * Clone dari Remote-Side-04 (tambah forward $SHUTDOWN via ESP-NOW 0xA2).
+ * Tambahan: filter compile-time untuk feedback sudut servo rudder
+ * (RUDDER_DEG_FILTER, default 1 = oversample 8× ADC per tick).
  *
  * Hardware yang digunakan:
  * - Receiver RC (FS-iA6B) dengan output PPM
@@ -21,6 +23,7 @@
  * - Mode Manual: Kontrol rudder langsung dari RC (CH1)
  * - Mode Auto alg 1: waypoint + PD rudder (AUTO_TRACK_ALG=1, opsional)
  * - Mode Auto alg 2: rudder dari mini PC via serial timestamp,result (default)
+ * - Filter Calc_deg_servo_1/2 (hanya telemetry; PWM rudder tidak difilter)
  *
  * Waypoint & mini PC (USB Serial 115200):
  * - Terima waypoints_payload (msg 0xA1) dari User-Side → simpan g_lastWaypoints
@@ -39,6 +42,7 @@
  * - Struct DatatoSend harus sama dengan User-Side-05 (64 byte, 24 field)
  * - Penerimaan waypoint: Dashboard → User-Side ($WPSET) → ESP-NOW → sini
  * - Shutdown mini PC: Dashboard ($SHUTDOWN) → User → ESP-NOW 0xA2 → sini → Serial
+ * - RUDDER_DEG_FILTER 0..4 (default 1 oversample); lihat src/README.md
  */
 
 #include <Arduino.h>
@@ -349,11 +353,14 @@ uint8_t ADC_PIN_BATT_2 = 2;   // GPIO2 = ADC1_1 pin for analog input (ESP32-S3)
 /**
  * @brief Filter feedback sudut servo rudder (ADC → derajat)
  *
+ * Compile-time. Hanya mempengaruhi Calc_deg_servo_1/2 (telemetry/CSV),
+ * bukan perintah PWM rudder.
+ *
  * 0 = mentah (1 sample ADC / tick)
  * 1 = oversample (rata-rata N baca ADC dalam 1 tick, hampir tanpa lag)
- * 2 = EMA
- * 3 = SMA (jendela N tick, seperti RPM)
- * 4 = median 3
+ * 2 = EMA (α = RUDDER_EMA_ALPHA)
+ * 3 = SMA (jendela RUDDER_SMA_N tick @ 10 Hz, seperti RPM)
+ * 4 = median 3 (tahan outlier ADC)
  */
 #define RUDDER_DEG_FILTER     1
 #define RUDDER_OVERSAMPLE_N   8
@@ -497,6 +504,12 @@ static inline float mapFloat(long x, long in_min, long in_max, float out_min, fl
   return (float)(x - in_min) * (out_max - out_min) / (float)(in_max - in_min) + out_min;
 }
 
+/**
+ * @brief Baca ADC feedback servo dalam millivolt.
+ * @param pin GPIO ADC1 (servo 1 = GPIO8, servo 2 = GPIO3)
+ * @return mV; jika RUDDER_DEG_FILTER==1, rata-rata RUDDER_OVERSAMPLE_N bacaan
+ *         dalam tick yang sama (hampir tanpa lag antar-sampel 10 Hz).
+ */
 static uint32_t readServoMilliVolts(uint8_t pin) {
 #if RUDDER_DEG_FILTER == 1
   uint32_t sum = 0;
@@ -509,6 +522,7 @@ static uint32_t readServoMilliVolts(uint8_t pin) {
 #endif
 }
 
+/** @brief State EMA / SMA / median untuk satu channel sudut servo. */
 struct RudderDegFilterState {
   float ema;
   bool ema_init;
@@ -543,6 +557,11 @@ static float median3(float a, float b, float c) {
 }
 #endif
 
+/**
+ * @brief Terapkan filter antar-tick pada sudut (derajat).
+ * @details Mode 0 dan 1 mengembalikan raw (oversample sudah di ADC).
+ *          Mode 2–4 memakai st (EMA / SMA / median).
+ */
 static float applyRudderDegFilter(float raw, RudderDegFilterState &st) {
 #if RUDDER_DEG_FILTER == 2
   if (!st.ema_init) {
@@ -1144,7 +1163,7 @@ void setup() {
  *    - Update data IMU (yaw, accel, gyro)
  *    - Map PPM values ke range 1000-2000
  *    - Check mode auto/manual dan eksekusi fungsi kontrol
- *    - Baca feedback servo dari ADC
+ *    - Baca feedback servo dari ADC (filter RUDDER_DEG_FILTER)
  *    - Kontrol motor propeller (speed dan direction)
  *    - Hitung RPM dari rotary encoder
  *    - Baca tegangan baterai
