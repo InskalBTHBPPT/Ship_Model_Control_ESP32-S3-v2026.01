@@ -8,7 +8,7 @@
 enum class LocalFrameKind { Enu, Ned };
 
 // Ubah konstanta ini per folder: ENU-beta = Enu, NED-beta = Ned.
-inline constexpr LocalFrameKind kLocalFrame = LocalFrameKind::Enu;
+inline constexpr LocalFrameKind kLocalFrame = LocalFrameKind::Ned;
 
 inline constexpr double kDefaultOriginLat = -7.2867106;
 inline constexpr double kDefaultOriginLon = 112.7958064;

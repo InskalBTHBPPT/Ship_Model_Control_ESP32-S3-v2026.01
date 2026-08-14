@@ -14,7 +14,7 @@ cd /d "D:\path\to\folder"
 **C++ exe (ini):** tidak perlu path Python — langsung panggil `.exe` + argumen CLI.
 ```batch
 @echo off
-cd /d "D:\path\to\Cpp_ReadWriteSerial-1.1-ENU-beta"
+cd /d "D:\path\to\Cpp_ReadWriteSerial-1.2-NED-beta"
 read_write_serial.exe --port COM16 --baud 115200 --rudder-mode yawrate2 --print none
 ```
 
@@ -80,7 +80,7 @@ Boleh, tapi **wajib** path absolut ke folder exe (karena `%~dp0` akan jadi folde
 
 ```batch
 @echo off
-cd /d "D:\Pengujian\Ship_Model_Control_ESP32-S3 v2026.01\Cpp_Files\Cpp_ReadWriteSerial-1.1-ENU-beta"
+cd /d "D:\Pengujian\Ship_Model_Control_ESP32-S3 v2026.01\Cpp_Files\Cpp_ReadWriteSerial-1.2-NED-beta"
 read_write_serial.exe --port COM16 --baud 115200 --rudder-mode yawrate2
 ```
 
@@ -91,12 +91,12 @@ Sesuaikan drive/path di mini PC.
 1. Buka `taskschd.msc`.
 2. Create Task → trigger **At log on**.
 3. Action: Start a program → `start_read_write_serial.bat`.
-4. **Start in**: folder `Cpp_ReadWriteSerial-1.1-ENU-beta` (penting).
+4. **Start in**: folder `Cpp_ReadWriteSerial-1.2-NED-beta` (penting).
 
 Atau PowerShell (Administrator), sesuaikan `$dir`:
 
 ```powershell
-$dir = "D:\Pengujian\Ship_Model_Control_ESP32-S3 v2026.01\Cpp_Files\Cpp_ReadWriteSerial-1.1-ENU-beta"
+$dir = "D:\Pengujian\Ship_Model_Control_ESP32-S3 v2026.01\Cpp_Files\Cpp_ReadWriteSerial-1.2-NED-beta"
 $action = New-ScheduledTaskAction -Execute "$dir\start_read_write_serial.bat" -WorkingDirectory $dir
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME
 $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1)

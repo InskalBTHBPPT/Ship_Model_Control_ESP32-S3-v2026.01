@@ -1,4 +1,5 @@
 #include "local_frame.hpp"
+#include "ned_velocity.hpp"
 #include "processor.hpp"
 #include "serial_port.hpp"
 #include "telemetry_parser.hpp"
@@ -47,8 +48,9 @@ void print_usage(const char *program_name) {
       << "  - Baris timestamp,result (rudder deg) -> serial TX saja\n"
       << "  - Baris $SHUTDOWN dari Remote -> matikan OS (Windows/Linux)\n"
       << "  - Frame lokal " << local_frame_name()
-      << " (x=" << local_x_axis_name() << ", y=" << local_y_axis_name()
-      << ") hanya internal\n"
+      << " (x=" << local_x_axis_name() << " m, y=" << local_y_axis_name()
+      << " m) hanya internal\n"
+      << "  - Surge u / sway v (m/s, kecepatan badan) dihitung internal\n"
       << "  - Origin: [WP] Home lat/lon, fallback "
       << std::fixed << std::setprecision(7) << kDefaultOriginLat << ","
       << kDefaultOriginLon << "\n";
@@ -214,13 +216,16 @@ int main(int argc, char **argv) {
   std::cerr << "[INFO] Rudder mode: " << rudder_mode << "\n";
 
   Origin origin = default_origin();
-  LocalXy ship_xy{};
+  NedVelocityTracker vel_tracker;
+  NedKinematics kin{};
+  auto last_kin_log = std::chrono::steady_clock::now();
   std::cerr << std::fixed << std::setprecision(7)
             << "[INFO] Frame " << local_frame_name()
-            << " internal | x=" << local_x_axis_name()
-            << " y=" << local_y_axis_name() << " (m)\n"
+            << " internal | X=" << local_x_axis_name()
+            << " (m) Y=" << local_y_axis_name() << " (m)\n"
             << "[INFO] Origin default (home belum ada): "
-            << origin.lat << ", " << origin.lon << "\n";
+            << origin.lat << ", " << origin.lon << "\n"
+            << "[INFO] u=surge v=sway (m/s, kecepatan) | r dari gyro_z (rad/s)\n";
   std::cerr << "[INFO] Tekan Ctrl+C untuk berhenti\n";
 
   uint64_t valid_lines = 0;
@@ -261,11 +266,12 @@ int main(int argc, char **argv) {
       if (const auto parsed_home = try_parse_wp_home(line)) {
         if (origin_changed(origin, *parsed_home)) {
           origin = *parsed_home;
+          vel_tracker.reset();
           std::cerr << std::fixed << std::setprecision(7)
                     << "[INFO] Origin " << local_frame_name() << " = "
                     << origin.lat << ", " << origin.lon
                     << (origin.from_home ? " (dari Home)" : " (default, Home <none>)")
-                    << "\n";
+                    << " — reset Ẋ Ẏ\n";
         } else {
           origin = *parsed_home;
         }
@@ -312,9 +318,24 @@ int main(int argc, char **argv) {
     }
 
     ++valid_lines;
-    ship_xy = ll_to_local(row->lat, row->lon, origin);
+    kin = vel_tracker.update(row->timestamp, row->lat, row->lon, row->yaw,
+                             row->gyro_z, origin);
     if (print_csv) {
       std::cout << line << "\n" << std::flush;
+    }
+
+    const auto kin_now = std::chrono::steady_clock::now();
+    if (std::chrono::duration_cast<std::chrono::milliseconds>(kin_now - last_kin_log)
+            .count() >= 1000) {
+      std::cerr << std::fixed << std::setprecision(2)
+                << "[KIN] X=" << kin.xy.x << " Y=" << kin.xy.y
+                << " m | Ẋ=" << kin.x_dot << " Ẏ=" << kin.y_dot
+                << " |V|=" << kin.speed << " m/s | u=" << kin.u << " v=" << kin.v
+                << " m/s | psi=" << std::setprecision(1)
+                << (kin.psi / kDegToRad) << " deg r=" << std::setprecision(3)
+                << kin.r << " rad/s"
+                << (kin.vel_ok ? "" : " (vel n/a)") << "\n";
+      last_kin_log = kin_now;
     }
 
     const std::string result_line = format_result_line(row->timestamp, rudder_deg);
@@ -330,7 +351,7 @@ int main(int argc, char **argv) {
             << ", dilewati: " << skipped_lines
             << ", gagal tulis serial: " << write_errors
             << std::fixed << std::setprecision(2)
-            << " | last " << local_frame_name()
-            << " x=" << ship_xy.x << " y=" << ship_xy.y << "\n";
+            << " | last NED X=" << kin.xy.x << " Y=" << kin.xy.y
+            << " u=" << kin.u << " v=" << kin.v << " m/s\n";
   return 0;
 }
