@@ -4,7 +4,87 @@ Catatan perubahan utama antar versi firmware dan dashboard **Way Points Tracking
 
 ---
 
+## [Remote-Side-05] Filter sudut rudder — `RUDDER_DEG_FILTER`
+
+### Ringkasan
+
+Feedback ADC servo (`Calc_deg_servo_1/2`) mendapat filter **compile-time** lima opsi. Default **oversample 8×** dalam 1 tick (hampir tanpa lag). Perintah PWM rudder **tidak** difilter. Telemetry tetap 24 kolom / 64 byte.
+
+### Opsi (`src/main.cpp`)
+
+| `RUDDER_DEG_FILTER` | Perilaku |
+|--------------------:|----------|
+| `0` | Mentah, 1 sample ADC / 100 ms |
+| `1` | Oversample `RUDDER_OVERSAMPLE_N` (default 8) millivolt, lalu konversi derajat |
+| `2` | EMA, `RUDDER_EMA_ALPHA` = 0.45 |
+| `3` | SMA `RUDDER_SMA_N` = 5 (@ 10 Hz) |
+| `4` | Median 3 |
+
+RPM propeller tetap SMA 10 terpisah (tidak berubah).
+
+### File
+
+- `PlatformIO/Way_Points_Tracking/ESP-Now_ESP32-S3_Remote-Side-05/src/main.cpp`
+- `.../src/README.md` (tabel filter, rumus ADC → derajat)
+
+---
+
+## [Cpp_ReadWriteSerial-1.1-ENU-beta] — dari `Cpp_ReadWriteSerial-1.0`
+
+### Ringkasan
+
+Folder baru: clone 1.0 + transformasi **lat/lon → ENU** (X=East m, Y=North m) relatif origin. Hanya internal (stderr). CSV stdout, `$HB`, `timestamp,result`, `$SHUTDOWN` sama seperti 1.0.
+
+### File baru / inti
+
+- `Cpp_Files/Cpp_ReadWriteSerial-1.1-ENU-beta/`
+- `include/local_frame.hpp` (`kLocalFrame = Enu`)
+- Origin: `[WP] Home`, fallback `-7.2867106, 112.7958064`
+
+---
+
+## [Cpp_ReadWriteSerial-1.1-NED-beta] — dari `1.1-ENU-beta`
+
+### Ringkasan
+
+Folder baru: sama seperti 1.1-ENU, frame **NED** (X=North m, Y=East m).
+
+### File baru / inti
+
+- `Cpp_Files/Cpp_ReadWriteSerial-1.1-NED-beta/`
+- `include/local_frame.hpp` (`kLocalFrame = Ned`)
+
+---
+
+## [Cpp_ReadWriteSerial-1.2-NED-beta] — dari `1.1-NED-beta`
+
+### Ringkasan
+
+Folder baru: posisi NED plus **kecepatan** peta `Ẋ,Ẏ` dan badan **surge `u` / sway `v`** (m/s), low-pass α=0.70. Ringkasan `[KIN]` di stderr ~1 Hz. Rudder **belum** memakai NMPC. Firmware Remote tidak diubah.
+
+### File baru / inti
+
+- `Cpp_Files/Cpp_ReadWriteSerial-1.2-NED-beta/`
+- `include/ned_velocity.hpp`, `include/local_frame.hpp`
+
+---
+
+## Folder baru: NMPC / Linear MPC (PC)
+
+Benchmark solver di PC (bukan flash ESP32). Belum di-hook ke `timestamp,result` mini PC.
+
+| Folder | Isi |
+|--------|-----|
+| `Cpp_Files/Cpp_NMPC_1` | Satu solve NMPC (`fmincon` codegen, horizon N=30) |
+| `Cpp_Files/Cpp_NMPC_150` | Simulasi 150 langkah NMPC |
+| `Cpp_Files/Cpp_MPC_1` | Satu solve Linear MPC (QP Np=60) |
+| `Cpp_Files/Cpp_MPC_150` | Simulasi Linear MPC |
+| `Cpp_Files/mpc_common` | Model + QP + OSQP bersama untuk `Cpp_MPC_*` |
+
+---
+
 ## [Remote-Side-05] — dari `ESP-Now_ESP32-S3_Remote-Side-04`
+
 
 ### Ringkasan
 
@@ -30,6 +110,7 @@ Remote-Side-05 menambahkan forward perintah **shutdown mini PC** lewat ESP-NOW (
 ### Tidak berubah dari 04
 
 - Telemetry 24 field / 64 byte, CSV 8 kolom, `$HB` + `timestamp,result`, `[WP]` echo, `AUTO_TRACK_ALG` default 2
+- Setelah itu: filter `RUDDER_DEG_FILTER` pada `Calc_deg_servo_*` (lihat bagian filter di atas)
 
 ---
 
@@ -124,6 +205,12 @@ Clone folder dengan handler **`$SHUTDOWN`**: menutup port serial lalu menjalanka
 
 - Remote-Side-05 (sumber `$SHUTDOWN` / CSV / `[WP]`)
 - Dashboard beta 1.5 (tombol Shutdown)
+
+### Penerus (folder terpisah)
+
+- `Cpp_ReadWriteSerial-1.1-ENU-beta` — + ENU internal
+- `Cpp_ReadWriteSerial-1.1-NED-beta` — + NED internal
+- `Cpp_ReadWriteSerial-1.2-NED-beta` — + `Ẋ,Ẏ,u,v` internal
 
 ---
 
