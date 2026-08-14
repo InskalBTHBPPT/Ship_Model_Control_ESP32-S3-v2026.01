@@ -346,6 +346,25 @@ uint8_t ADC_PIN_SERVO_2 = 3;  // GPIO3 = ADC1_2 pin for analog input (ESP32-S3)
 uint8_t ADC_PIN_BATT_1 = 1;   // GPIO1 = ADC1_0 pin for analog input (ESP32-S3)
 uint8_t ADC_PIN_BATT_2 = 2;   // GPIO2 = ADC1_1 pin for analog input (ESP32-S3)
 
+/**
+ * @brief Filter feedback sudut servo rudder (ADC → derajat)
+ *
+ * 0 = mentah (1 sample ADC / tick)
+ * 1 = oversample (rata-rata N baca ADC dalam 1 tick, hampir tanpa lag)
+ * 2 = EMA
+ * 3 = SMA (jendela N tick, seperti RPM)
+ * 4 = median 3
+ */
+#define RUDDER_DEG_FILTER     1
+#define RUDDER_OVERSAMPLE_N   8
+#define RUDDER_EMA_ALPHA      0.45f
+#define RUDDER_SMA_N          5
+#define RUDDER_MEDIAN_N       3
+
+#if (RUDDER_DEG_FILTER < 0) || (RUDDER_DEG_FILTER > 4)
+#error "RUDDER_DEG_FILTER must be 0..4"
+#endif
+
 // PWM for propeller
 #define SERVO_PROP_SPEED_PIN 6
 #define SERVO_PROP_DIRECTION_PIN 7
@@ -476,6 +495,83 @@ static void pollMiniPcSerial() {
 // Utility: map long to float with custom output range
 static inline float mapFloat(long x, long in_min, long in_max, float out_min, float out_max) {
   return (float)(x - in_min) * (out_max - out_min) / (float)(in_max - in_min) + out_min;
+}
+
+static uint32_t readServoMilliVolts(uint8_t pin) {
+#if RUDDER_DEG_FILTER == 1
+  uint32_t sum = 0;
+  for (uint8_t i = 0; i < RUDDER_OVERSAMPLE_N; i++) {
+    sum += analogReadMilliVolts(pin);
+  }
+  return sum / RUDDER_OVERSAMPLE_N;
+#else
+  return analogReadMilliVolts(pin);
+#endif
+}
+
+struct RudderDegFilterState {
+  float ema;
+  bool ema_init;
+  float sma[RUDDER_SMA_N];
+  uint8_t sma_idx;
+  float med[RUDDER_MEDIAN_N];
+  uint8_t med_count;
+  uint8_t med_idx;
+};
+
+static RudderDegFilterState g_rudderDegFilt1{};
+static RudderDegFilterState g_rudderDegFilt2{};
+
+#if RUDDER_DEG_FILTER == 4
+static float median3(float a, float b, float c) {
+  if (a > b) {
+    const float t = a;
+    a = b;
+    b = t;
+  }
+  if (b > c) {
+    const float t = b;
+    b = c;
+    c = t;
+  }
+  if (a > b) {
+    const float t = a;
+    a = b;
+    b = t;
+  }
+  return b;
+}
+#endif
+
+static float applyRudderDegFilter(float raw, RudderDegFilterState &st) {
+#if RUDDER_DEG_FILTER == 2
+  if (!st.ema_init) {
+    st.ema = raw;
+    st.ema_init = true;
+  } else {
+    st.ema = RUDDER_EMA_ALPHA * raw + (1.0f - RUDDER_EMA_ALPHA) * st.ema;
+  }
+  return st.ema;
+#elif RUDDER_DEG_FILTER == 3
+  st.sma[st.sma_idx] = raw;
+  st.sma_idx = (uint8_t)((st.sma_idx + 1) % RUDDER_SMA_N);
+  float sum = 0.0f;
+  for (uint8_t i = 0; i < RUDDER_SMA_N; i++) {
+    sum += st.sma[i];
+  }
+  return sum / (float)RUDDER_SMA_N;
+#elif RUDDER_DEG_FILTER == 4
+  st.med[st.med_idx] = raw;
+  st.med_idx = (uint8_t)((st.med_idx + 1) % RUDDER_MEDIAN_N);
+  if (st.med_count < RUDDER_MEDIAN_N) {
+    st.med_count++;
+    return raw;
+  }
+  return median3(st.med[0], st.med[1], st.med[2]);
+#else
+  (void)st;
+  return raw;
+#endif
 }
 
 /**
@@ -1147,11 +1243,13 @@ void loop() {
 
         
         // Read analog values of servo potensiometer output in millivolts
-        uint32_t adc_millivolts_servo_1 = analogReadMilliVolts(ADC_PIN_SERVO_1);
-        uint32_t adc_millivolts_servo_2 = analogReadMilliVolts(ADC_PIN_SERVO_2);
+        uint32_t adc_millivolts_servo_1 = readServoMilliVolts(ADC_PIN_SERVO_1);
+        uint32_t adc_millivolts_servo_2 = readServoMilliVolts(ADC_PIN_SERVO_2);
   
-        float Calc_deg_servo_1 = adc_millivolts_servo_1 * 0.0595 - 98.848;
-        float Calc_deg_servo_2 = adc_millivolts_servo_2 * 0.0594 - 98.801;
+        float Calc_deg_servo_1 = applyRudderDegFilter(
+            adc_millivolts_servo_1 * 0.0595f - 98.848f, g_rudderDegFilt1);
+        float Calc_deg_servo_2 = applyRudderDegFilter(
+            adc_millivolts_servo_2 * 0.0594f - 98.801f, g_rudderDegFilt2);
 
         // Set PWM for PropSpeed dan PropDirection
         controlInput.propSpeed = ppm_mapped[2];           // CH3
