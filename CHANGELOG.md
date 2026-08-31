@@ -69,6 +69,19 @@ Folder baru: posisi NED plus **kecepatan** peta `Ẋ,Ẏ` dan badan **surge `u` 
 
 ---
 
+## [Cpp_ReadWriteSerial-1.2-ENU-beta] — dari `1.1-ENU-beta`
+
+### Ringkasan
+
+Folder baru: posisi ENU (x=East, y=North) plus **kecepatan** peta `ẋ,ẏ` dan badan **surge `u` / sway `v`** (m/s), low-pass α=0.70. Ringkasan `[KIN]` di stderr ~1 Hz. Rudder **belum** memakai NMPC. Firmware Remote tidak diubah.
+
+### File baru / inti
+
+- `Cpp_Files/Cpp_ReadWriteSerial-1.2-ENU-beta/`
+- `include/enu_velocity.hpp`, `include/local_frame.hpp`
+
+---
+
 ## Folder baru: NMPC / Linear MPC (PC)
 
 Benchmark solver di PC (bukan flash ESP32). Belum di-hook ke `timestamp,result` mini PC.
@@ -211,6 +224,7 @@ Clone folder dengan handler **`$SHUTDOWN`**: menutup port serial lalu menjalanka
 - `Cpp_ReadWriteSerial-1.1-ENU-beta` — + ENU internal
 - `Cpp_ReadWriteSerial-1.1-NED-beta` — + NED internal
 - `Cpp_ReadWriteSerial-1.2-NED-beta` — + `Ẋ,Ẏ,u,v` internal
+- `Cpp_ReadWriteSerial-1.2-ENU-beta` — + `ẋ,ẏ,u,v` internal (ENU)
 
 ---
 

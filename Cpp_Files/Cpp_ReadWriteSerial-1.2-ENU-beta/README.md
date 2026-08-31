@@ -1,6 +1,6 @@
-# Cpp_ReadWriteSerial-1.2-NED-beta
+# Cpp_ReadWriteSerial-1.2-ENU-beta
 
-Versi **1.2-NED-beta** — clone dari `Cpp_Files/Cpp_ReadWriteSerial-1.1-NED-beta` dengan hitungan **posisi NED** dan **kecepatan surge/sway** (internal).
+Versi **1.2-ENU-beta** — clone dari `Cpp_Files/Cpp_ReadWriteSerial-1.1-ENU-beta` dengan hitungan **posisi ENU** dan **kecepatan surge/sway** (internal).
 
 Program C++ mini-PC: baca telemetry USB dari **ESP-Now_ESP32-S3_Remote-Side-05**, kirim `$HB`, tulis balik `timestamp,result` (rudder deg).
 
@@ -9,8 +9,8 @@ Program C++ mini-PC: baca telemetry USB dari **ESP-Now_ESP32-S3_Remote-Side-05**
 | Firmware Remote | `PlatformIO/Way_Points_Tracking/ESP-Now_ESP32-S3_Remote-Side-05` |
 | Firmware User | `PlatformIO/Way_Points_Tracking/ESP-Now_ESP32-S3_User-Side-05` |
 | Dashboard | `Pythonfile/Way_Points_Tracking/Local Monitor Dashboard-beta1.5.py` |
-| Versi sebelumnya | `Cpp_Files/Cpp_ReadWriteSerial-1.1-NED-beta` |
-| Varian ENU | `Cpp_Files/Cpp_ReadWriteSerial-1.2-ENU-beta` |
+| Versi sebelumnya | `Cpp_Files/Cpp_ReadWriteSerial-1.1-ENU-beta` |
+| Varian NED | `Cpp_Files/Cpp_ReadWriteSerial-1.2-NED-beta` |
 
 **Firmware Remote tidak diubah.** CSV stdout dan serial TX sama seperti 1.1.
 
@@ -22,9 +22,9 @@ Kolom `calc_deg_servo_1/2` dari Remote-Side-05 sudah lewat `RUDDER_DEG_FILTER` (
 
 | Simbol | Jenis | Satuan | Arti |
 |--------|--------|--------|------|
-| `X`, `Y` | **posisi / perpindahan** dari home | **m** | di mana kapal di peta |
-| `Ẋ`, `Ẏ` | **kecepatan** di peta | **m/s** | seberapa cepat `X`,`Y` berubah |
-| `\|V\|` | **kecepatan** ground | **m/s** | `√(Ẋ² + Ẏ²)` |
+| `x`, `y` | **posisi / perpindahan** dari home | **m** | di mana kapal di peta |
+| `ẋ`, `ẏ` | **kecepatan** di peta | **m/s** | seberapa cepat `x`,`y` berubah |
+| `\|V\|` | **kecepatan** ground | **m/s** | `√(ẋ² + ẏ²)` |
 | `u` surge | **kecepatan** badan | **m/s** | maju (+) / mundur (−) |
 | `v` sway | **kecepatan** badan | **m/s** | kanan (+) / kiri (−) |
 | `ψ` | sudut | **rad** | heading dari Utara |
@@ -36,16 +36,16 @@ Kolom `calc_deg_servo_1/2` dari Remote-Side-05 sudah lewat `RUDDER_DEG_FILTER` (
 
 ## Dua kerangka
 
-### Global NED (tetap di bumi, origin = home)
+### Global ENU (tetap di bumi, origin = home)
 
 | Simbol | Nama | Arti |
 |--------|------|------|
-| `X` | North | meter ke **utara** dari home |
-| `Y` | East | meter ke **timur** dari home |
-| `Ẋ` (`dX/dt`) | kecepatan utara | m/s |
-| `Ẏ` (`dY/dt`) | kecepatan timur | m/s |
+| `x` | East | meter ke **timur** dari home |
+| `y` | North | meter ke **utara** dari home |
+| `ẋ` (`dx/dt`) | kecepatan timur | m/s |
+| `ẏ` (`dy/dt`) | kecepatan utara | m/s |
 
-`Ẋ`, `Ẏ` = ke mana kapal bergerak **di peta**.
+`ẋ`, `ẏ` = ke mana kapal bergerak **di peta**.
 
 ### Badan kapal (ikut haluan)
 
@@ -62,9 +62,9 @@ Kolom `calc_deg_servo_1/2` dari Remote-Side-05 sudah lewat `RUDDER_DEG_FILTER` (
 
 ## Langkah hitungan (internal)
 
-Kode: `include/local_frame.hpp` + `include/ned_velocity.hpp`.
+Kode: `include/local_frame.hpp` + `include/enu_velocity.hpp`.
 
-### Langkah 1 — `lat, lon` → `X, Y` (posisi, meter)
+### Langkah 1 — `lat, lon` → `x, y` (posisi, meter)
 
 | Simbol | Arti |
 |--------|------|
@@ -73,43 +73,43 @@ Kode: `include/local_frame.hpp` + `include/ned_velocity.hpp`.
 | `R` | jari-jari bumi `6 371 000` m |
 
 ```text
-X = (lat − lat0) × (π/180) × R                    // North, m
-Y = (lon − lon0) × (π/180) × R × cos(lat0)        // East, m
+x = (lon − lon0) × (π/180) × R × cos(lat0)        // East, m
+y = (lat − lat0) × (π/180) × R                    // North, m
 ```
 
-Home sendiri: `(X, Y) = (0, 0)`.
+Home sendiri: `(x, y) = (0, 0)`.
 
 Origin:
 
 | Kondisi | Origin |
 |---------|--------|
 | Belum ada home / `[WP] Home: <none>` | `-7.2867106, 112.7958064` |
-| `[WP] Home: lat, lon` | koordinat itu; tracker `Ẋ,Ẏ` di-reset |
+| `[WP] Home: lat, lon` | koordinat itu; tracker `ẋ,ẏ` di-reset |
 
 `lat ≈ 0` dan `lon ≈ 0` dianggap GPS belum fix → `u, v` tidak dihitung (dianggap 0).
 
-### Langkah 2 — `Ẋ, Ẏ` dari perubahan posisi (kecepatan peta)
+### Langkah 2 — `ẋ, ẏ` dari perubahan posisi (kecepatan peta)
 
 `Δt = timestamp_k − timestamp_{k-1}` (CSV ≈ 0.1 s).
 
 ```text
-Ẋ_raw ≈ (X_k − X_{k-1}) / Δt
-Ẏ_raw ≈ (Y_k − Y_{k-1}) / Δt
+ẋ_raw ≈ (x_k − x_{k-1}) / Δt
+ẏ_raw ≈ (y_k − y_{k-1}) / Δt
 ```
 
 Low-pass (α = 0.70):
 
 ```text
-Ẋ = α · Ẋ_lama + (1 − α) · Ẋ_raw
-Ẏ = α · Ẏ_lama + (1 − α) · Ẏ_raw
-|V| = √(Ẋ² + Ẏ²)
+ẋ = α · ẋ_lama + (1 − α) · ẋ_raw
+ẏ = α · ẏ_lama + (1 − α) · ẏ_raw
+|V| = √(ẋ² + ẏ²)
 ```
 
-`Ẋ > 0` → ke utara. `Ẏ > 0` → ke timur.
+`ẏ > 0` → ke utara. `ẋ > 0` → ke timur.
 
 `|V|` secara fisis sama dengan `speedMps` GPS, tetapi dihitung dari Δposisi. Nilai per sampel sering beda (noise). `speedMps` **tidak** ada di CSV 8 kolom, jadi tidak dipakai di 1.2.
 
-Sampel pertama, `Δt` aneh (`< 1 ms` atau `> 1 s`), atau origin baru → `Ẋ, Ẏ, u, v = 0`.
+Sampel pertama, `Δt` aneh (`< 1 ms` atau `> 1 s`), atau origin baru → `ẋ, ẏ, u, v = 0`.
 
 ### Langkah 3 — `ψ` dari IMU
 
@@ -130,14 +130,14 @@ r = gyro_z × π / 180     // rad/s, untuk state NMPC, bukan rumus u,v
 ### Langkah 4 — rotasi ke badan: `u, v` (kecepatan, m/s)
 
 ```text
-u =  Ẋ cosψ + Ẏ sinψ     // surge
-v = −Ẋ sinψ + Ẏ cosψ     // sway
+u =  ẋ sinψ + ẏ cosψ     // surge
+v =  ẋ cosψ − ẏ sinψ     // sway
 ```
 
-Arah maju di peta = `(cosψ, sinψ)` (North, East).  
-Arah kanan = `(−sinψ, cosψ)`.
+Arah maju di peta ENU = `(sinψ, cosψ)` (East, North).  
+Arah kanan = `(cosψ, −sinψ)`.
 
-Cek `ψ = 0` (haluan utara): `u = Ẋ`, `v = Ẏ`.
+Cek `ψ = 0` (haluan utara): `u = ẏ`, `v = ẋ`.
 
 ---
 
@@ -147,13 +147,13 @@ Origin default. Titik GPS ≈ 20 m utara, 10 m timur:
 
 ```text
 lat ≈ -7.2865307    lon ≈ 112.7958971
-X ≈ 20 m            Y ≈ 10 m
+x ≈ 10 m            y ≈ 20 m
 ```
 
-0.1 s kemudian `X = 20.5`, `Y = 10.2` (sebelum filter):
+0.1 s kemudian `x = 10.2`, `y = 20.5` (sebelum filter):
 
 ```text
-Ẋ ≈ 5 m/s     Ẏ ≈ 2 m/s     |V| ≈ 5.39 m/s
+ẋ ≈ 2 m/s     ẏ ≈ 5 m/s     |V| ≈ 5.39 m/s
 ```
 
 Heading `yaw = 0°` (`ψ = 0`):
@@ -162,7 +162,7 @@ Heading `yaw = 0°` (`ψ = 0`):
 u ≈ 5 m/s     v ≈ 2 m/s
 ```
 
-Heading `yaw = 90°` (haluan timur), `Ẋ, Ẏ` sama:
+Heading `yaw = 90°` (haluan timur), `ẋ, ẏ` sama:
 
 ```text
 u ≈ 2 m/s     v ≈ −5 m/s
@@ -180,12 +180,12 @@ Hitungan **tidak** masuk stdout CSV dan **tidak** dikirim ke serial.
 | `[WP] ...` | stdout |
 | `$SHUTDOWN` | stdout + matikan OS |
 | `timestamp,result` | serial TX saja |
-| origin, `[KIN] X Y Ẋ Ẏ \|V\| u v psi r` | **stderr**, ringkasan ~1 Hz |
+| origin, `[KIN] x y ẋ ẏ \|V\| u v psi r` | **stderr**, ringkasan ~1 Hz |
 
 Contoh stderr:
 
 ```text
-[KIN] X=20.12 Y=10.05 m | Ẋ=0.31 Ẏ=0.08 |V|=0.32 m/s | u=0.30 v=0.09 m/s | psi=12.0 deg r=0.021 rad/s
+[KIN] x=10.05 y=20.12 m | ẋ=0.08 ẏ=0.31 |V|=0.32 m/s | u=0.30 v=0.09 m/s | psi=12.0 deg r=0.021 rad/s
 ```
 
 ---
@@ -200,7 +200,7 @@ timestamp,lat,lon,calc_deg_servo_1,calc_deg_servo_2,yaw,gyro_z,yaw_rate
 
 **Baud:** `115200`
 
-`--print` hanya memfilter stdout. Hitung NED/`u,v` + rudder + `$HB` tetap jalan.
+`--print` hanya memfilter stdout. Hitung ENU/`u,v` + rudder + `$HB` tetap jalan.
 
 Mode default: `--rudder-mode zero`. Uji: `--rudder-mode yawrate2`.
 
@@ -209,7 +209,7 @@ Mode default: `--rudder-mode zero`. Uji: `--rudder-mode yawrate2`.
 ## Build
 
 ```powershell
-cd "Cpp_Files\Cpp_ReadWriteSerial-1.2-NED-beta"
+cd "Cpp_Files\Cpp_ReadWriteSerial-1.2-ENU-beta"
 g++ -std=c++17 -Iinclude src/main.cpp src/serial_port.cpp -o read_write_serial.exe
 ```
 
@@ -224,7 +224,7 @@ g++ -std=c++17 -static -static-libgcc -static-libstdc++ -Iinclude src/main.cpp s
 ## Penggunaan
 
 ```powershell
-cd "Cpp_Files\Cpp_ReadWriteSerial-1.2-NED-beta"
+cd "Cpp_Files\Cpp_ReadWriteSerial-1.2-ENU-beta"
 .\read_write_serial.exe --port COM16 --baud 115200 --rudder-mode yawrate2 --print all
 .\read_write_serial.exe --port COM16 --print none
 ```
@@ -246,6 +246,6 @@ Auto-start: [`startup_guide.md`](startup_guide.md). DLL MinGW satu folder dengan
 ## Catatan
 
 1. Port COM hanya satu aplikasi.
-2. `u, v` untuk bekal NMPC (`s = [v, r, X, Y, ψ]`); rudder 1.2 belum memakai NMPC.
+2. `u, v` untuk bekal NMPC (`s = [v, r, X, Y, ψ]` dengan state peta sesuai kerangka yang dipilih); rudder 1.2 belum memakai NMPC.
 3. Model NMPC memakai surge konstan `u_0`; `u` hasil GPS berguna untuk cek / ganti `u_0` nanti.
 4. User Windows perlu hak `shutdown`. Setelah mati, mini PC tidak bisa dihidupkan dari dashboard.

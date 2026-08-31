@@ -11,7 +11,8 @@ Program C++ untuk **membaca** data dari **ESP-Now_ESP32-S3_Remote-Side-05** via 
 | Dashboard | `Pythonfile/Way_Points_Tracking/Local Monitor Dashboard-beta1.5.py` |
 | Versi sebelumnya | `Cpp_Files/Cpp_ReadWriteSerial-1.0` |
 | Varian NED | `Cpp_Files/Cpp_ReadWriteSerial-1.1-NED-beta` |
-| Penerus NED | `Cpp_Files/Cpp_ReadWriteSerial-1.2-NED-beta` |
+| Penerus (kecepatan) | `Cpp_Files/Cpp_ReadWriteSerial-1.2-ENU-beta` |
+| Varian NED + kecepatan | `Cpp_Files/Cpp_ReadWriteSerial-1.2-NED-beta` |
 
 ## Format input (dari ESP32 Remote)
 
