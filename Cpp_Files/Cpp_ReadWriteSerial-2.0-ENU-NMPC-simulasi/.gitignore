@@ -1,0 +1,5 @@
+build/
+nmpc_sim
+nmpc_sim.exe
+*.o
+*.obj

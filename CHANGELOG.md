@@ -96,6 +96,19 @@ Folder baru: serial mentah seperti 1.2, `result` dari **NMPC C Sep 2026**. `v=0`
 
 ---
 
+## [Cpp_ReadWriteSerial-2.0-ENU-NMPC-simulasi] — replay tanpa serial
+
+### Ringkasan
+
+Folder baru: verifikasi `result` dari file skenario (format USB), tanpa COM/`$HB`. Adaptor sama (`nmpc_tick.hpp`).
+
+### File
+
+- `Cpp_Files/Cpp_ReadWriteSerial-2.0-ENU-NMPC-simulasi/`
+- `scenarios/diam_ke_utara.txt`, `belok.txt`, `tanpa_wp.txt`
+
+---
+
 ## Folder baru: NMPC / Linear MPC (PC)
 
 Benchmark solver di PC (bukan flash ESP32). Belum di-hook ke `timestamp,result` mini PC.
@@ -240,6 +253,7 @@ Clone folder dengan handler **`$SHUTDOWN`**: menutup port serial lalu menjalanka
 - `Cpp_ReadWriteSerial-1.2-NED-beta` — + `Ẋ,Ẏ,u,v` internal
 - `Cpp_ReadWriteSerial-1.2-ENU-beta` — + `ẋ,ẏ,u,v` internal (ENU)
 - `Cpp_ReadWriteSerial-2.0-ENU-NMPC-beta` — serial 1.2 + NMPC C → `result`
+- `Cpp_ReadWriteSerial-2.0-ENU-NMPC-simulasi` — replay file → `result` (tanpa COM)
 
 ---
 

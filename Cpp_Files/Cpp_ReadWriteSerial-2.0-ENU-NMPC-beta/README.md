@@ -9,6 +9,7 @@ Bridge USB **1.2** (data mentah) + **NMPC C Sep 2026**. Keluaran ke ESP32 tetap 
 | Dashboard | `Pythonfile/Way_Points_Tracking/Local Monitor Dashboard-beta1.5.py` |
 | Serial / CSV | `Cpp_Files/Cpp_ReadWriteSerial-1.2-ENU-beta` |
 | Solver NMPC | `MPC NMPC Agus/Coding_NMPC_Sep2026/C code NMPC` |
+| Simulasi (tanpa COM) | `Cpp_Files/Cpp_ReadWriteSerial-2.0-ENU-NMPC-simulasi` |
 
 **Firmware Remote tidak diubah.** `gyro_z` dan `calc_deg_servo_*` tidak dipakai solver. `v = 0`.
 

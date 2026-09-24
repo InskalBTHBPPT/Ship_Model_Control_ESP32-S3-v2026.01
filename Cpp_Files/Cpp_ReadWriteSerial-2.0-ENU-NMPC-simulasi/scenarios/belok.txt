@@ -1,0 +1,8 @@
+# Heading 0° (Utara kompas) padahal WP1 di utara dari Home... 
+# yaw 0 = Utara, WP1 juga utara — untuk belok besar pakai yaw 0 vs WP di timur.
+# WP1 di timur Home; yaw=0 (hadap utara) → |result| diharapkan besar.
+[WP] Home: -7.287150, 112.796000
+[WP] #1: -7.287150, 112.796400
+0.000,-7.287150,112.796000,0.00,0.00,0.00,0.00,0.00
+0.100,-7.287150,112.796000,0.00,0.00,0.00,0.00,0.00
+0.200,-7.287150,112.796000,0.00,0.00,0.00,0.00,30.00
