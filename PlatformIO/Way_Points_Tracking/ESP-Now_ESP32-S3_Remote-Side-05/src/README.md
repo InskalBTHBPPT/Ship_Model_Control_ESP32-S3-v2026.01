@@ -91,6 +91,30 @@ Parameter (default):
 
 Auto alg 2: jika `mini_pc_link=0` saat RC auto → rudder netral + `[WARN]` serial. Tidak fallback ke PD.
 
+### Home, daftar WP, dan reset tracking
+
+Home dari dashboard = origin / echo `[WP] Home`, **bukan** titik start kaki pertama. Kaki pertama = **posisi GPS kapal sekarang → WP1** (bukan Home → WP1). Garis Home → WP1 di peta dashboard hanya gambar.
+
+`[WP]` dicetak ke USB begitu paket `0xA1` diterima (manual atau auto). CSV 8 kolom hanya saat CH6 auto.
+
+**CH6 manual ↔ auto tidak mereset** indeks WP. Kalau sudah lewat WP1–WP2 lalu salah pencet manual lalu auto lagi → **lanjut WP aktif** (mis. WP3), tidak ulang dari WP1.
+
+Indeks di-reset ke WP1 hanya jika:
+
+- dashboard **Send Way Points** lagi (`0xA1` → `g_active_wp_index = 0`; mini-PC 2.0 reset saat `[WP] Home`), atau
+- program mini-PC di-restart.
+
+**Mengulang tracking dari WP1 (disarankan):**
+
+1. CH6 → **manual** (rudder stik; kapal tidak ditarik NMPC/PD)
+2. Dashboard → **Send Way Points** (Home + daftar yang sama atau baru)
+3. Tunggu `[WP]` di serial / mini-PC
+4. CH6 → **auto**
+
+Jangan Send Way Points saat masih auto: indeks langsung 0 dan kapal bisa belok ke WP1 di tengah jalan.
+
+Urutan operasional biasa: mini-PC sudah jalan → Send Way Points (boleh masih manual) → CH6 auto.
+
 ### `RUDDER_DEG_FILTER` (ubah di `main.cpp` sebelum upload)
 
 Hanya `Calc_deg_servo_1/2` (ADC → derajat, telemetry/CSV). Perintah PWM rudder **tidak** difilter.
@@ -327,10 +351,11 @@ Sesuaikan `upload_port` / `monitor_port` di `platformio.ini` (default: `COM14`).
 
 1. Power ON → inisialisasi PPM, ADC, LEDC, GNSS (re-baud 115200, 10 Hz), IMU, ESP-NOW
 2. User-Side kirim waypoint via ESP-NOW → Remote simpan + cetak `[WP]` ke mini PC
-3. Operator pilih Manual/Auto lewat CH6
+3. Operator pilih Manual/Auto lewat CH6 (ganti mode **tidak** reset WP aktif)
 4. Loop 10 Hz: baca sensor (ADC rudder + filter) → kontrol rudder/propeller → isi `dataToSend` → `esp_now_send`
-5. Serial CSV debug ke mini PC saat RC auto; `$HB` / `timestamp,result` dari `Cpp_ReadWriteSerial-1.0`
-6. Opsional: dashboard Shutdown → `$SHUTDOWN` ke mini PC
+5. Serial CSV ke mini PC saat RC auto; `$HB` / `timestamp,result` dari `Cpp_ReadWriteSerial-1.2` / `2.0-ENU-NMPC`
+6. Ulang dari WP1: manual → Send Way Points → auto (lihat di atas)
+7. Opsional: dashboard Shutdown → `$SHUTDOWN` ke mini PC
 
 ---
 

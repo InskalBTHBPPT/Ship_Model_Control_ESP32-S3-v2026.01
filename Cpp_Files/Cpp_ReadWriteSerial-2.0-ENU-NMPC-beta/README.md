@@ -113,6 +113,30 @@ Konstanta solver (demo C): `L=1.0107` m, `u0=0.6114` m/s, `T_sim=0.1` s, `N=20`,
 
 Tanpa GPS fix, tanpa WP, atau misi selesai (`r_tran` di WP terakhir) → `result = 0`.
 
+### Home, daftar WP, dan reset tracking
+
+Home dari dashboard = origin ENU `(0,0)`, **bukan** target kaki pertama. Kaki pertama = **posisi CSV kapal sekarang → WP `#1`**.
+
+`[WP]` bisa masuk saat RC masih manual (Remote echo `0xA1` ke USB). CSV (dan `NMPC_Solve`) hanya saat CH6 auto.
+
+**CH6 manual ↔ auto tidak mereset** `active_idx`. Sudah lewat WP1–WP2, salah pencet manual lalu auto lagi → **lanjut WP3**, tidak ulang dari WP1.
+
+Reset ke WP1 hanya jika:
+
+- dashboard **Send Way Points** (baris `[WP] Home` mengosongkan daftar lalu `#n` di-`WP_Init` dari awal), atau
+- `read_write_serial.exe` di-restart.
+
+**Mengulang tracking dari WP1 (disarankan):**
+
+1. CH6 → **manual**
+2. Dashboard → **Send Way Points**
+3. Cek stderr `[INFO] WP siap: N titik`
+4. CH6 → **auto**
+
+Jangan Send Way Points saat masih auto: NMPC langsung mengarah ke WP1.
+
+Urutan biasa: 2.0 sudah jalan → Send Way Points (boleh manual) → CH6 auto.
+
 ---
 
 ## Build
@@ -151,3 +175,4 @@ Log stderr ~1 Hz: `[NMPC] WP2 d=4.2 m | E=... N=... | psi=... | d=12.4 deg | sta
 2. `v` tidak diestimasi dari GPS (isi 0, seperti demo C).
 3. Tanda minus pada `yaw_rate` wajib karena `ψ` diputar dari kompas.
 4. User Windows perlu hak `shutdown` untuk `$SHUTDOWN`.
+5. Manual → auto tanpa kirim ulang WP = lanjut titik aktif, bukan ulang WP1.
