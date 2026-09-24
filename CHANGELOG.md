@@ -82,6 +82,20 @@ Folder baru: posisi ENU (x=East, y=North) plus **kecepatan** peta `ẋ,ẏ` dan 
 
 ---
 
+## [Cpp_ReadWriteSerial-2.0-ENU-NMPC-beta] — dari `1.2-ENU-beta` + NMPC C
+
+### Ringkasan
+
+Folder baru: serial mentah seperti 1.2, `result` dari **NMPC C Sep 2026**. `v=0`, `r` dari `yaw_rate` (bukan `gyro_z`), `ψ = π/2 − yaw` kompas. Parse `[WP] Home` dan `[WP] #n`. Firmware Remote tidak diubah.
+
+### File baru / inti
+
+- `Cpp_Files/Cpp_ReadWriteSerial-2.0-ENU-NMPC-beta/`
+- `nmpc/` (salinan `Coding_NMPC_Sep2026/C code NMPC`)
+- `src/main.cpp` adaptor serial → `NMPC_Solve` → `timestamp,result`
+
+---
+
 ## Folder baru: NMPC / Linear MPC (PC)
 
 Benchmark solver di PC (bukan flash ESP32). Belum di-hook ke `timestamp,result` mini PC.
@@ -225,6 +239,7 @@ Clone folder dengan handler **`$SHUTDOWN`**: menutup port serial lalu menjalanka
 - `Cpp_ReadWriteSerial-1.1-NED-beta` — + NED internal
 - `Cpp_ReadWriteSerial-1.2-NED-beta` — + `Ẋ,Ẏ,u,v` internal
 - `Cpp_ReadWriteSerial-1.2-ENU-beta` — + `ẋ,ẏ,u,v` internal (ENU)
+- `Cpp_ReadWriteSerial-2.0-ENU-NMPC-beta` — serial 1.2 + NMPC C → `result`
 
 ---
 
