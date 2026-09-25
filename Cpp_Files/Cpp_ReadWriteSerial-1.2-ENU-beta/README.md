@@ -140,6 +140,91 @@ v =  ẋ cosψ + ẏ sinψ     // sway
 Cek `ψ = 0` (utara): `u = ẏ`, `v = ẋ`.  
 Cek `ψ = 270°` (timur): `u = ẋ`, `v = −ẏ`.
 
+### Penurunan rumus `u`, `v`
+
+Turunannya dari **proyeksi kecepatan peta ke sumbu badan**, bukan dari menukar `lat`/`lon` mentah.
+
+**1. `x` = bujur, `y` = lintang → ENU**
+
+```text
+x = (lon − lon0) × (π/180) × R × cos(lat0)   // East  (timur)
+y = (lat − lat0) × (π/180) × R               // North (utara)
+```
+
+Maka `ẋ = dx/dt` ke timur, `ẏ = dy/dt` ke utara. Vektor kecepatan di peta:
+
+```text
+V = (ẋ, ẏ)
+```
+
+**2. Arah haluan IMU**
+
+`ψ` dari yaw CSV: **0 = Utara, 90 = Barat, 270 = Timur**.  
+Di peta (`x` kanan = timur, `y` atas = utara) sudut ini naik **berlawanan jarum jam dari Utara**.
+
+Arah **maju** (haluan) harus memenuhi:
+
+| `ψ` | haluan | maju `(x, y)` |
+|----:|--------|----------------|
+| 0° | Utara | `(0, 1)` |
+| 90° | Barat | `(−1, 0)` |
+| 180° | Selatan | `(0, −1)` |
+| 270° | Timur | `(1, 0)` |
+
+Satu vektor yang cocok semua baris:
+
+```text
+ê_maju = (−sinψ,  cosψ)
+```
+
+Arah **kanan** = sisi **starboard**: 90° ke kanan dari haluan kapal, di peta ENU. Bukan “kanan layar” atau “selalu timur di peta”.
+
+Kalau kapal menghadap suatu arah, **maju** = haluan, **kanan** = bahu kanan kapal.
+
+| Kapal menghadap | `ψ` | Haluan (maju) | Bahu kanan |
+|-----------------|----:|---------------|------------|
+| Utara | 0° | utara `(0, 1)` | **timur** `(1, 0)` |
+| Barat | 90° | barat `(−1, 0)` | **utara** `(0, 1)` |
+| Timur | 270° | timur `(1, 0)` | **selatan** `(0, −1)` |
+
+Gambar (`ψ = 0`, haluan utara):
+
+```text
+        y (utara) = maju
+            ↑
+            │
+   barat ───┼───→ x (timur) = kanan
+            │
+          selatan
+```
+
+`ê_kanan = (cosψ, sinψ)` merangkum tabel itu:
+
+- `ψ = 0`: `(1, 0)` = timur
+- `ψ = 90°`: `(0, 1)` = utara
+- `ψ = 270°`: `(0, −1)` = selatan
+
+`v = V · ê_kanan`: seberapa cepat kapal **geser ke bahu kanan**. Positif = starboard, negatif = port (kiri).  
+`u = V · ê_maju`: maju/mundur sepanjang haluan.
+
+**3. Surge / sway = hasil kali titik**
+
+`u` = komponen `V` sepanjang maju, `v` sepanjang kanan:
+
+```text
+u = V · ê_maju  = ẋ(−sinψ) + ẏ(cosψ) = −ẋ sinψ + ẏ cosψ
+v = V · ê_kanan = ẋ( cosψ) + ẏ(sinψ) =  ẋ cosψ + ẏ sinψ
+```
+
+`lat`/`lon` hanya menentukan `x`,`y` lalu `ẋ`,`ẏ`. Sudut `ψ` hanya memutar **sumbu badan** di atas peta itu.
+
+**4. Cek**
+
+- `ψ = 0` (utara): `u = ẏ`, `v = ẋ` — maju ikut utara, kanan ikut timur.
+- `ψ = 270°` (timur): `sin = −1`, `cos = 0` → `u = ẋ`, `v = −ẏ` — maju ikut timur, kanan ikut selatan.
+
+Rumus `u = ẋ cosψ + ẏ sinψ` (tanpa minus di suku pertama) adalah `V · ê_kanan`, jadi **tertukar** `u`↔`v` terhadap rumus di atas: “surge” mengikuti kanan kapal, bukan haluan.
+
 ---
 
 ## Contoh angka
