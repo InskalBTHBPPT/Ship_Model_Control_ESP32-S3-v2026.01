@@ -7,6 +7,8 @@ Versi **simulasi only** dari `Cpp_ReadWriteSerial-2.0-ENU-NMPC-beta`.
 - Output = `timestamp,result` (derajat rudder) ke stdout.
 - Adaptor NMPC sama: `v=0`, `r` dari `yaw_rate`, `ψ = π/2 + yaw` (IMU **0 = Utara, 270° = Timur**).
 
+Revisi heading sama 2.0 live: dulu `ψ = π/2 − yaw` dan `r_nd` bertanda minus; sekarang `ψ = π/2 + yaw`, `r_nd` ikut `yaw_rate`. Bukan rumus `u`,`v` 1.2.
+
 | Live | Simulasi |
 |------|----------|
 | `Cpp_ReadWriteSerial-2.0-ENU-NMPC-beta` | folder ini |

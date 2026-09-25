@@ -15,6 +15,30 @@ Bridge USB **1.2** (data mentah) + **NMPC C Sep 2026**. Keluaran ke ESP32 tetap 
 
 ---
 
+## Revisi — heading IMU (0 = Utara, 270° = Timur)
+
+2.0 **tidak** menghitung `u`,`v` badan seperti 1.2. Surge NMPC tetap `u0`, sway `v = 0`. Yang diubah hanya **sudut `ψ`** (dan tanda `yaw_rate`) karena kerangka NMPC **0 = Timur**, CSV yaw **0 = Utara / 270° = Timur**.
+
+| | Sebelum | Sekarang |
+|--|---------|----------|
+| Asumsi `yaw` | kompas 90° = Timur | IMU **0 = Utara, 270° = Timur**, 90° = Barat |
+| `ψ` ke NMPC | `π/2 − yaw` | **`π/2 + yaw`** |
+| `r_nd` | `−yaw_rate · π/180 · L/u0` | **`+yaw_rate · π/180 · L/u0`** |
+| `u`, `v` dari GPS | tidak dipakai | tetap tidak dipakai (`v = 0`) |
+
+```text
+ψ_nmpc = wrap(π/2 + deg2rad(yaw))
+```
+
+Cek: `yaw = 0` → Utara → `ψ = π/2`. `yaw = 270°` → Timur → `ψ = 0`.  
+Rumus lama `π/2 − yaw` membuat 270° (timur) jadi `ψ = −π` (barat) — rudder bisa terbalik.
+
+Tanda `yaw_rate` ikut `dψ/dt = +yaw_rate` (minus hanya perlu jika `ψ = π/2 − yaw`).
+
+Kode: `src/main.cpp` — `imu_yaw_to_nmpc_psi()`, `yaw_rate_to_r_nd()`. Salinan sama di simulasi `include/nmpc_tick.hpp`.
+
+---
+
 ## Alur (Mermaid)
 
 ```mermaid
@@ -112,7 +136,7 @@ $HB
 
 ### Konvensi heading IMU → NMPC
 
-CSV `yaw` = Remote-05 / HWT905 (0–360).
+CSV `yaw` = Remote-05 / HWT905 (0–360). Bukan rumus `u`,`v` 1.2; hanya rotasi ke `ψ` NMPC.
 
 | `yaw` CSV | Haluan | `ψ` NMPC (0 = Timur, CCW) |
 |----------:|--------|---------------------------|
@@ -193,6 +217,6 @@ Log stderr ~1 Hz: `[NMPC] WP2 d=4.2 m | E=... N=... | psi=... | d=12.4 deg | sta
 
 1. Port COM hanya satu aplikasi.
 2. `v` tidak diestimasi dari GPS (isi 0, seperti demo C).
-3. Heading CSV: **0 = Utara, 270° = Timur**. `ψ = π/2 + yaw`, `r_nd` ikut tanda `yaw_rate`.
-5. User Windows perlu hak `shutdown` untuk `$SHUTDOWN`.
-6. Manual → auto tanpa kirim ulang WP = lanjut titik aktif, bukan ulang WP1.
+3. Heading CSV: **0 = Utara, 270° = Timur**. Lihat **Revisi** di atas: `ψ = π/2 + yaw`, `r_nd` ikut tanda `yaw_rate`.
+4. User Windows perlu hak `shutdown` untuk `$SHUTDOWN`.
+5. Manual → auto tanpa kirim ulang WP = lanjut titik aktif, bukan ulang WP1.
