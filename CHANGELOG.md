@@ -4,6 +4,28 @@ Catatan perubahan utama antar versi firmware dan dashboard **Way Points Tracking
 
 ---
 
+## [Remote-Side-05] Offset pasang AHRS — `YAW_MOUNT_OFFSET_DEG`
+
+### Ringkasan
+
+AHRS tidak sejajar haluan. Setelah wrap 0…360, yaw ditambah **+90°** sebelum dikirim. `dataToSend.yaw` / CSV = **arah kapal**, bukan arah sensor.
+
+```text
+raw (−180…180) → wrap 0…360 (yaw_sensor) → +90° (yaw_kapal)
+```
+
+Contoh: sensor 0° (Utara) → kapal 90° (Barat); sensor 90° (Barat) → kapal 180° (Selatan).
+
+Dashboard, 1.2, 2.0 **tidak** diubah (hanya ÷100). Log sebelum flash ini = yaw_sensor.
+
+### File
+
+- `PlatformIO/Way_Points_Tracking/ESP-Now_ESP32-S3_Remote-Side-05/src/main.cpp`
+- `.../src/README.md` (catatan 7)
+
+---
+
+
 ## [Remote-Side-05] Filter sudut rudder — `RUDDER_DEG_FILTER`
 
 ### Ringkasan

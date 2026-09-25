@@ -93,6 +93,8 @@ typedef struct pc_command_payload {
 #define AUTO_TRACK_KD  0.05f   // damping dari gyro_z (deg/s) [alg 1]
 #define RUDDER_CMD_MAX 40.0f   // max offset rudder (deg)
 #define MINI_PC_HB_TIMEOUT_MS 3000
+// AHRS tidak sejajar haluan: sensor 0=Utara → kapal ke Barat; sensor 90=Barat → kapal ke Selatan.
+#define YAW_MOUNT_OFFSET_DEG 90.0f
 
 // Mini PC serial: $HB heartbeat + timestamp,result rudder command
 static uint32_t g_lastHbMs = 0;
@@ -1220,15 +1222,22 @@ void loop() {
 
         // IMU JY901: yaw, accel (g), gyro (deg/s)
         float rawYaw = (float)JY901.stcAngle.Angle[2]/32768*180;
-        
-        // Modifikasi: jika yaw < 0, jadikan 360 + yaw
+
+        // raw (−180…+180) → yaw_sensor (0…360)
         float yaw;
         if (rawYaw < 0) {
-          yaw = 360.0 + rawYaw;
+          yaw = 360.0f + rawYaw;
         } else {
           yaw = rawYaw;
         }
-        
+        // yaw_sensor → yaw_kapal (offset pemasangan)
+        yaw += YAW_MOUNT_OFFSET_DEG;
+        if (yaw >= 360.0f) {
+          yaw -= 360.0f;
+        } else if (yaw < 0.0f) {
+          yaw += 360.0f;
+        }
+
         dataToSend.yaw = (uint16_t)(yaw * 100);
 
         // Accel (g) dan gyro (deg/s) dari IMU JY901 — fixed-point x100
