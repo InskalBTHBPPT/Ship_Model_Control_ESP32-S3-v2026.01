@@ -28,7 +28,7 @@ Kolom `calc_deg_servo_1/2` dari Remote-Side-05 sudah lewat `RUDDER_DEG_FILTER` (
 | `\|V\|` | **kecepatan** ground | **m/s** | `√(ẋ² + ẏ²)` |
 | `u` surge | **kecepatan** badan | **m/s** | maju (+) / mundur (−) |
 | `v` sway | **kecepatan** badan | **m/s** | kanan (+) / kiri (−) |
-| `ψ` | sudut | **rad** | heading IMU: **0 = Utara, 270° = Timur** |
+| `ψ` | sudut | **rad** | heading kompas CW: **0 = Utara, 90° = Timur** |
 | `r` | **kecepatan sudut** | **rad/s** | dari `gyro_z` |
 
 `u` bukan “sudah maju berapa meter”, melainkan “sedang maju berapa m/s”.
@@ -54,7 +54,7 @@ Kolom `calc_deg_servo_1/2` dari Remote-Side-05 sudah lewat `RUDDER_DEG_FILTER` (
 |--------|------|------|
 | `u` | surge | m/s, maju (+) / mundur (−) |
 | `v` | sway | m/s, ke **kanan** (+) / kiri (−) |
-| `ψ` (psi) | yaw / heading | rad, IMU **0 = Utara**, **270° = Timur**, **90° = Barat** |
+| `ψ` (psi) | yaw / heading | rad, kompas CW **0 = Utara**, **90° = Timur**, **270° = Barat** |
 | `r` | yaw rate | rad/s, dari `gyro_z` — **bukan** untuk rumus `u, v` |
 
 `u`, `v` = maju/mundur dan kiri/kanan relatif **badan kapal**.
@@ -112,9 +112,9 @@ Low-pass (α = 0.70):
 
 Sampel pertama, `Δt` aneh (`< 1 ms` atau `> 1 s`), atau origin baru → `ẋ, ẏ, u, v = 0`.
 
-### Langkah 3 — `ψ` dari IMU
+### Langkah 3 — `ψ` dari CSV (haluan kapal, kompas CW)
 
-Kolom CSV `yaw` dalam **derajat** (0–360), sama Remote-05 / HWT905. Mentah IMU **−180…+180**; jika negatif `yaw = 360 + raw` (**−90 = Timur → 270°**). Internal pakai **radian**:
+Kolom CSV `yaw` sudah **haluan kapal** dari Remote-05: wrap 0…360, offset pasang +90°, lalu `360 − yaw` ke kompas CW. Internal pakai **radian**:
 
 ```text
 ψ = yaw × π / 180
@@ -124,21 +124,21 @@ r = gyro_z × π / 180     // rad/s, untuk state NMPC, bukan rumus u,v
 | `yaw` CSV | `ψ` | Haluan |
 |----------:|----:|--------|
 | 0° | 0 | Utara |
-| 90° | π/2 | Barat |
+| 90° | π/2 | Timur |
 | 180° | π | Selatan |
-| 270° | 3π/2 | Timur |
+| 270° | 3π/2 | Barat |
 
 ### Langkah 4 — rotasi ke badan: `u, v` (kecepatan, m/s)
 
-Vektor maju di peta ENU = `(−sinψ, cosψ)`, kanan = `(cosψ, sinψ)`:
+Vektor maju di peta ENU = `(sinψ, cosψ)`, kanan = `(cosψ, −sinψ)`:
 
 ```text
-u = −ẋ sinψ + ẏ cosψ     // surge
-v =  ẋ cosψ + ẏ sinψ     // sway
+u =  ẋ sinψ + ẏ cosψ     // surge
+v =  ẋ cosψ − ẏ sinψ     // sway
 ```
 
 Cek `ψ = 0` (utara): `u = ẏ`, `v = ẋ`.  
-Cek `ψ = 270°` (timur): `u = ẋ`, `v = −ẏ`.
+Cek `ψ = 90°` (timur): `u = ẋ`, `v = −ẏ`.
 
 ### Penurunan rumus `u`, `v`
 
@@ -157,35 +157,31 @@ Maka `ẋ = dx/dt` ke timur, `ẏ = dy/dt` ke utara. Vektor kecepatan di peta:
 V = (ẋ, ẏ)
 ```
 
-**2. Arah haluan IMU**
+**2. Arah haluan (kompas CW)**
 
-`ψ` dari yaw CSV: **0 = Utara, 90 = Barat, 270 = Timur**.  
-Di peta (`x` kanan = timur, `y` atas = utara) sudut ini naik **berlawanan jarum jam dari Utara**.
+`ψ` dari yaw CSV (setelah Remote): **0 = Utara, 90 = Timur, 270 = Barat**.  
+Di peta sudut naik **searah jarum jam dari Utara**.
 
-Arah **maju** (haluan) harus memenuhi:
+Arah **maju** (haluan):
 
 | `ψ` | haluan | maju `(x, y)` |
 |----:|--------|----------------|
 | 0° | Utara | `(0, 1)` |
-| 90° | Barat | `(−1, 0)` |
+| 90° | Timur | `(1, 0)` |
 | 180° | Selatan | `(0, −1)` |
-| 270° | Timur | `(1, 0)` |
-
-Satu vektor yang cocok semua baris:
+| 270° | Barat | `(−1, 0)` |
 
 ```text
-ê_maju = (−sinψ,  cosψ)
+ê_maju = (sinψ,  cosψ)
 ```
 
-Arah **kanan** = sisi **starboard**: 90° ke kanan dari haluan kapal, di peta ENU. Bukan “kanan layar” atau “selalu timur di peta”.
-
-Kalau kapal menghadap suatu arah, **maju** = haluan, **kanan** = bahu kanan kapal.
+Arah **kanan** = starboard (90° kanan dari haluan):
 
 | Kapal menghadap | `ψ` | Haluan (maju) | Bahu kanan |
 |-----------------|----:|---------------|------------|
 | Utara | 0° | utara `(0, 1)` | **timur** `(1, 0)` |
-| Barat | 90° | barat `(−1, 0)` | **utara** `(0, 1)` |
-| Timur | 270° | timur `(1, 0)` | **selatan** `(0, −1)` |
+| Timur | 90° | timur `(1, 0)` | **selatan** `(0, −1)` |
+| Barat | 270° | barat `(−1, 0)` | **utara** `(0, 1)` |
 
 Gambar (`ψ = 0`, haluan utara):
 
@@ -198,32 +194,27 @@ Gambar (`ψ = 0`, haluan utara):
           selatan
 ```
 
-`ê_kanan = (cosψ, sinψ)` merangkum tabel itu:
+```text
+ê_kanan = (cosψ, −sinψ)
+```
 
 - `ψ = 0`: `(1, 0)` = timur
-- `ψ = 90°`: `(0, 1)` = utara
-- `ψ = 270°`: `(0, −1)` = selatan
+- `ψ = 90°`: `(0, −1)` = selatan
+- `ψ = 270°`: `(0, 1)` = utara
 
-`v = V · ê_kanan`: seberapa cepat kapal **geser ke bahu kanan**. Positif = starboard, negatif = port (kiri).  
-`u = V · ê_maju`: maju/mundur sepanjang haluan.
+`v = V · ê_kanan`: geser ke bahu kanan. `u = V · ê_maju`: maju/mundur.
 
 **3. Surge / sway = hasil kali titik**
 
-`u` = komponen `V` sepanjang maju, `v` sepanjang kanan:
-
 ```text
-u = V · ê_maju  = ẋ(−sinψ) + ẏ(cosψ) = −ẋ sinψ + ẏ cosψ
-v = V · ê_kanan = ẋ( cosψ) + ẏ(sinψ) =  ẋ cosψ + ẏ sinψ
+u = V · ê_maju  = ẋ sinψ + ẏ cosψ
+v = V · ê_kanan = ẋ cosψ − ẏ sinψ
 ```
-
-`lat`/`lon` hanya menentukan `x`,`y` lalu `ẋ`,`ẏ`. Sudut `ψ` hanya memutar **sumbu badan** di atas peta itu.
 
 **4. Cek**
 
-- `ψ = 0` (utara): `u = ẏ`, `v = ẋ` — maju ikut utara, kanan ikut timur.
-- `ψ = 270°` (timur): `sin = −1`, `cos = 0` → `u = ẋ`, `v = −ẏ` — maju ikut timur, kanan ikut selatan.
-
-Rumus `u = ẋ cosψ + ẏ sinψ` (tanpa minus di suku pertama) adalah `V · ê_kanan`, jadi **tertukar** `u`↔`v` terhadap rumus di atas: “surge” mengikuti kanan kapal, bukan haluan.
+- `ψ = 0` (utara): `u = ẏ`, `v = ẋ`
+- `ψ = 90°` (timur): `u = ẋ`, `v = −ẏ`
 
 ---
 
@@ -248,13 +239,13 @@ Heading `yaw = 0°` (`ψ = 0`):
 u ≈ 5 m/s     v ≈ 2 m/s
 ```
 
-Heading `yaw = 270°` (haluan **timur** IMU), `ẋ, ẏ` sama:
+Heading `yaw = 90°` (haluan **timur** kompas), `ẋ, ẏ` sama:
 
 ```text
 u ≈ 2 m/s     v ≈ −5 m/s
 ```
 
-(`yaw = 90°` = haluan barat.)
+(`yaw = 270°` = haluan barat.)
 
 ---
 
@@ -334,7 +325,7 @@ Auto-start: [`startup_guide.md`](startup_guide.md). DLL MinGW satu folder dengan
 ## Catatan
 
 1. Port COM hanya satu aplikasi.
-2. Heading CSV: **0 = Utara, 270° = Timur, 90° = Barat**.
+2. Heading CSV: **0 = Utara, 90° = Timur, 270° = Barat** (kompas CW, dari Remote-05).
 3. `u, v` untuk bekal NMPC (`s = [v, r, X, Y, ψ]` dengan state peta sesuai kerangka yang dipilih); rudder 1.2 belum memakai NMPC.
 4. Model NMPC memakai surge konstan `u_0`; `u` hasil GPS berguna untuk cek / ganti `u_0` nanti.
 5. User Windows perlu hak `shutdown`. Setelah mati, mini PC tidak bisa dihidupkan dari dashboard.

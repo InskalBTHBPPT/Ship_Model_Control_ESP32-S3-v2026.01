@@ -1230,12 +1230,17 @@ void loop() {
         } else {
           yaw = rawYaw;
         }
-        // yaw_sensor → yaw_kapal (offset pemasangan)
+        // yaw_sensor → yaw_kapal di skala IMU (offset pasang +90°)
         yaw += YAW_MOUNT_OFFSET_DEG;
         if (yaw >= 360.0f) {
           yaw -= 360.0f;
         } else if (yaw < 0.0f) {
           yaw += 360.0f;
+        }
+        // skala IMU CCW (90=Barat) → kompas CW (0=U, 90=T, 270=B)
+        yaw = 360.0f - yaw;
+        if (yaw >= 360.0f) {
+          yaw -= 360.0f;
         }
 
         dataToSend.yaw = (uint16_t)(yaw * 100);

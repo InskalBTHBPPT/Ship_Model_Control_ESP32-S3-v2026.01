@@ -3,7 +3,7 @@
  * @brief Cpp_ReadWriteSerial-2.0-ENU-NMPC-beta
  *
  * Bridge USB seperti 1.2 (mentah) + NMPC C Sep 2026 → timestamp,result.
- * gyro_z diabaikan; r dari yaw_rate. v = 0. ψ = π/2 + yaw IMU (0=N, 270=E).
+ * gyro_z diabaikan; r dari yaw_rate. v = 0. ψ = π/2 − yaw kompas (0=N, 90=E).
  */
 
 #include "serial_port.hpp"
@@ -59,8 +59,8 @@ void print_usage(const char *program_name) {
       << "  --help                   Tampilkan bantuan ini\n\n"
       << "Serial RX: CSV 8 kolom, [WP] Home / [WP] #n, $SHUTDOWN\n"
       << "Serial TX: $HB tiap 1 s, timestamp,result (rudder deg)\n"
-      << "NMPC: v=0, r dari yaw_rate (bukan gyro_z), psi = pi/2 + yaw\n"
-      << "      yaw IMU: 0=Utara, 270=Timur, 90=Barat\n";
+      << "NMPC: v=0, r dari yaw_rate (bukan gyro_z), psi = pi/2 - yaw\n"
+      << "      yaw kompas CW: 0=Utara, 90=Timur, 270=Barat\n";
 }
 
 bool is_shutdown_line(const std::string &line) { return line == "$SHUTDOWN"; }
@@ -125,14 +125,14 @@ double wrap_pi(double a) {
   return std::atan2(std::sin(a), std::cos(a));
 }
 
-// yaw IMU [deg]: 0=Utara, 270=Timur → psi NMPC [rad], 0=Timur CCW
-double imu_yaw_to_nmpc_psi(double yaw_deg) {
-  return wrap_pi((M_PI / 2.0) + (yaw_deg * (M_PI / 180.0)));
+// yaw kompas CW [deg]: 0=Utara, 90=Timur → psi NMPC [rad], 0=Timur CCW
+double compass_yaw_to_nmpc_psi(double yaw_deg) {
+  return wrap_pi((M_PI / 2.0) - (yaw_deg * (M_PI / 180.0)));
 }
 
-// yaw_rate IMU [deg/s] → r nondim (tanda sama: dψ/dt = +yaw_rate)
+// yaw_rate kompas CW [deg/s] → r nondim (tanda terbalik: dψ/dt = −yaw_rate)
 double yaw_rate_to_r_nd(double yaw_rate_dps, double L, double u0) {
-  const double r_rad_s = yaw_rate_dps * (M_PI / 180.0);
+  const double r_rad_s = -(yaw_rate_dps * (M_PI / 180.0));
   return r_rad_s * (L / u0);
 }
 
@@ -255,7 +255,7 @@ int main(int argc, char **argv) {
   std::cerr << std::setprecision(7)
             << "[INFO] Origin default: " << origin.lat << ", " << origin.lon
             << " (menunggu [WP] Home)\n";
-  std::cerr << "[INFO] v=0 | r dari yaw_rate | psi = pi/2 + yaw (0=N 270=E) | gyro_z abaikan\n";
+  std::cerr << "[INFO] v=0 | r dari yaw_rate | psi = pi/2 - yaw (0=N 90=E CW) | gyro_z abaikan\n";
   std::cerr << "[INFO] Tekan Ctrl+C untuk berhenti\n";
 
   uint64_t valid_lines = 0;
@@ -416,7 +416,7 @@ int main(int argc, char **argv) {
             psi_ref[h] = theta_target;
           }
 
-          const double psi = imu_yaw_to_nmpc_psi(row->yaw);
+          const double psi = compass_yaw_to_nmpc_psi(row->yaw);
           const double r_nd = yaw_rate_to_r_nd(row->yaw_rate, kShipLengthM, kU0Mps);
           const double s_nd[NMPC_NUM_STATES] = {
               0.0, r_nd, east / kShipLengthM, north / kShipLengthM, psi};

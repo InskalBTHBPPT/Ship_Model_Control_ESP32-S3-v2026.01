@@ -45,13 +45,13 @@ inline double gyro_z_dps_to_r_rad(double gyro_z_dps) {
   return gyro_z_dps * kDegToRad;
 }
 
-// ẋ,ẏ peta ENU → u,v badan. ψ IMU: 0=Utara, 270=Timur.
+// ẋ,ẏ peta ENU → u,v badan. ψ kompas CW: 0=Utara, 90=Timur.
 inline void enu_vel_to_body(double x_dot, double y_dot, double psi, double &u,
                             double &v) {
   const double c = std::cos(psi);
   const double s = std::sin(psi);
-  u = -x_dot * s + y_dot * c;
-  v = x_dot * c + y_dot * s;
+  u = x_dot * s + y_dot * c;
+  v = x_dot * c - y_dot * s;
 }
 
 struct EnuVelocityTracker {

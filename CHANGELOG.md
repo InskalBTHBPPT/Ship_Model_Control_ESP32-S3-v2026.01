@@ -4,19 +4,26 @@ Catatan perubahan utama antar versi firmware dan dashboard **Way Points Tracking
 
 ---
 
+## Haluan kapal kompas CW (0=U, 90=T)
+
+Remote-05: setelah wrap + offset pasang, `yaw = 360 − yaw` sehingga CSV **0 Utara, 90 Timur, 270 Barat**. Rumus `u`,`v` 1.2 / dashboard 1.51: `u = ẋ sinψ + ẏ cosψ`. NMPC 2.0: `ψ = π/2 − yaw`.
+
+---
+
+
 ## [Remote-Side-05] Offset pasang AHRS — `YAW_MOUNT_OFFSET_DEG`
 
 ### Ringkasan
 
-AHRS tidak sejajar haluan. Setelah wrap 0…360, yaw ditambah **+90°** sebelum dikirim. `dataToSend.yaw` / CSV = **arah kapal**, bukan arah sensor.
+AHRS tidak sejajar haluan. Setelah wrap 0…360, yaw ditambah **+90°**, lalu `360 − yaw` ke kompas CW (lihat entri di atas).
 
 ```text
-raw (−180…180) → wrap 0…360 (yaw_sensor) → +90° (yaw_kapal)
+raw (−180…180) → wrap 0…360 (yaw_sensor) → +90° → 360 − yaw (CSV kompas CW)
 ```
 
-Contoh: sensor 0° (Utara) → kapal 90° (Barat); sensor 90° (Barat) → kapal 180° (Selatan).
+Contoh: sensor 0° (Utara) → kapal Barat → CSV **270°**; sensor 90° (Barat) → kapal Selatan → CSV **180°**.
 
-Dashboard, 1.2, 2.0 **tidak** diubah (hanya ÷100). Log sebelum flash ini = yaw_sensor.
+Log sebelum flash ini = yaw_sensor IMU.
 
 ### File
 
@@ -108,7 +115,7 @@ Folder baru: posisi ENU (x=East, y=North) plus **kecepatan** peta `ẋ,ẏ` dan 
 
 ### Ringkasan
 
-Folder baru: serial mentah seperti 1.2, `result` dari **NMPC C Sep 2026**. `v=0`, `r` dari `yaw_rate` (bukan `gyro_z`), `ψ = π/2 + yaw` IMU (**0 = Utara, 270° = Timur**). Parse `[WP] Home` dan `[WP] #n`. Firmware Remote tidak diubah.
+Folder baru: serial mentah seperti 1.2, `result` dari **NMPC C Sep 2026**. `v=0`, `r` dari `yaw_rate` (bukan `gyro_z`), `ψ = π/2 − yaw` kompas CW (**0 = Utara, 90° = Timur**). Parse `[WP] Home` dan `[WP] #n`.
 
 ### File baru / inti
 
@@ -221,11 +228,11 @@ User-Side-05 (dari **User-Side-04**) menambahkan perintah serial **`$SHUTDOWN`**
 
 ### Ringkasan
 
-Beta 1.51 menampilkan dan men-log **surge `u` / sway `v`** di tab Live. Hitungan lokal dari `lat, lon, yaw, timestamp` (rumus 1.2, IMU **0 = Utara, 270° = Timur**). Firmware tidak diubah.
+Beta 1.51 menampilkan dan men-log **surge `u` / sway `v`** di tab Live. Hitungan lokal dari `lat, lon, yaw, timestamp` (rumus 1.2 kompas CW **0 = Utara, 90° = Timur**).
 
 ```text
-u = −ẋ sinψ + ẏ cosψ
-v =  ẋ cosψ + ẏ sinψ
+u =  ẋ sinψ + ẏ cosψ
+v =  ẋ cosψ − ẏ sinψ
 ```
 
 `ẋ`,`ẏ` dari ΔENU / Δt, LPF α = 0.70. Origin = GPS pertama, atau Home jika di-set. GPS 0,0 → `u,v = 0`.

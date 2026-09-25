@@ -72,7 +72,7 @@ int main(int argc, char **argv) {
 
   if (!quiet) {
     std::cerr << "[SIM] " << scenario_path << " | r_tran=" << r_tran
-              << " m | v=0 | r dari yaw_rate | psi=pi/2+yaw (0=N 270=E) | tanpa serial\n";
+              << " m | v=0 | r dari yaw_rate | psi=pi/2-yaw (0=N 90=E CW) | tanpa serial\n";
   }
 
   uint64_t csv_n = 0;

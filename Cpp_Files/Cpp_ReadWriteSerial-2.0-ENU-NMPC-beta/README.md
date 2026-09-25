@@ -11,31 +11,28 @@ Bridge USB **1.2** (data mentah) + **NMPC C Sep 2026**. Keluaran ke ESP32 tetap 
 | Solver NMPC | `MPC NMPC Agus/Coding_NMPC_Sep2026/C code NMPC` |
 | Simulasi (tanpa COM) | `Cpp_Files/Cpp_ReadWriteSerial-2.0-ENU-NMPC-simulasi` |
 
-**Firmware Remote tidak diubah.** `gyro_z` dan `calc_deg_servo_*` tidak dipakai solver. `v = 0`.
+Remote-05 mengirim yaw **kompas CW**. `gyro_z` dan `calc_deg_servo_*` tidak dipakai solver. `v = 0`.
 
 ---
 
-## Revisi — heading IMU (0 = Utara, 270° = Timur)
+## Revisi — yaw kompas CW (0 = Utara, 90° = Timur)
 
-2.0 **tidak** menghitung `u`,`v` badan seperti 1.2. Surge NMPC tetap `u0`, sway `v = 0`. Yang diubah hanya **sudut `ψ`** (dan tanda `yaw_rate`) karena kerangka NMPC **0 = Timur**, CSV yaw **0 = Utara / 270° = Timur**.
+Remote-05 mengirim **haluan kapal** kompas CW. 2.0 **tidak** menghitung `u`,`v`. Yang dipakai: `ψ` NMPC (0 = Timur, CCW) dari yaw CSV.
 
-| | Sebelum | Sekarang |
-|--|---------|----------|
-| Asumsi `yaw` | kompas 90° = Timur | IMU **0 = Utara, 270° = Timur**, 90° = Barat |
-| `ψ` ke NMPC | `π/2 − yaw` | **`π/2 + yaw`** |
-| `r_nd` | `−yaw_rate · π/180 · L/u0` | **`+yaw_rate · π/180 · L/u0`** |
-| `u`, `v` dari GPS | tidak dipakai | tetap tidak dipakai (`v = 0`) |
+| | Sekarang |
+|--|----------|
+| `yaw` CSV | **0 = Utara, 90° = Timur, 270° = Barat** (CW) |
+| `ψ` ke NMPC | **`π/2 − yaw`** |
+| `r_nd` | **`−yaw_rate · π/180 · L/u0`** |
+| `u`, `v` dari GPS | tidak dipakai (`v = 0`) |
 
 ```text
-ψ_nmpc = wrap(π/2 + deg2rad(yaw))
+ψ_nmpc = wrap(π/2 − deg2rad(yaw))
 ```
 
-Cek: `yaw = 0` → Utara → `ψ = π/2`. `yaw = 270°` → Timur → `ψ = 0`.  
-Rumus lama `π/2 − yaw` membuat 270° (timur) jadi `ψ = −π` (barat) — rudder bisa terbalik.
+Cek: `yaw = 0` → Utara → `ψ = π/2`. `yaw = 90°` → Timur → `ψ = 0`.
 
-Tanda `yaw_rate` ikut `dψ/dt = +yaw_rate` (minus hanya perlu jika `ψ = π/2 − yaw`).
-
-Kode: `src/main.cpp` — `imu_yaw_to_nmpc_psi()`, `yaw_rate_to_r_nd()`. Salinan sama di simulasi `include/nmpc_tick.hpp`.
+Kode: `src/main.cpp` — `compass_yaw_to_nmpc_psi()`, `yaw_rate_to_r_nd()`. Sama di simulasi `nmpc_tick.hpp`.
 
 ---
 
@@ -65,8 +62,8 @@ flowchart TD
   Ready -->|ya| State["State NMPC"]
 
   State --> S1["x,y = ENU / L"]
-  State --> S2["psi = pi/2 + yaw  IMU 270=Timur"]
-  State --> S3["r_nd = +yaw_rate · pi/180 · L/u0"]
+  State --> S2["psi = pi/2 - yaw  kompas 90=Timur"]
+  State --> S3["r_nd = -yaw_rate · pi/180 · L/u0"]
   State --> S4["v = 0"]
   State --> Hor["Horizon ke WP aktif"]
 
@@ -128,30 +125,30 @@ $HB
 |--------|----------|------|
 | `timestamp` | ya | echo TX |
 | `lat`, `lon` | ya | East, North → `x/L`, `y/L` |
-| `yaw` ° IMU | ya | `ψ = π/2 + deg2rad(yaw)` (0 NMPC = Timur) |
-| `yaw_rate` °/s | ya | `r_nd = +deg2rad(yaw_rate)·L/u0` |
+| `yaw` ° kompas CW | ya | `ψ = π/2 − deg2rad(yaw)` (0 NMPC = Timur) |
+| `yaw_rate` °/s | ya | `r_nd = −deg2rad(yaw_rate)·L/u0` |
 | `[WP]` | ya | origin + target + horizon N=20 |
 | `gyro_z` | **tidak** | — |
 | `calc_deg_servo_*` | **tidak** | — |
 
 ### Konvensi heading IMU → NMPC
 
-CSV `yaw` = Remote-05 / HWT905 (0–360). Bukan rumus `u`,`v` 1.2; hanya rotasi ke `ψ` NMPC.
+CSV `yaw` = Remote-05, **haluan kapal** kompas CW.
 
 | `yaw` CSV | Haluan | `ψ` NMPC (0 = Timur, CCW) |
 |----------:|--------|---------------------------|
 | 0° | Utara | π/2 |
-| 90° | Barat | π |
+| 90° | **Timur** | 0 |
 | 180° | Selatan | −π/2 |
-| 270° | **Timur** | 0 |
+| 270° | Barat | π |
 
 ```text
-ψ_nmpc = wrap(π/2 + deg2rad(yaw))
+ψ_nmpc = wrap(π/2 − deg2rad(yaw))
 ```
 
-Cek: `yaw = 0` → Utara = π/2; `yaw = 270°` → Timur = 0.
+Cek: `yaw = 0` → Utara = π/2; `yaw = 90°` → Timur = 0.
 
-Karena `dψ/dt = +yaw_rate`, tanda `yaw_rate` **tidak** dibalik.
+Karena `dψ/dt = −yaw_rate`, tanda `yaw_rate` **dibalik**.
 
 Konstanta solver (demo C): `L=1.0107` m, `u0=0.6114` m/s, `T_sim=0.1` s, `N=20`, `r_tran=3` m, rudder ±45°.
 
@@ -217,6 +214,6 @@ Log stderr ~1 Hz: `[NMPC] WP2 d=4.2 m | E=... N=... | psi=... | d=12.4 deg | sta
 
 1. Port COM hanya satu aplikasi.
 2. `v` tidak diestimasi dari GPS (isi 0, seperti demo C).
-3. Heading CSV: **0 = Utara, 270° = Timur**. Lihat **Revisi** di atas: `ψ = π/2 + yaw`, `r_nd` ikut tanda `yaw_rate`.
+3. Heading CSV: **0 = Utara, 90° = Timur** (kompas CW). Lihat **Revisi**: `ψ = π/2 − yaw`.
 4. User Windows perlu hak `shutdown` untuk `$SHUTDOWN`.
 5. Manual → auto tanpa kirim ulang WP = lanjut titik aktif, bukan ulang WP1.

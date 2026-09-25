@@ -3,10 +3,10 @@ Local Monitor Dashboard beta 1.51
 
 Clone dari beta 1.5. Tambahan: surge `u` / sway `v` di panel Live dan log CSV.
 
-Hitungan lokal (bukan dari firmware), rumus 1.2 IMU 0=Utara / 270=Timur:
+Hitungan lokal (bukan dari firmware), rumus 1.2 kompas CW (0=Utara, 90=Timur):
   x,y ENU dari lat,lon; ẋ,ẏ LPF α=0.70; ψ=yaw·π/180
-  u = −ẋ sinψ + ẏ cosψ
-  v =  ẋ cosψ + ẏ sinψ
+  u =  ẋ sinψ + ẏ cosψ
+  v =  ẋ cosψ − ẏ sinψ
 
 Ringkasan:
 - Dashboard PySide6 untuk monitoring telemetry kapal secara real-time.
@@ -71,7 +71,7 @@ _GPS_INVALID_ABS = 1e-6
 
 
 class EnuBodyVelocityTracker:
-    """ẋ,ẏ ENU (LPF α=0.70) → u surge, v sway. IMU 0=Utara, 270=Timur."""
+    """ẋ,ẏ ENU (LPF α=0.70) → u surge, v sway. Yaw kompas CW: 0=Utara, 90=Timur."""
 
     def __init__(self) -> None:
         self.reset()
@@ -130,8 +130,8 @@ class EnuBodyVelocityTracker:
         psi = math.radians(yaw_deg)
         s = math.sin(psi)
         c = math.cos(psi)
-        u = -self.x_dot * s + self.y_dot * c
-        v = self.x_dot * c + self.y_dot * s
+        u = self.x_dot * s + self.y_dot * c
+        v = self.x_dot * c - self.y_dot * s
         return u, v
 
 
@@ -2088,7 +2088,7 @@ class MainWindow(QMainWindow):
         # Baris 2: GPS Speed
         _add_indicator_row([_make_live_stat_cell(self, "GPS Speed (m/s)", self.speed_label)])
 
-        # Baris 2b: u surge + v sway (hitung lokal, IMU 0=N 270=E)
+        # Baris 2b: u surge + v sway (hitung lokal, yaw kompas CW 0=N 90=E)
         _add_indicator_row([
             _make_live_stat_cell(self, "u surge (m/s)", self.u_surge_label),
             _make_live_stat_cell(self, "v sway (m/s)", self.v_sway_label),

@@ -5,9 +5,7 @@ Versi **simulasi only** dari `Cpp_ReadWriteSerial-2.0-ENU-NMPC-beta`.
 - **Tidak** membuka COM, **tidak** kirim `$HB`, **bukan** untuk kapal.
 - Input = file teks berformat sama dengan USB Remote.
 - Output = `timestamp,result` (derajat rudder) ke stdout.
-- Adaptor NMPC sama: `v=0`, `r` dari `yaw_rate`, `ψ = π/2 + yaw` (IMU **0 = Utara, 270° = Timur**).
-
-Revisi heading sama 2.0 live: dulu `ψ = π/2 − yaw` dan `r_nd` bertanda minus; sekarang `ψ = π/2 + yaw`, `r_nd` ikut `yaw_rate`. Bukan rumus `u`,`v` 1.2.
+- Adaptor NMPC sama: `v=0`, `r` dari `yaw_rate`, `ψ = π/2 − yaw` (kompas CW **0 = Utara, 90° = Timur**).
 
 | Live | Simulasi |
 |------|----------|
@@ -59,7 +57,7 @@ Baris kosong, header `timestamp,...`, dan komentar `#...` (bukan `[WP]`) dilewat
 | `scenarios/belok.txt` | WP timur, `yaw=0` (hadap utara), lalu `yaw_rate=30` | \|result\| besar, ±45 |
 | `scenarios/tanpa_wp.txt` | CSV saja, satu baris GPS 0 | semua `0.00` |
 
-`yaw=0` (Utara) → `ψ = π/2`. `yaw=90` = Barat, `yaw=270` = Timur.
+`yaw=0` (Utara) → `ψ = π/2`. `yaw=90` = Timur, `yaw=270` = Barat.
 
 ---
 
@@ -74,13 +72,13 @@ Baris kosong, header `timestamp,...`, dan komentar `#...` (bukan `[WP]`) dilewat
 Kolom CSV sama Remote: `timestamp,lat,lon,servo1,servo2,yaw,gyro_z,yaw_rate`.  
 `gyro_z` dan servo diabaikan.
 
-`yaw` IMU: **0 = Utara, 90 = Barat, 180 = Selatan, 270 = Timur**.
+`yaw` kompas CW: **0 = Utara, 90 = Timur, 180 = Selatan, 270 = Barat**.
 
 Konversi ke NMPC (0 = Timur, CCW):
 
 ```text
-ψ_nmpc = wrap(π/2 + deg2rad(yaw))
-r_nd   = +deg2rad(yaw_rate) · L / u0
+ψ_nmpc = wrap(π/2 − deg2rad(yaw))
+r_nd   = −deg2rad(yaw_rate) · L / u0
 ```
 
 ---
@@ -88,6 +86,6 @@ r_nd   = +deg2rad(yaw_rate) · L / u0
 ## Catatan
 
 1. Logika tick ada di `include/nmpc_tick.hpp` (salinan aturan 2.0). Jika 2.0 live diubah, samakan file ini.
-2. Heading: **0 = Utara, 270° = Timur**. `ψ = π/2 + yaw`, `r_nd` ikut tanda `yaw_rate` (sama 2.0 live).
+2. Heading: **0 = Utara, 90° = Timur** (CW). `ψ = π/2 − yaw` (sama 2.0 live).
 3. Tidak ada plant WyNDA; ini **replay terbuka**.
 4. Tick pertama vs `nmpc_demo` C bisa dekat (`v=0`); langkah berikutnya C mengisi `v` dari model.
