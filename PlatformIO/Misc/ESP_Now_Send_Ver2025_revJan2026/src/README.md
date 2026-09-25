@@ -93,7 +93,7 @@ struct DatatoSend {
   int16_t Calc_deg_servo_2;  // Sudut servo 2 (derajat × 100)
   int16_t roll;              // Roll angle (derajat × 100)
   int16_t pitch;             // Pitch angle (derajat × 100)
-  uint16_t yaw;              // Yaw angle (derajat × 100, 0-360°)
+  uint16_t yaw;              // Yaw (× 100, 0-360°). IMU −180…180; −90=Timur → 270°. Lihat Catatan.
   int16_t zigzag_yaw;        // Zigzag yaw offset (derajat × 100)
   uint16_t rpm_prop_1;       // RPM motor propeller 1 (× 100)
   uint16_t rpm_prop_2;       // RPM motor propeller 2 (× 100)
@@ -255,6 +255,12 @@ Serial monitor akan menampilkan:
 3. **Servo PWM**: 50Hz dengan resolusi 12-bit
 4. **PPM range**: 600-1600 µs (FS-iA6B) dimapping ke 1000-2000 µs
 5. **Zigzag setpoint**: Diambil dari yaw saat masuk mode manual atau auto
+6. **Yaw HWT905TTL (penting):** IMU mentah **−180…+180**. Kode membungkus ke **0…360**: jika `rawYaw < 0` maka `yaw = 360 + rawYaw`, lalu dikirim `uint16 × 100`.
+   - **0 = Utara**
+   - **−90 = Timur** → di CSV / `dataToSend.yaw` menjadi **270°**
+   - **+90 = Barat** → **90°**
+   - **±180 = Selatan** → **180°**
+   Ini **bukan** kompas “+90 = Timur”. Jangan samakan 90° log dengan Timur saat pakai 1.2 / NMPC.
 
 ## Library Dependencies
 

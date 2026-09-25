@@ -226,7 +226,7 @@ struct DatatoSend {
   uint16_t speedMps;          // m/s × 100
   int16_t Calc_deg_servo_1;   // ° × 100 (feedback ADC, setelah filter)
   int16_t Calc_deg_servo_2;   // ° × 100
-  uint16_t yaw;               // ° × 100 (0–360)
+  uint16_t yaw;               // ° × 100 (0–360). IMU: −90=Timur → 270°. Lihat Catatan.
   uint16_t heading_setpoint;  // bearing ke WP aktif, ° × 100
   int16_t  heading_error;     // setpoint − yaw, ° × 100 (±180)
   int16_t  rudder_cmd;        // perintah rudder offset netral, ° × 100 (±40)
@@ -271,7 +271,7 @@ Contoh baris data:
 | `timestamp` | `millis()/1000` |
 | `lat`, `lon` | GNSS |
 | `calc_deg_servo_1/2` | ADC feedback (°) setelah `RUDDER_DEG_FILTER` |
-| `yaw` | IMU (°) |
+| `yaw` | IMU (°) 0–360; **270 ≈ Timur**, 0 Utara, 90 Barat, 180 Selatan |
 | `gyro_z` | IMU (°/s) |
 | `yaw_rate` | Δyaw/Δt lokal (°/s), **tidak** masuk struct ESP-NOW |
 
@@ -380,6 +380,7 @@ Sesuaikan `upload_port` / `monitor_port` di `platformio.ini` (default: `COM14`).
 4. `RUDDER_DEG_FILTER` dipilih **compile-time** (default `1` oversample); PWM rudder tidak difilter
 5. `msg_type 0xA2` = perintah mini PC (shutdown), **bukan** tuning NVS lama
 6. Struct `DatatoSend` 64 byte / 24 field harus identik dengan User-Side-05
+7. **Yaw HWT905TTL** (sama Send Jan2026): mentah **−180…+180**, jika negatif `yaw = 360 + raw`. **0 = Utara**, **−90 = Timur → 270°** di `dataToSend.yaw` / CSV, **+90 = Barat → 90°**, ±180 = Selatan. **270 dalam perhitungan ini ≈ Timur.** Bukan kompas “90° = Timur”. User-Side / dashboard hanya ÷100; wrap hanya di Remote.
 
 ---
 
