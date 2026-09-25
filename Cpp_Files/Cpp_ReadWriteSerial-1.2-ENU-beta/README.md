@@ -28,7 +28,7 @@ Kolom `calc_deg_servo_1/2` dari Remote-Side-05 sudah lewat `RUDDER_DEG_FILTER` (
 | `\|V\|` | **kecepatan** ground | **m/s** | `√(ẋ² + ẏ²)` |
 | `u` surge | **kecepatan** badan | **m/s** | maju (+) / mundur (−) |
 | `v` sway | **kecepatan** badan | **m/s** | kanan (+) / kiri (−) |
-| `ψ` | sudut | **rad** | heading dari Utara |
+| `ψ` | sudut | **rad** | heading IMU: **0 = Utara, 270° = Timur** |
 | `r` | **kecepatan sudut** | **rad/s** | dari `gyro_z` |
 
 `u` bukan “sudah maju berapa meter”, melainkan “sedang maju berapa m/s”.
@@ -54,7 +54,7 @@ Kolom `calc_deg_servo_1/2` dari Remote-Side-05 sudah lewat `RUDDER_DEG_FILTER` (
 |--------|------|------|
 | `u` | surge | m/s, maju (+) / mundur (−) |
 | `v` | sway | m/s, ke **kanan** (+) / kiri (−) |
-| `ψ` (psi) | yaw / heading | rad, dari **Utara**, naik ke **timur** (kompas) |
+| `ψ` (psi) | yaw / heading | rad, IMU **0 = Utara**, **270° = Timur**, **90° = Barat** |
 | `r` | yaw rate | rad/s, dari `gyro_z` — **bukan** untuk rumus `u, v` |
 
 `u`, `v` = maju/mundur dan kiri/kanan relatif **badan kapal**.
@@ -114,31 +114,37 @@ Sampel pertama, `Δt` aneh (`< 1 ms` atau `> 1 s`), atau origin baru → `ẋ, �
 
 ### Langkah 3 — `ψ` dari IMU
 
-Kolom CSV `yaw` dalam **derajat** (0–360). Internal pakai **radian**:
+Kolom CSV `yaw` dalam **derajat** (0–360), sama Remote-05 / HWT905. Mentah IMU **−180…+180**; jika negatif `yaw = 360 + raw` (**−90 = Timur → 270°**). Internal pakai **radian**:
 
 ```text
 ψ = yaw × π / 180
 r = gyro_z × π / 180     // rad/s, untuk state NMPC, bukan rumus u,v
 ```
 
-| `yaw` | `ψ` | Haluan |
-|------:|----:|--------|
+Ini **bukan** kompas “90° = Timur”.
+
+| `yaw` CSV | `ψ` | Haluan |
+|----------:|----:|--------|
 | 0° | 0 | Utara |
-| 90° | π/2 | Timur |
+| 90° | π/2 | **Barat** |
 | 180° | π | Selatan |
-| 270° | 3π/2 | Barat |
+| 270° | 3π/2 | **Timur** |
 
 ### Langkah 4 — rotasi ke badan: `u, v` (kecepatan, m/s)
 
+Karena **270° = Timur**, vektor maju di peta ENU = `(−sinψ, cosψ)`, kanan = `(cosψ, sinψ)`:
+
 ```text
-u =  ẋ sinψ + ẏ cosψ     // surge
-v =  ẋ cosψ − ẏ sinψ     // sway
+u = −ẋ sinψ + ẏ cosψ     // surge
+v =  ẋ cosψ + ẏ sinψ     // sway
 ```
 
-Arah maju di peta ENU = `(sinψ, cosψ)` (East, North).  
-Arah kanan = `(cosψ, −sinψ)`.
+Setara rumus lama (asumsi 90°=Timur) jika `ψ` diganti `−ψ`.
 
-Cek `ψ = 0` (haluan utara): `u = ẏ`, `v = ẋ`.
+Cek `ψ = 0` (utara): `u = ẏ`, `v = ẋ`.  
+Cek `ψ = 270°` (timur): `u = ẋ`, `v = −ẏ`.
+
+`include/enu_velocity.hpp` **saat ini masih rumus 90°=Timur** (`u = ẋ sinψ + ẏ cosψ`). Belum disesuaikan.
 
 ---
 
@@ -163,11 +169,13 @@ Heading `yaw = 0°` (`ψ = 0`):
 u ≈ 5 m/s     v ≈ 2 m/s
 ```
 
-Heading `yaw = 90°` (haluan timur), `ẋ, ẏ` sama:
+Heading `yaw = 270°` (haluan **timur** IMU), `ẋ, ẏ` sama:
 
 ```text
 u ≈ 2 m/s     v ≈ −5 m/s
 ```
+
+(`yaw = 90°` di data ini = haluan **barat**, bukan timur.)
 
 ---
 
@@ -247,6 +255,7 @@ Auto-start: [`startup_guide.md`](startup_guide.md). DLL MinGW satu folder dengan
 ## Catatan
 
 1. Port COM hanya satu aplikasi.
-2. `u, v` untuk bekal NMPC (`s = [v, r, X, Y, ψ]` dengan state peta sesuai kerangka yang dipilih); rudder 1.2 belum memakai NMPC.
-3. Model NMPC memakai surge konstan `u_0`; `u` hasil GPS berguna untuk cek / ganti `u_0` nanti.
-4. User Windows perlu hak `shutdown`. Setelah mati, mini PC tidak bisa dihidupkan dari dashboard.
+2. Heading CSV: **0 = Utara, 270° = Timur**. Jangan pakai tabel kompas 90°=Timur.
+3. `u, v` untuk bekal NMPC (`s = [v, r, X, Y, ψ]` dengan state peta sesuai kerangka yang dipilih); rudder 1.2 belum memakai NMPC.
+4. Model NMPC memakai surge konstan `u_0`; `u` hasil GPS berguna untuk cek / ganti `u_0` nanti.
+5. User Windows perlu hak `shutdown`. Setelah mati, mini PC tidak bisa dihidupkan dari dashboard.

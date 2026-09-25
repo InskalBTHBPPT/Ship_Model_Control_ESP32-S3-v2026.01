@@ -41,8 +41,8 @@ flowchart TD
   Ready -->|ya| State["State NMPC"]
 
   State --> S1["x,y = ENU / L"]
-  State --> S2["psi = pi/2 - yaw"]
-  State --> S3["r_nd = -yaw_rate · pi/180 · L/u0"]
+  State --> S2["psi = pi/2 + yaw  IMU 270=Timur"]
+  State --> S3["r_nd = +yaw_rate · pi/180 · L/u0"]
   State --> S4["v = 0"]
   State --> Hor["Horizon ke WP aktif"]
 
@@ -104,11 +104,30 @@ $HB
 |--------|----------|------|
 | `timestamp` | ya | echo TX |
 | `lat`, `lon` | ya | East, North → `x/L`, `y/L` |
-| `yaw` ° kompas | ya | `ψ = π/2 − deg2rad(yaw)` (0 NMPC = Timur) |
-| `yaw_rate` °/s | ya | `r_nd = −deg2rad(yaw_rate)·L/u0` |
+| `yaw` ° IMU | ya | `ψ = π/2 + deg2rad(yaw)` (0 NMPC = Timur) |
+| `yaw_rate` °/s | ya | `r_nd = +deg2rad(yaw_rate)·L/u0` |
 | `[WP]` | ya | origin + target + horizon N=20 |
 | `gyro_z` | **tidak** | — |
 | `calc_deg_servo_*` | **tidak** | — |
+
+### Konvensi heading IMU → NMPC
+
+CSV `yaw` = Remote-05 / HWT905 (0–360), **bukan** kompas 90°=Timur.
+
+| `yaw` CSV | Haluan | `ψ` NMPC (0 = Timur, CCW) |
+|----------:|--------|---------------------------|
+| 0° | Utara | π/2 |
+| 90° | Barat | π |
+| 180° | Selatan | −π/2 |
+| 270° | **Timur** | 0 |
+
+```text
+ψ_nmpc = wrap(π/2 + deg2rad(yaw))
+```
+
+Cek: `yaw = 0` → Utara = π/2; `yaw = 270°` → Timur = 0.
+
+Karena `dψ/dt = +yaw_rate`, tanda `yaw_rate` **tidak** dibalik. (Minus hanya perlu jika pakai `π/2 − yaw` kompas 90=Timur.)
 
 Konstanta solver (demo C): `L=1.0107` m, `u0=0.6114` m/s, `T_sim=0.1` s, `N=20`, `r_tran=3` m, rudder ±45°.
 
@@ -174,6 +193,6 @@ Log stderr ~1 Hz: `[NMPC] WP2 d=4.2 m | E=... N=... | psi=... | d=12.4 deg | sta
 
 1. Port COM hanya satu aplikasi.
 2. `v` tidak diestimasi dari GPS (isi 0, seperti demo C).
-3. Tanda minus pada `yaw_rate` wajib karena `ψ` diputar dari kompas.
-4. User Windows perlu hak `shutdown` untuk `$SHUTDOWN`.
-5. Manual → auto tanpa kirim ulang WP = lanjut titik aktif, bukan ulang WP1.
+3. Heading CSV: **0 = Utara, 270° = Timur**. `ψ = π/2 + yaw`, `r_nd` ikut tanda `yaw_rate`.
+5. User Windows perlu hak `shutdown` untuk `$SHUTDOWN`.
+6. Manual → auto tanpa kirim ulang WP = lanjut titik aktif, bukan ulang WP1.

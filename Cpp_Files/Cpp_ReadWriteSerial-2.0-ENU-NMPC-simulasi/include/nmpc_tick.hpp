@@ -2,7 +2,7 @@
  * @file nmpc_tick.hpp
  * @brief Adaptor mentah → NMPC_Solve → result deg (sama aturan 2.0 live).
  *
- * v=0, r dari yaw_rate (bukan gyro_z), psi = pi/2 - yaw kompas.
+ * v=0, r dari yaw_rate (bukan gyro_z), psi = pi/2 + yaw IMU (0=N, 270=E).
  */
 #pragma once
 
@@ -45,12 +45,12 @@ inline double wrap_pi(double a) {
   return std::atan2(std::sin(a), std::cos(a));
 }
 
-inline double compass_yaw_to_nmpc_psi(double yaw_deg) {
-  return wrap_pi((M_PI / 2.0) - (yaw_deg * (M_PI / 180.0)));
+inline double imu_yaw_to_nmpc_psi(double yaw_deg) {
+  return wrap_pi((M_PI / 2.0) + (yaw_deg * (M_PI / 180.0)));
 }
 
 inline double yaw_rate_to_r_nd(double yaw_rate_dps, double L, double u0) {
-  const double r_rad_s = -(yaw_rate_dps * (M_PI / 180.0));
+  const double r_rad_s = yaw_rate_dps * (M_PI / 180.0);
   return r_rad_s * (L / u0);
 }
 
@@ -207,7 +207,7 @@ struct NmpcSession {
       psi_ref[h] = theta_target;
     }
 
-    const double psi = compass_yaw_to_nmpc_psi(row.yaw);
+    const double psi = imu_yaw_to_nmpc_psi(row.yaw);
     info.psi_deg = psi * (180.0 / M_PI);
     const double r_nd = yaw_rate_to_r_nd(row.yaw_rate, kShipLengthM, kU0Mps);
     const double s_nd[NMPC_NUM_STATES] = {

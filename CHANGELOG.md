@@ -86,7 +86,7 @@ Folder baru: posisi ENU (x=East, y=North) plus **kecepatan** peta `ẋ,ẏ` dan 
 
 ### Ringkasan
 
-Folder baru: serial mentah seperti 1.2, `result` dari **NMPC C Sep 2026**. `v=0`, `r` dari `yaw_rate` (bukan `gyro_z`), `ψ = π/2 − yaw` kompas. Parse `[WP] Home` dan `[WP] #n`. Firmware Remote tidak diubah.
+Folder baru: serial mentah seperti 1.2, `result` dari **NMPC C Sep 2026**. `v=0`, `r` dari `yaw_rate` (bukan `gyro_z`), `ψ = π/2 + yaw` IMU (**0 = Utara, 270° = Timur**). Parse `[WP] Home` dan `[WP] #n`. Firmware Remote tidak diubah.
 
 ### File baru / inti
 
