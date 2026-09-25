@@ -57,7 +57,7 @@ Baris kosong, header `timestamp,...`, dan komentar `#...` (bukan `[WP]`) dilewat
 | `scenarios/belok.txt` | WP timur, `yaw=0` (hadap utara), lalu `yaw_rate=30` | \|result\| besar, ±45 |
 | `scenarios/tanpa_wp.txt` | CSV saja, satu baris GPS 0 | semua `0.00` |
 
-`yaw=0` (Utara) → `ψ = π/2` sama seperti rumus lama. `yaw=90` / `270` sekarang Barat / Timur.
+`yaw=0` (Utara) → `ψ = π/2`. `yaw=90` = Barat, `yaw=270` = Timur.
 
 ---
 
@@ -72,7 +72,7 @@ Baris kosong, header `timestamp,...`, dan komentar `#...` (bukan `[WP]`) dilewat
 Kolom CSV sama Remote: `timestamp,lat,lon,servo1,servo2,yaw,gyro_z,yaw_rate`.  
 `gyro_z` dan servo diabaikan.
 
-`yaw` IMU: **0 = Utara, 90 = Barat, 180 = Selatan, 270 = Timur**. Bukan kompas 90°=Timur.
+`yaw` IMU: **0 = Utara, 90 = Barat, 180 = Selatan, 270 = Timur**.
 
 Konversi ke NMPC (0 = Timur, CCW):
 

@@ -112,7 +112,7 @@ $HB
 
 ### Konvensi heading IMU → NMPC
 
-CSV `yaw` = Remote-05 / HWT905 (0–360), **bukan** kompas 90°=Timur.
+CSV `yaw` = Remote-05 / HWT905 (0–360).
 
 | `yaw` CSV | Haluan | `ψ` NMPC (0 = Timur, CCW) |
 |----------:|--------|---------------------------|
@@ -127,7 +127,7 @@ CSV `yaw` = Remote-05 / HWT905 (0–360), **bukan** kompas 90°=Timur.
 
 Cek: `yaw = 0` → Utara = π/2; `yaw = 270°` → Timur = 0.
 
-Karena `dψ/dt = +yaw_rate`, tanda `yaw_rate` **tidak** dibalik. (Minus hanya perlu jika pakai `π/2 − yaw` kompas 90=Timur.)
+Karena `dψ/dt = +yaw_rate`, tanda `yaw_rate` **tidak** dibalik.
 
 Konstanta solver (demo C): `L=1.0107` m, `u0=0.6114` m/s, `T_sim=0.1` s, `N=20`, `r_tran=3` m, rudder ±45°.
 

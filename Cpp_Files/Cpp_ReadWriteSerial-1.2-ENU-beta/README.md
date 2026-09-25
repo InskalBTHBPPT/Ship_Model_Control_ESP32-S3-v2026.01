@@ -121,30 +121,24 @@ Kolom CSV `yaw` dalam **derajat** (0–360), sama Remote-05 / HWT905. Mentah IMU
 r = gyro_z × π / 180     // rad/s, untuk state NMPC, bukan rumus u,v
 ```
 
-Ini **bukan** kompas “90° = Timur”.
-
 | `yaw` CSV | `ψ` | Haluan |
 |----------:|----:|--------|
 | 0° | 0 | Utara |
-| 90° | π/2 | **Barat** |
+| 90° | π/2 | Barat |
 | 180° | π | Selatan |
-| 270° | 3π/2 | **Timur** |
+| 270° | 3π/2 | Timur |
 
 ### Langkah 4 — rotasi ke badan: `u, v` (kecepatan, m/s)
 
-Karena **270° = Timur**, vektor maju di peta ENU = `(−sinψ, cosψ)`, kanan = `(cosψ, sinψ)`:
+Vektor maju di peta ENU = `(−sinψ, cosψ)`, kanan = `(cosψ, sinψ)`:
 
 ```text
 u = −ẋ sinψ + ẏ cosψ     // surge
 v =  ẋ cosψ + ẏ sinψ     // sway
 ```
 
-Setara rumus lama (asumsi 90°=Timur) jika `ψ` diganti `−ψ`.
-
 Cek `ψ = 0` (utara): `u = ẏ`, `v = ẋ`.  
 Cek `ψ = 270°` (timur): `u = ẋ`, `v = −ẏ`.
-
-`include/enu_velocity.hpp` **saat ini masih rumus 90°=Timur** (`u = ẋ sinψ + ẏ cosψ`). Belum disesuaikan.
 
 ---
 
@@ -175,7 +169,7 @@ Heading `yaw = 270°` (haluan **timur** IMU), `ẋ, ẏ` sama:
 u ≈ 2 m/s     v ≈ −5 m/s
 ```
 
-(`yaw = 90°` di data ini = haluan **barat**, bukan timur.)
+(`yaw = 90°` = haluan barat.)
 
 ---
 
@@ -255,7 +249,7 @@ Auto-start: [`startup_guide.md`](startup_guide.md). DLL MinGW satu folder dengan
 ## Catatan
 
 1. Port COM hanya satu aplikasi.
-2. Heading CSV: **0 = Utara, 270° = Timur**. Jangan pakai tabel kompas 90°=Timur.
+2. Heading CSV: **0 = Utara, 270° = Timur, 90° = Barat**.
 3. `u, v` untuk bekal NMPC (`s = [v, r, X, Y, ψ]` dengan state peta sesuai kerangka yang dipilih); rudder 1.2 belum memakai NMPC.
 4. Model NMPC memakai surge konstan `u_0`; `u` hasil GPS berguna untuk cek / ganti `u_0` nanti.
 5. User Windows perlu hak `shutdown`. Setelah mati, mini PC tidak bisa dihidupkan dari dashboard.

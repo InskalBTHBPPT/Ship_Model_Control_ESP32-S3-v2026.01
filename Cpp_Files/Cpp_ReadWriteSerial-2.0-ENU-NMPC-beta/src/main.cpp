@@ -60,7 +60,7 @@ void print_usage(const char *program_name) {
       << "Serial RX: CSV 8 kolom, [WP] Home / [WP] #n, $SHUTDOWN\n"
       << "Serial TX: $HB tiap 1 s, timestamp,result (rudder deg)\n"
       << "NMPC: v=0, r dari yaw_rate (bukan gyro_z), psi = pi/2 + yaw\n"
-      << "      yaw IMU: 0=Utara, 270=Timur (bukan kompas 90=Timur)\n";
+      << "      yaw IMU: 0=Utara, 270=Timur, 90=Barat\n";
 }
 
 bool is_shutdown_line(const std::string &line) { return line == "$SHUTDOWN"; }
