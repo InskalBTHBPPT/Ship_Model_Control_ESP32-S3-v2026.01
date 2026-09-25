@@ -6,7 +6,7 @@ Catatan perubahan utama antar versi firmware dan dashboard **Way Points Tracking
 
 ## Haluan kapal kompas CW (0=U, 90=T)
 
-Remote-05: setelah wrap + offset pasang, `yaw = 360 − yaw` sehingga CSV **0 Utara, 90 Timur, 270 Barat**. Rumus `u`,`v` 1.2 / dashboard 1.51: `u = ẋ sinψ + ẏ cosψ`. NMPC 2.0: `ψ = π/2 − yaw`.
+Remote-05: setelah wrap + offset pasang, `yaw = 360 − yaw` sehingga CSV **0 Utara, 90 Timur, 270 Barat**. Rumus `u`,`v` 1.2 / dashboard 1.6: `u = ẋ sinψ + ẏ cosψ`. NMPC 2.0: `ψ = π/2 − yaw`.
 
 ---
 
@@ -224,11 +224,11 @@ User-Side-05 (dari **User-Side-04**) menambahkan perintah serial **`$SHUTDOWN`**
 
 ---
 
-## [Dashboard beta 1.51] — dari `Local Monitor Dashboard-beta1.5.py`
+## [Dashboard beta 1.6] — dari `Local Monitor Dashboard-beta1.5.py`
 
 ### Ringkasan
 
-Beta 1.51 menampilkan dan men-log **surge `u` / sway `v`** di tab Live. Hitungan lokal dari `lat, lon, yaw, timestamp` (rumus 1.2 kompas CW **0 = Utara, 90° = Timur**).
+Beta 1.6 (nama baru dari 1.51) menampilkan dan men-log **surge `u` / sway `v`** di tab Live. Hitungan lokal dari `lat, lon, yaw, timestamp` (rumus 1.2 kompas CW **0 = Utara, 90° = Timur**).
 
 ```text
 u =  ẋ sinψ + ẏ cosψ
@@ -241,11 +241,11 @@ v =  ẋ cosψ − ẏ sinψ
 
 - Label Live: **u surge (m/s)**, **v sway (m/s)**
 - CSV: kolom baru `u (m/s)`, `v (m/s)` setelah `speedMps`
-- Judul window: `Ship Model Local Dashboard — beta 1.51`
+- Judul window: `Ship Model Local Dashboard — beta 1.6`
 
 ### File
 
-- `Pythonfile/Way_Points_Tracking/Local Monitor Dashboard-beta1.51.py`
+- `Pythonfile/Way_Points_Tracking/Local Monitor Dashboard-beta1.6.py`
 
 ---
 

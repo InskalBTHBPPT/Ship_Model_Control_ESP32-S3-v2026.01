@@ -6,7 +6,7 @@ Bridge USB **1.2** (data mentah) + **NMPC C Sep 2026**. Keluaran ke ESP32 tetap 
 |----------|------|
 | Firmware Remote | `PlatformIO/Way_Points_Tracking/ESP-Now_ESP32-S3_Remote-Side-05` |
 | Firmware User | `PlatformIO/Way_Points_Tracking/ESP-Now_ESP32-S3_User-Side-05` |
-| Dashboard | `Pythonfile/Way_Points_Tracking/Local Monitor Dashboard-beta1.5.py` |
+| Dashboard | `Pythonfile/Way_Points_Tracking/Local Monitor Dashboard-beta1.6.py` |
 | Serial / CSV | `Cpp_Files/Cpp_ReadWriteSerial-1.2-ENU-beta` |
 | Solver NMPC | `MPC NMPC Agus/Coding_NMPC_Sep2026/C code NMPC` |
 | Simulasi (tanpa COM) | `Cpp_Files/Cpp_ReadWriteSerial-2.0-ENU-NMPC-simulasi` |
@@ -40,7 +40,7 @@ Kode: `src/main.cpp` — `compass_yaw_to_nmpc_psi()`, `yaw_rate_to_r_nd()`. Sama
 
 ```mermaid
 flowchart LR
-  Dash["Dashboard 1.5"] -->|"$WPSET / $SHUTDOWN"| User["User-Side-05"]
+  Dash["Dashboard 1.6"] -->|"$WPSET / $SHUTDOWN"| User["User-Side-05"]
   User -->|"ESP-NOW"| Remote["Remote-Side-05"]
   Remote -->|"USB 115200"| Bridge["2.0 mini-PC"]
   Bridge -->|"$HB + timestamp,result"| Remote

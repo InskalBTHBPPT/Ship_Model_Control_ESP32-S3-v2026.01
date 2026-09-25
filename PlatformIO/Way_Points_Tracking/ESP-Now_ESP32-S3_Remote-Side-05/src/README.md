@@ -10,7 +10,7 @@ Mengumpulkan data sensor dan actuator, menjalankan kontrol rudder/propeller, men
 | Komponen | Path |
 |----------|------|
 | User-Side | `ESP-Now_ESP32-S3_User-Side-05` |
-| Dashboard | `Local Monitor Dashboard-beta1.5.py` |
+| Dashboard | `Local Monitor Dashboard-beta1.6.py` |
 | Mini PC | `Cpp_Files/Cpp_ReadWriteSerial-1.0` |
 
 ---

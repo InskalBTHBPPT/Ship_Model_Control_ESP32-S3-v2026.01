@@ -8,7 +8,7 @@ Program C++ mini-PC: baca telemetry USB dari **ESP-Now_ESP32-S3_Remote-Side-05**
 |----------|------|
 | Firmware Remote | `PlatformIO/Way_Points_Tracking/ESP-Now_ESP32-S3_Remote-Side-05` |
 | Firmware User | `PlatformIO/Way_Points_Tracking/ESP-Now_ESP32-S3_User-Side-05` |
-| Dashboard | `Pythonfile/Way_Points_Tracking/Local Monitor Dashboard-beta1.5.py` |
+| Dashboard | `Pythonfile/Way_Points_Tracking/Local Monitor Dashboard-beta1.6.py` |
 | Versi sebelumnya | `Cpp_Files/Cpp_ReadWriteSerial-1.1-ENU-beta` |
 | Varian NED | `Cpp_Files/Cpp_ReadWriteSerial-1.2-NED-beta` |
 | Penerus NMPC | `Cpp_Files/Cpp_ReadWriteSerial-2.0-ENU-NMPC-beta` |

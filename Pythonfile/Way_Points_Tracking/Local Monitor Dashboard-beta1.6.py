@@ -1,7 +1,7 @@
 """
-Local Monitor Dashboard beta 1.51
+Local Monitor Dashboard beta 1.6
 
-Clone dari beta 1.5. Tambahan: surge `u` / sway `v` di panel Live dan log CSV.
+Dari beta 1.5 (lewat 1.51). Tambahan: surge `u` / sway `v` di panel Live dan log CSV.
 
 Hitungan lokal (bukan dari firmware), rumus 1.2 kompas CW (0=Utara, 90=Timur):
   x,y ENU dari lat,lon; ẋ,ẏ LPF α=0.70; ψ=yaw·π/180
@@ -1667,7 +1667,7 @@ class MainWindow(QMainWindow):
         """
         super().__init__()
         self.resize(800, 700)
-        self.setWindowTitle("Ship Model Local Dashboard — beta 1.51")
+        self.setWindowTitle("Ship Model Local Dashboard — beta 1.6")
         self.tab_widget = QTabWidget(self)
         self.setCentralWidget(self.tab_widget)
         
