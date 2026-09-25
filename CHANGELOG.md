@@ -195,6 +195,31 @@ User-Side-05 (dari **User-Side-04**) menambahkan perintah serial **`$SHUTDOWN`**
 
 ---
 
+## [Dashboard beta 1.51] — dari `Local Monitor Dashboard-beta1.5.py`
+
+### Ringkasan
+
+Beta 1.51 menampilkan dan men-log **surge `u` / sway `v`** di tab Live. Hitungan lokal dari `lat, lon, yaw, timestamp` (rumus 1.2, IMU **0 = Utara, 270° = Timur**). Firmware tidak diubah.
+
+```text
+u = −ẋ sinψ + ẏ cosψ
+v =  ẋ cosψ + ẏ sinψ
+```
+
+`ẋ`,`ẏ` dari ΔENU / Δt, LPF α = 0.70. Origin = GPS pertama, atau Home jika di-set. GPS 0,0 → `u,v = 0`.
+
+### UI / log
+
+- Label Live: **u surge (m/s)**, **v sway (m/s)**
+- CSV: kolom baru `u (m/s)`, `v (m/s)` setelah `speedMps`
+- Judul window: `Ship Model Local Dashboard — beta 1.51`
+
+### File
+
+- `Pythonfile/Way_Points_Tracking/Local Monitor Dashboard-beta1.51.py`
+
+---
+
 ## [Dashboard beta 1.5] — dari `Local Monitor Dashboard-beta1.4.py`
 
 ### Ringkasan
