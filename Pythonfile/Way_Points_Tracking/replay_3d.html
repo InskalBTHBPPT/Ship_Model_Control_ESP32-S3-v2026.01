@@ -207,26 +207,9 @@ window.setCameraMode = function (name) {
     applyPov();
     return;
   }
-  const fromPov = camMode === 'pov';
   camMode = 'orbit';
   controls.enabled = true;
-  if (fromPov) window.snapOrbit('side');
-  else followOrbit();
-};
-
-window.snapOrbit = function (which) {
-  camMode = 'orbit';
-  controls.enabled = true;
-  const target = shipWorld();
-  controls.target.copy(target);
-  const dist = Math.max(18, viewSpan * 0.45);
-  if (which === 'top') {
-    camera.position.set(target.x, target.y + dist, target.z + 0.4);
-  } else {
-    camera.position.set(target.x + dist * 0.85, target.y + dist * 0.28, target.z);
-  }
-  camera.up.set(0, 1, 0);
-  controls.update();
+  followOrbit();
 };
 
 window.setPose = function (east, north, yawDeg) {

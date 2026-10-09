@@ -4528,6 +4528,22 @@ class MainWindow(QMainWindow):
         self.view3d_time_slider.setRange(0, 1)
         self.view3d_time_slider.setValue(0)
         self.view3d_time_slider.valueChanged.connect(self._on_view3d_slider)
+        self.view3d_time_slider.sliderPressed.connect(self._stop_view3d_play)
+        self.view3d_play_btn = QPushButton("Play", self)
+        self.view3d_play_btn.clicked.connect(self._toggle_view3d_play)
+        self.view3d_speed = QComboBox(self)
+        for label, factor in (("0.5×", 0.5), ("1×", 1.0), ("2×", 2.0), ("4×", 4.0), ("8×", 8.0)):
+            self.view3d_speed.addItem(label, factor)
+        self.view3d_speed.setCurrentIndex(1)
+        self.view3d_speed.setStyleSheet(
+            "QComboBox { padding: 4px 8px; background: #1f2937; color: #e5e7eb;"
+            " border: 1px solid #4b5563; border-radius: 6px; min-width: 64px; }"
+        )
+        self.view3d_playing = False
+        self.view3d_play_last = 0.0
+        self.view3d_play_timer = QTimer(self)
+        self.view3d_play_timer.setInterval(40)
+        self.view3d_play_timer.timeout.connect(self._advance_view3d_play)
         self.view3d_time_label = QLabel("0.0 s", self)
         self.view3d_time_label.setMinimumWidth(78)
         self.view3d_time_label.setStyleSheet("color: #e5e7eb;")
@@ -4539,26 +4555,22 @@ class MainWindow(QMainWindow):
         )
         self.view3d_pov_btn = QPushButton("POV kapal", self)
         self.view3d_orbit_btn = QPushButton("Orbit", self)
-        self.view3d_top_btn = QPushButton("Atas", self)
-        self.view3d_side_btn = QPushButton("Samping", self)
-        for btn in (self.view3d_pov_btn, self.view3d_orbit_btn, self.view3d_top_btn, self.view3d_side_btn):
+        for btn in (self.view3d_play_btn, self.view3d_pov_btn, self.view3d_orbit_btn):
             btn.setStyleSheet(cam_style)
         self.view3d_pov_btn.setCheckable(True)
         self.view3d_orbit_btn.setCheckable(True)
         self.view3d_orbit_btn.setChecked(True)
         self.view3d_pov_btn.clicked.connect(lambda: self._set_view3d_camera("pov"))
         self.view3d_orbit_btn.clicked.connect(lambda: self._set_view3d_camera("orbit"))
-        self.view3d_top_btn.clicked.connect(lambda: self._snap_view3d("top"))
-        self.view3d_side_btn.clicked.connect(lambda: self._snap_view3d("side"))
 
         bar_layout.addWidget(self.view3d_load_btn)
         bar_layout.addWidget(self.view3d_wp_btn)
         bar_layout.addWidget(self.view3d_time_slider, 1)
+        bar_layout.addWidget(self.view3d_play_btn)
+        bar_layout.addWidget(self.view3d_speed)
         bar_layout.addWidget(self.view3d_time_label)
         bar_layout.addWidget(self.view3d_pov_btn)
         bar_layout.addWidget(self.view3d_orbit_btn)
-        bar_layout.addWidget(self.view3d_top_btn)
-        bar_layout.addWidget(self.view3d_side_btn)
 
         self.view3d_time: list[float] = []
         self.view3d_lat: list[float] = []
@@ -4724,13 +4736,46 @@ class MainWindow(QMainWindow):
         self.view3d_orbit_btn.setChecked(mode == "orbit")
         self._view3d_js("window.setCameraMode('%s')" % mode)
 
-    def _snap_view3d(self, which: str) -> None:
-        self.view3d_cam = "orbit"
-        self.view3d_pov_btn.setChecked(False)
-        self.view3d_orbit_btn.setChecked(True)
-        self._view3d_js("window.snapOrbit('%s')" % which)
+    def _stop_view3d_play(self) -> None:
+        self.view3d_playing = False
+        if hasattr(self, "view3d_play_timer"):
+            self.view3d_play_timer.stop()
+        if hasattr(self, "view3d_play_btn"):
+            self.view3d_play_btn.setText("Play")
+
+    def _toggle_view3d_play(self) -> None:
+        if self.view3d_playing:
+            self._stop_view3d_play()
+            return
+        if not self.view3d_time:
+            return
+        if self.view3d_time_slider.value() >= self.view3d_time_slider.maximum():
+            self.view3d_time_slider.setValue(self.view3d_time_slider.minimum())
+        self.view3d_playing = True
+        self.view3d_play_btn.setText("Pause")
+        self.view3d_play_last = time()
+        self.view3d_play_timer.start()
+
+    def _advance_view3d_play(self) -> None:
+        if not self.view3d_playing or not self.view3d_time:
+            self._stop_view3d_play()
+            return
+        now = time()
+        dt = min(0.2, max(0.0, now - self.view3d_play_last))
+        self.view3d_play_last = now
+        speed = float(self.view3d_speed.currentData() or 1.0)
+        step = int(dt * speed * self.view3d_time_slider_scale)
+        if step < 1:
+            step = 1
+        nxt = self.view3d_time_slider.value() + step
+        if nxt >= self.view3d_time_slider.maximum():
+            self.view3d_time_slider.setValue(self.view3d_time_slider.maximum())
+            self._stop_view3d_play()
+        else:
+            self.view3d_time_slider.setValue(nxt)
 
     def load_view3d_csv(self) -> None:
+        self._stop_view3d_play()
         path, _ = QFileDialog.getOpenFileName(self, "Load Log CSV", "", "CSV Files (*.csv)")
         if not path:
             return
