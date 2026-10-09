@@ -2073,6 +2073,11 @@ class MainWindow(QMainWindow):
         self.batt_warn_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.batt_warn_label.setStyleSheet("color: #ef4444; font-weight: bold; font-size: 11pt;")
         self.batt_mute_btn = QPushButton("Diamkan alarm", self)
+        self.batt_mute_btn.setEnabled(False)
+        self.batt_mute_btn.setStyleSheet(
+            "QPushButton { background-color: #ef4444; color: white; font-weight: bold; padding: 6px; }"
+            "QPushButton:disabled { background-color: #7f1d1d; color: #fecaca; }"
+        )
         self.batt_mute_btn.clicked.connect(self._toggle_batt_mute)
         self._batt_alarm_timer = QTimer(self)
         self._batt_alarm_timer.setInterval(500)
@@ -2147,8 +2152,7 @@ class MainWindow(QMainWindow):
         batt_alarm_layout = QHBoxLayout(batt_alarm_row)
         batt_alarm_layout.setContentsMargins(0, 0, 0, 0)
         batt_alarm_layout.setSpacing(6)
-        batt_alarm_layout.addWidget(self.batt_warn_label, 2)
-        batt_alarm_layout.addWidget(self.batt_mute_btn, 1)
+        batt_alarm_layout.addWidget(self.batt_warn_label, 1)
         indicator.layout().addWidget(batt_alarm_row)
 
         indicator_panel.layout().addWidget(indicator)
@@ -2156,7 +2160,13 @@ class MainWindow(QMainWindow):
 
         self.live_setup_btn = QPushButton("Setup", self)
         self.live_setup_btn.clicked.connect(self._open_live_setup_dialog)
-        indicator_panel.layout().addWidget(self.live_setup_btn)
+        setup_alarm_row = QWidget(self)
+        setup_alarm_layout = QHBoxLayout(setup_alarm_row)
+        setup_alarm_layout.setContentsMargins(0, 0, 0, 0)
+        setup_alarm_layout.setSpacing(6)
+        setup_alarm_layout.addWidget(self.live_setup_btn, 1)
+        setup_alarm_layout.addWidget(self.batt_mute_btn, 1)
+        indicator_panel.layout().addWidget(setup_alarm_row)
 
         # Map | plots — QSplitter agar lebar bisa di-drag
         left_panel = QSplitter(Qt.Orientation.Horizontal, self)
@@ -3138,6 +3148,7 @@ class MainWindow(QMainWindow):
             self._batt1_v = v1
             self._batt2_v = v2
             self._batt_low = self._batt1_low or self._batt2_low
+            self.batt_mute_btn.setEnabled(self._batt_low)
             if self._batt_low:
                 self.batt_warn_label.setText("Baterai di bawah 10,8 V — pulang ke Home setelah 10 detik saat auto")
                 self._paint_batt_labels()
