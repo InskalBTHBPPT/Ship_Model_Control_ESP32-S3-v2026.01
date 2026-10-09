@@ -1,5 +1,5 @@
 """
-Local Monitor Dashboard 1.8-beta
+Local Monitor Dashboard 1.8
 
 Dari 1.7. Simbol peta: Home kotak hijau tanpa lingkaran; waypoint bintang
 bernomor plus lingkaran 3 m; garis rencana oranye putus-putus antar waypoint.
@@ -1620,7 +1620,7 @@ class MainWindow(QMainWindow):
         """
         super().__init__()
         self.resize(800, 700)
-        self.setWindowTitle("Ship Model Local Dashboard — 1.8-beta")
+        self.setWindowTitle("Ship Model Local Dashboard — 1.8")
         self.tab_widget = QTabWidget(self)
         self.setCentralWidget(self.tab_widget)
         

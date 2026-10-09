@@ -2,10 +2,10 @@
 
 Dokumentasi sistem **Ship Auto Way Maps Points Tracking** — kontrol kapal model ESP32-S3 dengan waypoint, telemetry real-time, NMPC di mini PC, dan dashboard PySide6.
 
-**Versi dokumen:** dashboard 1.7 + User-05 + Remote-05.2 + Cpp 2.3  
-**Last update:** 2026-10
+**Versi dokumen:** dashboard 1.8 + User-05 + Remote-05.2 + Cpp 2.3  
+**Last update:** 2026-10-10
 
-Dokumen dashboard: `README Local Monitor Dashboard-1.7.md`
+Dokumen dashboard: `README Local Monitor Dashboard-1.8.md`
 
 ---
 
@@ -16,7 +16,7 @@ Dokumen dashboard: `README Local Monitor Dashboard-1.7.md`
 3. [Arsitektur & alur data](#3-arsitektur--alur-data)
 4. [Remote-Side-05.2](#4-remote-side-052)
 5. [User-Side-05](#5-user-side-05)
-6. [Dashboard 1.7](#6-dashboard-17)
+6. [Dashboard 1.8](#6-dashboard-18)
 7. [Mini PC — Cpp_ReadWriteSerial-2.3](#7-mini-pc--cpp_readwriteserial-23)
 8. [Protokol serial (Dashboard ↔ User-Side)](#8-protokol-serial-dashboard--user-side)
 9. [Protokol ESP-NOW](#9-protokol-esp-now)
@@ -37,16 +37,17 @@ Sistem ini memungkinkan:
 - **Perencanaan waypoint** di peta (Home + hingga 10 waypoint navigasi)
 - **Pengiriman waypoint** ke kapal via ESP-NOW (`0xA1`)
 - **Kontrol auto alg 2** — rudder dan bearing dari NMPC mini PC (`timestamp,result,bearing`)
-- **Baterai rendah** — Remote-05.2 mengirim `$RTL` setelah 10 detik di bawah 10,8 V saat auto; 2.3 mengarahkan ke Home. Dashboard 1.7 hanya alarm
+- **Baterai rendah** — Remote-05.2 mengirim `$RTL` setelah 10 detik di bawah 10,8 V saat auto; 2.3 mengarahkan ke Home. Dashboard 1.8 hanya alarm
 - **Kontrol auto alg 1** — waypoint + PD (opsional, compile-time)
 - **Propeller** — manual dari CH3/CH5; saat auto menahan nilai terakhir sebelum pindah mode
 - **Shutdown mini PC** dari dashboard (ESP-NOW `0xA2`, tanpa Wi‑Fi laptop↔mini PC)
 - **Analisis log CSV** — replay data dengan peta dan plot
+- **Replay 3D dan prediksi lintasan** — jejak uji di bingkai ENU; garis merah dari model NMPC 2.3 (Home, yaw awal timur)
 
 Alur end-to-end:
 
 ```text
-Dashboard 1.7 (PySide6)
+Dashboard 1.8 (PySide6)
     │ USB serial 115200
     ▼
 User-Side-05  (ESP-Now_ESP32-S3_User-Side-05)
@@ -64,7 +65,7 @@ Mini PC — Cpp_ReadWriteSerial-2.3-ENU-NMPC
 
 | Peran | Proyek | Path (dari root repo) |
 |-------|--------|------------------------|
-| Dashboard | `Local Monitor Dashboard-1.7.py` | `Pythonfile/Way_Points_Tracking/` |
+| Dashboard | `Local Monitor Dashboard-1.8.py` | `Pythonfile/Way_Points_Tracking/` |
 | Laptop, jembatan ESP-NOW | `ESP-Now_ESP32-S3_User-Side-05` | `PlatformIO/Way_Points_Tracking/` |
 | Kapal | `ESP-Now_ESP32-S3_Remote-Side-05.2` | `PlatformIO/Way_Points_Tracking/` |
 | Mini PC | `Cpp_ReadWriteSerial-2.3-ENU-NMPC` | `Cpp_Files/` |
@@ -142,21 +143,24 @@ Detail: `PlatformIO/.../User-Side-05/src/README.md`
 
 ---
 
-## 6. Dashboard 1.7
+## 6. Dashboard 1.8
 
-**File:** `Local Monitor Dashboard-1.7.py`
+**File:** `Local Monitor Dashboard-1.8.py`
 
 - Live: mode, Mini PC CONNECTED/DISCONNECTED, warning auto tanpa mini PC
 - Tombol **Shutdown** sebelah status Mini PC (enable jika Connect + `mini_pc_link=1`)
 - Map Points: Home + waypoints, **Send Way Points** (`$WPSET` / `$WACK`)
 - Live: **u surge**, **v sway** (hitung lokal; bukan dari firmware)
 - Logging & Analyze: CSV telemetry ditambah `u (m/s)`, `v (m/s)`
-- Analyze: **Load Log CSV** (jejak) dan **Load Waypoints** (Home kotak hijau, bintang + lingkaran 3 m, jumlah titik dari file)
-- Analyze: segitiga hijau = auto mulai, segitiga merah = auto selesai, belah ketupat oranye = log berakhir masih auto
+- Peta Live, Map Points, dan Analyze memakai simbol yang sama: Home kotak hijau (tanpa lingkaran), waypoint bintang bernomor + lingkaran 3 m, garis rencana oranye putus-putus antar waypoint, kapal belah ketupat hijau
+- Analyze: **Load Log CSV** (jejak biru) dan **Load Waypoints**. Segitiga hijau = auto mulai, segitiga merah = auto selesai, belah ketupat oranye = log berakhir masih auto
+- Heading: Live merah putus-putus 5 m; Map Points oranye solid 5 m; Analyze merah putus-putus pada slider, plus checkbox **Heading Line**
+- Tab **3D**: replay log (jejak hitam) dengan Play. **Prediksi** menggambar lintasan NMPC sebagai garis merah di scene yang sama. Play tidak memutar prediksi
+- Prediksi memakai `predict_track.exe` (Home, yaw awal 90° timur, `u0 = 0.6114`, `v = 0`)
 - Plot Heading Setpoint pada alg 2 mengikuti bearing dari 2.3 (waypoint, atau Home setelah `$RTL`). Saat manual, setpoint sama dengan yaw
 - Alarm Live: jika `battery_1` atau `battery_2` < 10,8 V, label berkedip dan bunyi berulang. Tombol Diamkan alarm mematikan bunyi saja. Dashboard tidak mengirim `$RTL`
 
-Detail: `README Local Monitor Dashboard-1.7.md`
+Detail: `README Local Monitor Dashboard-1.8.md`
 
 ---
 
@@ -260,7 +264,7 @@ Hasil di CSV: 0 = Utara, 90 = Timur, 270 = Barat. User-Side dan dashboard hanya 
 | Alg 2 tanpa kolom ketiga | salinan yaw |
 | Alg 1 | bearing haversine di Remote |
 
-**`u`, `v` di dashboard 1.7** (kompas CW, rumus sama dengan 1.6):
+**`u`, `v` di dashboard 1.8** (kompas CW, rumus sama dengan 1.6):
 
 ```text
 u = ẋ sinψ + ẏ cosψ
@@ -302,7 +306,7 @@ g++ -std=c++17 -Iinclude -Inmpc src/main.cpp src/serial_port.cpp nmpc/nmpc_kapal
 
 # Dashboard
 cd Pythonfile/Way_Points_Tracking
-python "Local Monitor Dashboard-1.7.py"
+python "Local Monitor Dashboard-1.8.py"
 ```
 
 Port COM mini PC ada di `start_read_write_serial.bat` (ubah sendiri). Sesuaikan MAC ESP-NOW di kedua `main.cpp`.
@@ -313,7 +317,7 @@ Port COM mini PC ada di `start_read_write_serial.bat` (ubah sendiri). Sesuaikan 
 
 1. Flash **Remote-05.2** + **User-05** berpasangan
 2. Jalankan **read_write_serial.exe** 2.3 di mini PC (auto-start opsional)
-3. Connect dashboard **1.7** ke User-Side
+3. Connect dashboard **1.8** ke User-Side
 4. Verifikasi Live: telemetry + Mini PC **CONNECTED**
 5. Map Points → Set Home + ≥1 WP → **Send Way Points** → `$WACK,OK`; cek `[WP]` di stderr/stdout 2.3
 6. Set kecepatan dan arah propeller di CH3/CH5 saat masih manual, lalu RC CH6 Auto. Propeller menahan nilai itu; pantau rudder dari `result` dan heading setpoint dari `bearing`
@@ -333,7 +337,7 @@ Port COM mini PC ada di `start_read_write_serial.bat` (ubah sendiri). Sesuaikan 
 | `u`,`v` aneh | Remote belum di-flash yaw CW, atau log lama (skala IMU) |
 | Shutdown tombol abu-abu | Harus Connect + CONNECTED |
 | `$SACK,OK` tapi PC tidak mati | Pastikan exe **2.3** yang menangani `$SHUTDOWN` |
-| Telemetry 23 kolom | Flash User-05 / Remote-05.2; dashboard 1.7 tetap terima 23/24 |
+| Telemetry 23 kolom | Flash User-05 / Remote-05.2; dashboard 1.8 tetap terima 23/24 |
 | Tidak pulang saat baterai rendah | CH6 harus auto, tegangan < 10,8 V selama 10 detik terus, dan `[WP] Home` sudah terkirim. Cek baris `$RTL` di serial mini PC |
 
 ---
@@ -342,7 +346,7 @@ Port COM mini PC ada di `start_read_write_serial.bat` (ubah sendiri). Sesuaikan 
 
 ```text
 ┌──────────────────┐  $WPSET / $SHUTDOWN  ┌──────────────┐  0xA1 / 0xA2  ┌────────────────┐
-│ Dashboard 1.7    │ ───────────────────► │ User-Side-05 │ ────────────► │ Remote-Side-05.2│
+│ Dashboard 1.8    │ ───────────────────► │ User-Side-05 │ ────────────► │ Remote-Side-05.2│
 │                  │ ◄─────────────────── │              │ ◄──────────── │ yaw kompas CW  │
 └──────────────────┘  CSV24 / $WACK/$SACK └──────────────┘  telemetry 24 └───────┬────────┘
                                                                                   │ USB
@@ -358,4 +362,4 @@ Port COM mini PC ada di `start_read_write_serial.bat` (ubah sendiri). Sesuaikan 
 
 ---
 
-*Dokumen ini: Ship Auto Way Maps Points Tracking — dashboard 1.7, User-Side-05, Remote-Side-05.2, Cpp_ReadWriteSerial-2.3-ENU-NMPC*
+*Dokumen ini: Ship Auto Way Maps Points Tracking — dashboard 1.8, User-Side-05, Remote-Side-05.2, Cpp_ReadWriteSerial-2.3-ENU-NMPC*
