@@ -18,7 +18,7 @@ const camera = new THREE.PerspectiveCamera(55, 1, 0.5, 2500);
 camera.position.set(16, 12, 16);
 camera.up.set(0, 1, 0);
 
-const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true });
+const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 document.body.appendChild(renderer.domElement);
 
@@ -126,6 +126,7 @@ function applyPov() {
   camera.position.copy(eye);
   camera.up.set(0, 1, 0);
   camera.lookAt(look);
+  renderFrame();
 }
 
 function followOrbit() {
@@ -137,6 +138,7 @@ function followOrbit() {
   controls.target.copy(target);
   camera.position.copy(target).add(offset);
   controls.update();
+  renderFrame();
 }
 
 function resizeGround(span) {
@@ -307,7 +309,12 @@ window.loadScene = function (data) {
   resizeGround(Math.ceil((maxAbs * 2 + 16) / 10) * 10);
   ship.visible = !!data.hasShip;
   if (camMode === 'orbit') followOrbit();
+  else renderFrame();
 };
+
+function renderFrame() {
+  renderer.render(scene, camera);
+}
 
 function onResize() {
   const w = window.innerWidth || 1;
@@ -315,17 +322,13 @@ function onResize() {
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
   renderer.setSize(w, h, false);
+  renderFrame();
 }
+controls.addEventListener('change', renderFrame);
 window.addEventListener('resize', onResize);
 window.onReplayResize = onResize;
+resizeGround(40);
 onResize();
-
-function tick() {
-  requestAnimationFrame(tick);
-  if (camMode === 'orbit') controls.update();
-  renderer.render(scene, camera);
-}
-tick();
 window.replayReady = true;
 </script>
 </body>
