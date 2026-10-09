@@ -4,6 +4,12 @@ Catatan perubahan utama antar versi firmware dan dashboard **Way Points Tracking
 
 ---
 
+## [Cpp_ReadWriteSerial-2.1-ENU-NMPC-beta] — `u`, `v` terukur
+
+Clone 2.0. Surge dan sway tidak lagi konstanta: `u`, `v` dari ΔENU dan yaw kompas (rumus 1.6), `v' = v/u`. `0.6114` m/s hanya acuan model. Lantai surge `0.15` m/s.
+
+---
+
 ## Haluan kapal kompas CW (0=U, 90=T)
 
 Remote-05: setelah wrap + offset pasang, `yaw = 360 − yaw` sehingga CSV **0 Utara, 90 Timur, 270 Barat**. Rumus `u`,`v` 1.2 / dashboard 1.6: `u = ẋ sinψ + ẏ cosψ`. NMPC 2.0: `ψ = π/2 − yaw`.
