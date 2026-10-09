@@ -14,11 +14,11 @@ canvas { display: block; }
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0b1220);
 
-const camera = new THREE.PerspectiveCamera(55, 1, 0.05, 8000);
+const camera = new THREE.PerspectiveCamera(55, 1, 0.5, 2500);
 camera.position.set(16, 12, 16);
 camera.up.set(0, 1, 0);
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
+const renderer = new THREE.WebGLRenderer({ antialias: true, logarithmicDepthBuffer: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 document.body.appendChild(renderer.domElement);
 
@@ -27,14 +27,20 @@ const sun = new THREE.DirectionalLight(0xffffff, 0.65);
 sun.position.set(40, 60, 20);
 scene.add(sun);
 
-const water = new THREE.Mesh(
-  new THREE.PlaneGeometry(1, 1),
-  new THREE.MeshPhongMaterial({ color: 0x12324f, shininess: 18 })
-);
+const waterMat = new THREE.MeshPhongMaterial({
+  color: 0x12324f,
+  shininess: 18,
+  polygonOffset: true,
+  polygonOffsetFactor: 2,
+  polygonOffsetUnits: 2
+});
+const water = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), waterMat);
 water.rotation.x = -Math.PI / 2;
+water.position.y = -0.2;
 scene.add(water);
 
 let grid = new THREE.GridHelper(40, 8, 0x94a3b8, 0x334155);
+grid.position.y = 0.02;
 scene.add(grid);
 let viewSpan = 40;
 
@@ -90,9 +96,10 @@ const overlay = new THREE.Group();
 scene.add(overlay);
 
 const controls = new THREE.OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
+controls.enableDamping = false;
 controls.target.set(0, 0.3, 0);
-controls.maxPolarAngle = Math.PI * 0.49;
+controls.minPolarAngle = 0.12;
+controls.maxPolarAngle = Math.PI * 0.48;
 
 let camMode = 'orbit';
 let shipE = 0;
@@ -140,6 +147,7 @@ function resizeGround(span) {
   mats.forEach(function (mat) { if (mat) mat.dispose(); });
   const divisions = Math.max(8, Math.round(viewSpan / 10));
   grid = new THREE.GridHelper(viewSpan, divisions, 0x94a3b8, 0x334155);
+  grid.position.y = 0.02;
   scene.add(grid);
   water.scale.set(viewSpan, viewSpan, 1);
 }
@@ -185,7 +193,7 @@ function circle3(east, north) {
   const pts = [];
   for (let i = 0; i <= 72; i++) {
     const a = (i / 72) * Math.PI * 2;
-    pts.push(new THREE.Vector3(east + Math.cos(a) * 3, 0.05, -(north + Math.sin(a) * 3)));
+    pts.push(new THREE.Vector3(east + Math.cos(a) * 3, 0.12, -(north + Math.sin(a) * 3)));
   }
   return new THREE.Line(
     new THREE.BufferGeometry().setFromPoints(pts),
@@ -243,11 +251,11 @@ window.loadScene = function (data) {
   if (trail.length) {
     const pts = trail.map(function (p) {
       note(p[0], p[1]);
-      return new THREE.Vector3(p[0], 0.04, -p[1]);
+      return new THREE.Vector3(p[0], 0.25, -p[1]);
     });
     overlay.add(new THREE.Line(
       new THREE.BufferGeometry().setFromPoints(pts),
-      new THREE.LineBasicMaterial({ color: 0x3b82f6 })
+      new THREE.LineBasicMaterial({ color: 0x000000 })
     ));
   }
   if (data.home) {
@@ -270,12 +278,12 @@ window.loadScene = function (data) {
     note(east, north);
     overlay.add(circle3(east, north));
     const star = starMesh();
-    star.position.set(east, 0.08, -north);
+    star.position.set(east, 0.2, -north);
     overlay.add(star);
     const tag = makeLabel(String(num), '#f8fafc');
     tag.position.set(east, 1.5, -north);
     overlay.add(tag);
-    route.push(new THREE.Vector3(east, 0.07, -north));
+    route.push(new THREE.Vector3(east, 0.18, -north));
   });
   if (route.length >= 2) {
     const line = new THREE.Line(
