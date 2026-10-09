@@ -2452,9 +2452,19 @@ class MainWindow(QMainWindow):
 
         analyze_right_placeholder = QGroupBox("", self)
         analyze_right_placeholder.setLayout(QVBoxLayout())
-        self.load_csv_btn = QPushButton("Load Recorded CSV", self)
+        analyze_load_row = QWidget(self)
+        analyze_load_layout = QHBoxLayout(analyze_load_row)
+        analyze_load_layout.setContentsMargins(0, 0, 0, 0)
+        analyze_load_layout.setSpacing(6)
+        self.load_csv_btn = QPushButton("Load Log CSV", self)
         self.load_csv_btn.clicked.connect(self.load_analyze_csv)
-        analyze_right_placeholder.layout().addWidget(self.load_csv_btn)
+        self.load_wp_btn = QPushButton("Load Waypoints", self)
+        self.load_wp_btn.clicked.connect(self.load_analyze_waypoints)
+        analyze_load_layout.addWidget(self.load_csv_btn, 1)
+        analyze_load_layout.addWidget(self.load_wp_btn, 1)
+        analyze_right_placeholder.layout().addWidget(analyze_load_row)
+        self.analyze_plan_home = None
+        self.analyze_plan_wps: list[tuple[int, float, float]] = []
 
         map_checkbox_container = QGroupBox("Map Control", self)
         map_checkbox_layout = QHBoxLayout()
@@ -4165,10 +4175,92 @@ class MainWindow(QMainWindow):
             self.log_buffer.clear()
         except Exception:
             pass
-    
+
+    def load_analyze_waypoints(self) -> None:
+        """Muat CSV Home + waypoint (No,Lat,Long) dan gambar di peta Analyze."""
+        start_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "WayPoints")
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Load Waypoints", start_dir, "CSV Files (*.csv)")
+        if not path:
+            return
+        home = None
+        wps: list[tuple[int, float, float]] = []
+        try:
+            with open(path, "r", encoding="utf-8-sig", newline="") as fh:
+                reader = csv.DictReader(fh)
+                for row in reader:
+                    if not row:
+                        continue
+                    label = str(row.get("No") or "").strip()
+                    if not label:
+                        continue
+                    lat = float(str(row.get("Lat") or "").strip())
+                    lon = float(str(row.get("Long") or "").strip())
+                    if not (-90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0):
+                        continue
+                    if label.lower() == "home":
+                        home = (lat, lon)
+                    else:
+                        wps.append((int(float(label)), lat, lon))
+        except Exception as exc:
+            QMessageBox.critical(self, "Load Waypoints", f"Gagal membaca file:\n{exc}")
+            return
+        wps.sort(key=lambda item: item[0])
+        if home is None and not wps:
+            QMessageBox.warning(self, "Load Waypoints", "Tidak ada Home atau waypoint di file.")
+            return
+        self.analyze_plan_home = home
+        self.analyze_plan_wps = wps
+        self._draw_analyze_plan()
+
+    def _draw_analyze_plan(self) -> None:
+        """Gambar Home (kotak) dan tiap waypoint (bintang + lingkaran 3 m)."""
+        if not hasattr(self, "analyze_map_webview"):
+            return
+        map_name = self.analyze_map_webview.folium_map.get_name()
+        parts = [
+            "(function() {",
+            f"if (window.analyzePlanGroup) {{ {map_name}.removeLayer(window.analyzePlanGroup); }}",
+            f"window.analyzePlanGroup = L.layerGroup().addTo({map_name});",
+        ]
+        home = getattr(self, "analyze_plan_home", None)
+        wps = getattr(self, "analyze_plan_wps", [])
+        if home is not None:
+            lat, lon = home
+            parts.append(
+                "window.analyzePlanGroup.addLayer(L.marker([%s, %s], {icon: L.divIcon({"
+                "className: '', "
+                "html: '<div style=\"width:14px;height:14px;background:#10b981;border:2px solid #064e3b;\"></div>', "
+                "iconSize: [14, 14], iconAnchor: [7, 7]"
+                "})}).bindTooltip('Home'));" % (lat, lon)
+            )
+        route = []
+        for num, lat, lon in wps:
+            route.append("[%s, %s]" % (lat, lon))
+            parts.append(
+                "window.analyzePlanGroup.addLayer(L.circle([%s, %s], "
+                "{radius: 3, color: '#d97706', weight: 1, fillColor: '#d97706', fillOpacity: 0.15})"
+                ".bindTooltip('WP%s, radius 3 m'));" % (lat, lon, num)
+            )
+            parts.append(
+                "window.analyzePlanGroup.addLayer(L.marker([%s, %s], {icon: L.divIcon({"
+                "className: '', "
+                "html: '<div style=\"color:#b45309;font-size:18px;text-align:center;line-height:14px;\">★"
+                "<div style=\"color:#111;font-size:10px;font-weight:bold;line-height:10px;\">%s</div></div>', "
+                "iconSize: [20, 28], iconAnchor: [10, 14]"
+                "})}).bindTooltip('WP%s'));" % (lat, lon, num, num)
+            )
+        if len(route) >= 2:
+            parts.append(
+                "window.analyzePlanGroup.addLayer(L.polyline([%s], "
+                "{color: '#d97706', weight: 2, opacity: 0.9, dashArray: '5 6'}));" % ",".join(route)
+            )
+        parts.append("})();")
+        self.analyze_map_webview.page().runJavaScript("\n".join(parts))
+
     def load_analyze_csv(self):
         """Load CSV rekaman (display v23, raw v23, atau legacy) ke tab Analyze."""
-        path, _ = QFileDialog.getOpenFileName(self, "Load Recorded CSV", "", "CSV Files (*.csv)")
+        path, _ = QFileDialog.getOpenFileName(self, "Load Log CSV", "", "CSV Files (*.csv)")
         if not path:
             return
         try:
@@ -4276,6 +4368,7 @@ class MainWindow(QMainWindow):
                 self.analyze_map_webview.folium_map.location = last_coord
                 map_name = self.analyze_map_webview.folium_map.get_name()
                 self.analyze_map_webview.page().runJavaScript(f'{map_name}.setView({list(last_coord)})')
+                self._draw_analyze_plan()
 
             print(f"[ANALYZE] Loaded {loaded}/{row_count} rows (format={fmt}) into graphs and map.")
         except Exception as e:
