@@ -57,6 +57,13 @@ import json
 import math
 import os
 import sys
+
+# Sebelum import QtWebEngine: hilangkan kedip DirectComposition (IDCompositionDevice4).
+os.environ.setdefault(
+    "QTWEBENGINE_CHROMIUM_FLAGS",
+    "--disable-logging --log-level=3 --disable-direct-composition",
+)
+
 from bisect import bisect_left
 from datetime import datetime
 
