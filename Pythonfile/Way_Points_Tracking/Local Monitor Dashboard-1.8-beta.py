@@ -3,9 +3,10 @@ Local Monitor Dashboard 1.8-beta
 
 Dari 1.7. Simbol peta: Home kotak hijau tanpa lingkaran; waypoint bintang
 bernomor plus lingkaran 3 m; garis rencana oranye putus-putus antar waypoint.
-Kapal berupa belah ketupat hijau. Tab 3D terbagi dua: kiri prediksi NMPC
-dari file waypoint (predict_track.exe, yaw awal 90°), kanan replay log.
-Bingkai ENU Three.js lokal, tanpa satelit. Alarm baterai 1.7 tetap.
+Kapal berupa belah ketupat hijau. Tab 3D memutar ulang log di bingkai ENU
+(Three.js lokal, tanpa satelit). Tombol Prediksi menggambar lintasan NMPC
+(predict_track.exe, yaw awal 90°) sebagai garis merah di scene yang sama.
+Play hanya memutar log uji. Alarm baterai 1.7 tetap.
 
 Hitungan lokal (bukan dari firmware), rumus 1.2 kompas CW (0=Utara, 90=Timur):
   x,y ENU dari lat,lon; ẋ,ẏ LPF α=0.70; ψ=yaw·π/180
@@ -4523,6 +4524,14 @@ class MainWindow(QMainWindow):
         self.view3d_load_btn.clicked.connect(self.load_view3d_csv)
         self.view3d_wp_btn = QPushButton("Load Waypoints", self)
         self.view3d_wp_btn.clicked.connect(self.load_view3d_waypoints)
+        self.view3d_pred_btn = QPushButton("Prediksi", self)
+        self.view3d_pred_btn.setEnabled(False)
+        self.view3d_pred_btn.setStyleSheet(
+            "QPushButton { padding: 6px 10px; background: #92400e; color: white;"
+            " border: 1px solid #d97706; border-radius: 6px; }"
+            "QPushButton:disabled { background: #374151; color: #9ca3af; border-color: #4b5563; }"
+        )
+        self.view3d_pred_btn.clicked.connect(self.run_view3d_predict)
 
         self.view3d_time_slider_scale = 1000
         self.view3d_time_slider = QSlider(Qt.Horizontal, self)
@@ -4566,6 +4575,7 @@ class MainWindow(QMainWindow):
 
         bar_layout.addWidget(self.view3d_load_btn)
         bar_layout.addWidget(self.view3d_wp_btn)
+        bar_layout.addWidget(self.view3d_pred_btn)
         bar_layout.addWidget(self.view3d_time_slider, 1)
         bar_layout.addWidget(self.view3d_play_btn)
         bar_layout.addWidget(self.view3d_speed)
@@ -4594,125 +4604,24 @@ class MainWindow(QMainWindow):
         self.view3d_view.loadFinished.connect(self._on_view3d_ready)
         self.view3d_view.load(QUrl.fromLocalFile(html_path))
 
-        pred_bar = QWidget(self)
-        pred_bar_layout = QHBoxLayout(pred_bar)
-        pred_bar_layout.setContentsMargins(0, 0, 0, 0)
-        pred_bar_layout.setSpacing(6)
-        self.pred_wp_btn = QPushButton("Load Waypoints", self)
-        self.pred_wp_btn.clicked.connect(self.load_pred_waypoints)
-        self.pred_run_btn = QPushButton("Prediksi", self)
-        self.pred_run_btn.setEnabled(False)
-        self.pred_run_btn.setStyleSheet(
-            "QPushButton { padding: 6px 10px; background: #92400e; color: white;"
-            " border: 1px solid #d97706; border-radius: 6px; }"
-            "QPushButton:disabled { background: #374151; color: #9ca3af; border-color: #4b5563; }"
-        )
-        self.pred_run_btn.clicked.connect(self.run_pred_track)
-        self.pred_time_slider_scale = 1000
-        self.pred_time_slider = QSlider(Qt.Horizontal, self)
-        self.pred_time_slider.setRange(0, 1)
-        self.pred_time_slider.setValue(0)
-        self.pred_time_slider.valueChanged.connect(self._on_pred_slider)
-        self.pred_time_slider.sliderPressed.connect(self._stop_pred_play)
-        self.pred_play_btn = QPushButton("Play", self)
-        self.pred_play_btn.clicked.connect(self._toggle_pred_play)
-        self.pred_speed = QComboBox(self)
-        for label, factor in (("0.5×", 0.5), ("1×", 1.0), ("2×", 2.0), ("4×", 4.0), ("8×", 8.0)):
-            self.pred_speed.addItem(label, factor)
-        self.pred_speed.setCurrentIndex(1)
-        self.pred_speed.setStyleSheet(
-            "QComboBox { padding: 4px 8px; background: #1f2937; color: #e5e7eb;"
-            " border: 1px solid #4b5563; border-radius: 6px; min-width: 64px; }"
-        )
-        self.pred_playing = False
-        self.pred_play_last = 0.0
-        self.pred_play_timer = QTimer(self)
-        self.pred_play_timer.setInterval(40)
-        self.pred_play_timer.timeout.connect(self._advance_pred_play)
-        self.pred_time_label = QLabel("0.0 s", self)
-        self.pred_time_label.setMinimumWidth(78)
-        self.pred_time_label.setStyleSheet("color: #e5e7eb;")
-        self.pred_pov_btn = QPushButton("POV kapal", self)
-        self.pred_orbit_btn = QPushButton("Orbit", self)
-        for btn in (self.pred_play_btn, self.pred_pov_btn, self.pred_orbit_btn):
-            btn.setStyleSheet(cam_style)
-        self.pred_pov_btn.setCheckable(True)
-        self.pred_orbit_btn.setCheckable(True)
-        self.pred_orbit_btn.setChecked(True)
-        self.pred_pov_btn.clicked.connect(lambda: self._set_pred_camera("pov"))
-        self.pred_orbit_btn.clicked.connect(lambda: self._set_pred_camera("orbit"))
-        pred_bar_layout.addWidget(self.pred_wp_btn)
-        pred_bar_layout.addWidget(self.pred_run_btn)
-        pred_bar_layout.addWidget(self.pred_time_slider, 1)
-        pred_bar_layout.addWidget(self.pred_play_btn)
-        pred_bar_layout.addWidget(self.pred_speed)
-        pred_bar_layout.addWidget(self.pred_time_label)
-        pred_bar_layout.addWidget(self.pred_pov_btn)
-        pred_bar_layout.addWidget(self.pred_orbit_btn)
+        self.view3d_wp_path = None
+        self.view3d_pred_lat: list[float] = []
+        self.view3d_pred_lon: list[float] = []
+        self.view3d_pred_east: list[float] = []
+        self.view3d_pred_north: list[float] = []
+        self.view3d_pred_job = 0
+        self.view3d_pred_active = 0
+        self.view3d_pred_proc = QProcess(self)
+        self.view3d_pred_proc.setProcessChannelMode(QProcess.ProcessChannelMode.SeparateChannels)
+        self.view3d_pred_proc.finished.connect(self._on_view3d_predict_finished)
 
-        self.pred_time: list[float] = []
-        self.pred_lat: list[float] = []
-        self.pred_lon: list[float] = []
-        self.pred_yaw: list[float] = []
-        self.pred_mode: list[int] = []
-        self.pred_east: list[float] = []
-        self.pred_north: list[float] = []
-        self.pred_home = None
-        self.pred_wps: list[tuple[int, float, float]] = []
-        self.pred_origin = None
-        self.pred_wp_path = None
-        self.pred_ready = False
-        self.pred_cam = "orbit"
-        self.pred_job = 0
-        self.pred_proc = QProcess(self)
-        self.pred_proc.setProcessChannelMode(QProcess.ProcessChannelMode.SeparateChannels)
-        self.pred_proc.finished.connect(self._on_pred_finished)
-
-        self.pred_view = QWebEngineView(self)
-        self.pred_view.settings().setAttribute(
-            QWebEngineSettings.WebAttribute.LocalContentCanAccessFileUrls, True
-        )
-        self.pred_view.loadFinished.connect(self._on_pred_ready)
-        self.pred_view.load(QUrl.fromLocalFile(html_path))
-
-        title_style = "color: #e5e7eb; font-weight: bold;"
-        left = QWidget(self)
-        left_layout = QVBoxLayout(left)
-        left_layout.setContentsMargins(0, 0, 4, 0)
-        left_layout.setSpacing(6)
-        left_title = QLabel("Prediksi lintasan", self)
-        left_title.setStyleSheet(title_style)
-        left_layout.addWidget(left_title)
-        left_layout.addWidget(pred_bar)
-        left_layout.addWidget(self.pred_view, 1)
-
-        right = QWidget(self)
-        right_layout = QVBoxLayout(right)
-        right_layout.setContentsMargins(4, 0, 0, 0)
-        right_layout.setSpacing(6)
-        right_title = QLabel("Replay data uji", self)
-        right_title.setStyleSheet(title_style)
-        right_layout.addWidget(right_title)
-        right_layout.addWidget(bar)
-        right_layout.addWidget(self.view3d_view, 1)
-
-        split = QSplitter(Qt.Orientation.Horizontal, self)
-        split.setChildrenCollapsible(False)
-        split.setStyleSheet(
-            "QSplitter::handle { background: #4b5563; }"
-            "QSplitter::handle:hover { background: #6b7280; }"
-        )
-        split.addWidget(left)
-        split.addWidget(right)
-        split.setStretchFactor(0, 1)
-        split.setStretchFactor(1, 1)
-        layout.addWidget(split, 1)
+        layout.addWidget(bar)
+        layout.addWidget(self.view3d_view, 1)
         self.tab_widget.currentChanged.connect(self._refresh_view3d_size)
         return tab
 
     def _refresh_view3d_size(self, _index: int = 0) -> None:
         self._view3d_js("if (window.onReplayResize) window.onReplayResize();")
-        self._pred_js("if (window.onReplayResize) window.onReplayResize();")
 
     def _view3d_js(self, code: str) -> None:
         if not getattr(self, "view3d_ready", False):
@@ -4748,12 +4657,18 @@ class MainWindow(QMainWindow):
         self.view3d_origin = self._view3d_pick_origin()
         self.view3d_east = []
         self.view3d_north = []
+        self.view3d_pred_east = []
+        self.view3d_pred_north = []
         if self.view3d_origin is None:
             return
         for lat, lon in zip(self.view3d_lat, self.view3d_lon):
             east, north = self._view3d_enu(lat, lon)
             self.view3d_east.append(east)
             self.view3d_north.append(north)
+        for lat, lon in zip(self.view3d_pred_lat, self.view3d_pred_lon):
+            east, north = self._view3d_enu(lat, lon)
+            self.view3d_pred_east.append(east)
+            self.view3d_pred_north.append(north)
 
     def _view3d_events(self) -> list[list]:
         modes = self.view3d_mode
@@ -4804,8 +4719,13 @@ class MainWindow(QMainWindow):
             [round(east, 3), round(north, 3)]
             for east, north in zip(self.view3d_east, self.view3d_north)
         ]
+        predict = [
+            [round(east, 3), round(north, 3)]
+            for east, north in zip(self.view3d_pred_east, self.view3d_pred_north)
+        ]
         payload = {
             "trail": trail,
+            "predict": predict,
             "home": home,
             "wps": wps,
             "events": self._view3d_events(),
@@ -4976,244 +4896,29 @@ class MainWindow(QMainWindow):
             return
         self.view3d_home = home
         self.view3d_wps = wps
+        self.view3d_wp_path = path if home is not None and wps else None
+        self._cancel_view3d_predict()
+        self.view3d_pred_lat = []
+        self.view3d_pred_lon = []
+        self.view3d_pred_btn.setEnabled(self.view3d_wp_path is not None)
         self._view3d_reframe()
         self._push_view3d_scene()
         if self.view3d_time:
             self._on_view3d_slider(self.view3d_time_slider.value())
 
-    def _pred_js(self, code: str) -> None:
-        if not getattr(self, "pred_ready", False):
+    def _cancel_view3d_predict(self) -> None:
+        self.view3d_pred_job = getattr(self, "view3d_pred_job", 0) + 1
+        proc = getattr(self, "view3d_pred_proc", None)
+        if proc is not None and proc.state() != QProcess.ProcessState.NotRunning:
+            proc.kill()
+        btn = getattr(self, "view3d_pred_btn", None)
+        if btn is not None:
+            btn.setText("Prediksi")
+
+    def run_view3d_predict(self) -> None:
+        if not self.view3d_wp_path or self.view3d_home is None or not self.view3d_wps:
             return
-        self.pred_view.page().runJavaScript(code)
-
-    def _on_pred_ready(self, ok: bool) -> None:
-        self.pred_ready = bool(ok)
-        if not ok:
-            return
-        self._push_pred_scene()
-        if self.pred_time:
-            self._on_pred_slider(self.pred_time_slider.value())
-        else:
-            self._set_pred_camera(self.pred_cam)
-
-    def _pred_pick_origin(self):
-        if self.pred_home is not None:
-            return self.pred_home
-        if self.pred_lat:
-            return (self.pred_lat[0], self.pred_lon[0])
-        if self.pred_wps:
-            return (self.pred_wps[0][1], self.pred_wps[0][2])
-        return None
-
-    def _pred_enu(self, lat: float, lon: float) -> tuple[float, float]:
-        lat0, lon0 = self.pred_origin
-        east = math.radians(lon - lon0) * _ENU_R_M * math.cos(math.radians(lat0))
-        north = math.radians(lat - lat0) * _ENU_R_M
-        return east, north
-
-    def _pred_reframe(self) -> None:
-        self.pred_origin = self._pred_pick_origin()
-        self.pred_east = []
-        self.pred_north = []
-        if self.pred_origin is None:
-            return
-        for lat, lon in zip(self.pred_lat, self.pred_lon):
-            east, north = self._pred_enu(lat, lon)
-            self.pred_east.append(east)
-            self.pred_north.append(north)
-
-    def _pred_events(self) -> list[list]:
-        modes = self.pred_mode
-        east = self.pred_east
-        north = self.pred_north
-        count = min(len(modes), len(east), len(north))
-        if count == 0:
-            return []
-
-        def auto_on(index: int) -> bool:
-            return int(modes[index]) != 0
-
-        events: list[list] = []
-        session = 0
-        if auto_on(0):
-            session = 1
-            events.append(["start", round(east[0], 3), round(north[0], 3), session])
-        for index in range(1, count):
-            was_auto = auto_on(index - 1)
-            now_auto = auto_on(index)
-            if (not was_auto) and now_auto:
-                session += 1
-                events.append(["start", round(east[index], 3), round(north[index], 3), session])
-            elif was_auto and (not now_auto):
-                events.append(["end", round(east[index], 3), round(north[index], 3), session])
-        if auto_on(count - 1):
-            same_as_start = (
-                events
-                and events[-1][0] == "start"
-                and events[-1][1] == round(east[count - 1], 3)
-                and events[-1][2] == round(north[count - 1], 3)
-            )
-            if not same_as_start:
-                events.append(["open", round(east[count - 1], 3), round(north[count - 1], 3), max(session, 1)])
-        return events
-
-    def _push_pred_scene(self) -> None:
-        home = None
-        if self.pred_home is not None and self.pred_origin is not None:
-            east, north = self._pred_enu(self.pred_home[0], self.pred_home[1])
-            home = [round(east, 3), round(north, 3)]
-        wps = []
-        if self.pred_origin is not None:
-            for num, lat, lon in self.pred_wps:
-                east, north = self._pred_enu(lat, lon)
-                wps.append([num, round(east, 3), round(north, 3)])
-        trail = [
-            [round(east, 3), round(north, 3)]
-            for east, north in zip(self.pred_east, self.pred_north)
-        ]
-        payload = {
-            "trail": trail,
-            "home": home,
-            "wps": wps,
-            "events": self._pred_events(),
-            "hasShip": bool(trail),
-        }
-        self._pred_js("window.loadScene(%s)" % json.dumps(payload, separators=(",", ":")))
-
-    def _pred_index(self, timestamp: float) -> int:
-        times = self.pred_time
-        if not times:
-            return -1
-        index = bisect_left(times, timestamp)
-        if index <= 0:
-            return 0
-        if index >= len(times):
-            return len(times) - 1
-        if abs(times[index - 1] - timestamp) <= abs(times[index] - timestamp):
-            return index - 1
-        return index
-
-    def _on_pred_slider(self, value: int) -> None:
-        if not self.pred_time:
-            self.pred_time_label.setText("0.0 s")
-            return
-        timestamp = value / float(self.pred_time_slider_scale)
-        index = self._pred_index(timestamp)
-        if index < 0:
-            return
-        self.pred_time_label.setText("%.1f s" % self.pred_time[index])
-        self._pred_js(
-            "window.setPose(%s,%s,%s)" % (
-                round(self.pred_east[index], 3),
-                round(self.pred_north[index], 3),
-                round(self.pred_yaw[index], 3),
-            )
-        )
-
-    def _set_pred_camera(self, mode: str) -> None:
-        self.pred_cam = mode
-        self.pred_pov_btn.setChecked(mode == "pov")
-        self.pred_orbit_btn.setChecked(mode == "orbit")
-        self._pred_js("window.setCameraMode('%s')" % mode)
-
-    def _stop_pred_play(self) -> None:
-        self.pred_playing = False
-        if hasattr(self, "pred_play_timer"):
-            self.pred_play_timer.stop()
-        if hasattr(self, "pred_play_btn"):
-            self.pred_play_btn.setText("Play")
-
-    def _toggle_pred_play(self) -> None:
-        if self.pred_playing:
-            self._stop_pred_play()
-            return
-        if not self.pred_time:
-            return
-        if self.pred_time_slider.value() >= self.pred_time_slider.maximum():
-            self.pred_time_slider.setValue(self.pred_time_slider.minimum())
-        self.pred_playing = True
-        self.pred_play_btn.setText("Pause")
-        self.pred_play_last = time()
-        self.pred_play_timer.start()
-
-    def _advance_pred_play(self) -> None:
-        if not self.pred_playing or not self.pred_time:
-            self._stop_pred_play()
-            return
-        now = time()
-        dt = min(0.2, max(0.0, now - self.pred_play_last))
-        self.pred_play_last = now
-        speed = float(self.pred_speed.currentData() or 1.0)
-        step = int(dt * speed * self.pred_time_slider_scale)
-        if step < 1:
-            step = 1
-        nxt = self.pred_time_slider.value() + step
-        if nxt >= self.pred_time_slider.maximum():
-            self.pred_time_slider.setValue(self.pred_time_slider.maximum())
-            self._stop_pred_play()
-        else:
-            self.pred_time_slider.setValue(nxt)
-
-    def load_pred_waypoints(self) -> None:
-        start_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "WayPoints")
-        path, _ = QFileDialog.getOpenFileName(
-            self, "Load Waypoints", start_dir, "CSV Files (*.csv)")
-        if not path:
-            return
-        home = None
-        wps: list[tuple[int, float, float]] = []
-        try:
-            with open(path, "r", encoding="utf-8-sig", newline="") as handle:
-                reader = csv.DictReader(handle)
-                for row in reader:
-                    if not row:
-                        continue
-                    label = str(row.get("No") or "").strip()
-                    if not label:
-                        continue
-                    lat = float(str(row.get("Lat") or "").strip())
-                    lon = float(str(row.get("Long") or "").strip())
-                    if not (-90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0):
-                        continue
-                    if label.lower() == "home":
-                        home = (lat, lon)
-                    else:
-                        wps.append((int(float(label)), lat, lon))
-        except Exception as exc:
-            QMessageBox.critical(self, "Load Waypoints", f"Gagal membaca file:\n{exc}")
-            return
-        wps.sort(key=lambda item: item[0])
-        if home is None or not wps:
-            QMessageBox.warning(
-                self, "Load Waypoints",
-                "Prediksi butuh baris Home dan minimal satu waypoint.")
-            return
-        self._stop_pred_play()
-        self.pred_job += 1
-        if self.pred_proc.state() != QProcess.ProcessState.NotRunning:
-            self.pred_proc.kill()
-            self.pred_run_btn.setText("Prediksi")
-        self.pred_home = home
-        self.pred_wps = wps
-        self.pred_wp_path = path
-        self.pred_time = []
-        self.pred_lat = []
-        self.pred_lon = []
-        self.pred_yaw = []
-        self.pred_mode = []
-        self.pred_run_btn.setEnabled(True)
-        self._pred_reframe()
-        self.pred_time_slider.blockSignals(True)
-        self.pred_time_slider.setRange(0, 1)
-        self.pred_time_slider.setValue(0)
-        self.pred_time_slider.blockSignals(False)
-        self.pred_time_label.setText("0.0 s")
-        self._push_pred_scene()
-
-    def run_pred_track(self) -> None:
-        if not self.pred_wp_path or self.pred_home is None or not self.pred_wps:
-            return
-        if self.pred_proc.state() != QProcess.ProcessState.NotRunning:
+        if self.view3d_pred_proc.state() != QProcess.ProcessState.NotRunning:
             return
         exe = os.path.join(os.path.dirname(os.path.abspath(__file__)), "predict_track.exe")
         if not os.path.isfile(exe):
@@ -5221,39 +4926,34 @@ class MainWindow(QMainWindow):
                 self, "Prediksi",
                 "predict_track.exe belum ada di folder yang sama dengan dashboard.")
             return
-        self._stop_pred_play()
-        self.pred_job += 1
-        self.pred_active_job = self.pred_job
-        self.pred_run_btn.setEnabled(False)
-        self.pred_run_btn.setText("Menghitung…")
-        self.pred_proc.setProgram(exe)
-        self.pred_proc.setArguments([self.pred_wp_path])
-        self.pred_proc.setWorkingDirectory(os.path.dirname(exe))
-        self.pred_proc.start()
+        self.view3d_pred_job += 1
+        self.view3d_pred_active = self.view3d_pred_job
+        self.view3d_pred_btn.setEnabled(False)
+        self.view3d_pred_btn.setText("Menghitung…")
+        self.view3d_pred_proc.setProgram(exe)
+        self.view3d_pred_proc.setArguments([self.view3d_wp_path])
+        self.view3d_pred_proc.setWorkingDirectory(os.path.dirname(exe))
+        self.view3d_pred_proc.start()
 
-    def _on_pred_finished(self, code: int, _status) -> None:
-        job = getattr(self, "pred_active_job", 0)
-        if job != self.pred_job:
+    def _on_view3d_predict_finished(self, code: int, _status) -> None:
+        if self.view3d_pred_active != self.view3d_pred_job:
             return
-        self.pred_run_btn.setText("Prediksi")
-        self.pred_run_btn.setEnabled(self.pred_home is not None and bool(self.pred_wps))
-        err = bytes(self.pred_proc.readAllStandardError()).decode("utf-8", errors="replace").strip()
+        self.view3d_pred_btn.setText("Prediksi")
+        self.view3d_pred_btn.setEnabled(self.view3d_wp_path is not None)
+        err = bytes(self.view3d_pred_proc.readAllStandardError()).decode("utf-8", errors="replace").strip()
         if code != 0:
             QMessageBox.critical(
                 self, "Prediksi",
                 err or "predict_track berhenti dengan kode %d." % code)
             return
-        text = bytes(self.pred_proc.readAllStandardOutput()).decode("utf-8", errors="replace")
+        text = bytes(self.view3d_pred_proc.readAllStandardOutput()).decode("utf-8", errors="replace")
         try:
             reader = csv.DictReader(io.StringIO(text))
             if not reader.fieldnames:
                 raise ValueError("Header CSV prediksi kosong")
             fmt = _detect_analyze_csv_format(set(reader.fieldnames))
-            times: list[float] = []
             lats: list[float] = []
             lons: list[float] = []
-            yaws: list[float] = []
-            modes: list[int] = []
             for row in reader:
                 parsed = _parse_analyze_csv_row(row, fmt)
                 if parsed is None:
@@ -5262,40 +4962,25 @@ class MainWindow(QMainWindow):
                 lon = parsed["lon"]
                 if lat == 0.0 and lon == 0.0:
                     continue
-                times.append(parsed["timestamp"])
                 lats.append(lat)
                 lons.append(lon)
-                yaws.append(parsed["yaw"])
-                modes.append(int(parsed["mode_auto"]))
         except Exception as exc:
             QMessageBox.critical(self, "Prediksi", f"Gagal membaca hasil:\n{exc}")
             return
-        if not times:
-            QMessageBox.warning(self, "Prediksi", "Tidak ada titik lintasan.")
+        if len(lats) < 2:
+            QMessageBox.warning(self, "Prediksi", "Tidak ada lintasan yang bisa digambar.")
             return
-        self.pred_time = times
-        self.pred_lat = lats
-        self.pred_lon = lons
-        self.pred_yaw = yaws
-        self.pred_mode = modes
-        self._pred_reframe()
-        scale = self.pred_time_slider_scale
-        slider_min = int(times[0] * scale)
-        slider_max = int(times[-1] * scale)
-        if slider_min == slider_max:
-            slider_max = slider_min + 1
-        self.pred_time_slider.blockSignals(True)
-        self.pred_time_slider.setRange(slider_min, slider_max)
-        self.pred_time_slider.setValue(slider_min)
-        self.pred_time_slider.blockSignals(False)
-        self._push_pred_scene()
-        self._on_pred_slider(slider_min)
+        self.view3d_pred_lat = lats
+        self.view3d_pred_lon = lons
+        self._view3d_reframe()
+        self._push_view3d_scene()
+        if self.view3d_time:
+            self._on_view3d_slider(self.view3d_time_slider.value())
 
     def closeEvent(self, event):
-        self.pred_job = getattr(self, "pred_job", 0) + 1
-        proc = getattr(self, "pred_proc", None)
+        self._cancel_view3d_predict()
+        proc = getattr(self, "view3d_pred_proc", None)
         if proc is not None and proc.state() != QProcess.ProcessState.NotRunning:
-            proc.kill()
             proc.waitForFinished(1000)
         self.disconnect_serial()
         super().closeEvent(event)

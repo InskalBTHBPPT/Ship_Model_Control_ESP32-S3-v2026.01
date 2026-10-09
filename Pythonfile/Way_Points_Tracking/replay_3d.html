@@ -241,6 +241,17 @@ window.loadScene = function (data) {
       new THREE.LineBasicMaterial({ color: 0x000000 })
     ));
   }
+  const predict = data.predict || [];
+  if (predict.length) {
+    const pts = predict.map(function (p) {
+      note(p[0], p[1]);
+      return new THREE.Vector3(p[0], 0.4, -p[1]);
+    });
+    overlay.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(pts),
+      new THREE.LineBasicMaterial({ color: 0xdc2626 })
+    ));
+  }
   if (data.home) {
     note(data.home[0], data.home[1]);
     const home = new THREE.Mesh(
