@@ -2,7 +2,7 @@
 
 Dokumentasi sistem **Ship Auto Way Maps Points Tracking** — kontrol kapal model ESP32-S3 dengan waypoint, telemetry real-time, NMPC di mini PC, dan dashboard PySide6.
 
-**Versi dokumen:** dashboard 1.6 + Remote/User-05 + Cpp 2.0  
+**Versi dokumen:** dashboard 1.6 + User-05 + Remote-05.1 + Cpp 2.2  
 **Last update:** 2026-10
 
 Dokumen dashboard: `README Local Monitor Dashboard-1.6.md`
@@ -14,10 +14,10 @@ Dokumen dashboard: `README Local Monitor Dashboard-1.6.md`
 1. [Ringkasan sistem](#1-ringkasan-sistem)
 2. [Komponen & path proyek](#2-komponen--path-proyek)
 3. [Arsitektur & alur data](#3-arsitektur--alur-data)
-4. [Remote-Side-05](#4-remote-side-05)
+4. [Remote-Side-05.1](#4-remote-side-051)
 5. [User-Side-05](#5-user-side-05)
-6. [Dashboard beta 1.6](#6-dashboard-beta-16)
-7. [Mini PC — Cpp_ReadWriteSerial-2.0](#7-mini-pc--cpp_readwriteserial-20)
+6. [Dashboard 1.6](#6-dashboard-16)
+7. [Mini PC — Cpp_ReadWriteSerial-2.2](#7-mini-pc--cpp_readwriteserial-22)
 8. [Protokol serial (Dashboard ↔ User-Side)](#8-protokol-serial-dashboard--user-side)
 9. [Protokol ESP-NOW](#9-protokol-esp-now)
 10. [Telemetry 24 kolom](#10-telemetry-24-kolom)
@@ -36,39 +36,40 @@ Sistem ini memungkinkan:
 - **Monitoring live** posisi, yaw kompas, rudder, RPM, baterai, status Mini PC, serta surge `u` / sway `v` (dihitung di dashboard)
 - **Perencanaan waypoint** di peta (Home + hingga 10 waypoint navigasi)
 - **Pengiriman waypoint** ke kapal via ESP-NOW (`0xA1`)
-- **Kontrol auto alg 2** — rudder dari NMPC mini PC (`timestamp,result`)
+- **Kontrol auto alg 2** — rudder dan bearing dari NMPC mini PC (`timestamp,result,bearing`)
 - **Kontrol auto alg 1** — waypoint + PD (opsional, compile-time)
+- **Propeller** — manual dari CH3/CH5; saat auto menahan nilai terakhir sebelum pindah mode
 - **Shutdown mini PC** dari dashboard (ESP-NOW `0xA2`, tanpa Wi‑Fi laptop↔mini PC)
 - **Analisis log CSV** — replay data dengan peta dan plot
 
 Alur end-to-end:
 
 ```text
-Dashboard beta 1.6 (PySide6)
+Dashboard 1.6 (PySide6)
     │ USB serial 115200
     ▼
 User-Side-05  (ESP-Now_ESP32-S3_User-Side-05)
     │ ESP-NOW peer-to-peer
     ▼
-Remote-Side-05 (ESP-Now_ESP32-S3_Remote-Side-05) — di kapal
+Remote-Side-05.1 (ESP-Now_ESP32-S3_Remote-Side-05.1) — di kapal
     │ USB Serial 115200
     ▼
-Mini PC — Cpp_ReadWriteSerial-2.0-ENU-NMPC
+Mini PC — Cpp_ReadWriteSerial-2.2-ENU-NMPC
 ```
 
 ---
 
 ## 2. Komponen & path proyek
 
-| Komponen | Path (dari root repo) |
-|----------|----------------------|
-| Dashboard | `Pythonfile/Way_Points_Tracking/Local Monitor Dashboard-1.6.py` |
-| User-Side | `PlatformIO/Way_Points_Tracking/ESP-Now_ESP32-S3_User-Side-05/` |
-| Remote-Side | `PlatformIO/Way_Points_Tracking/ESP-Now_ESP32-S3_Remote-Side-05/` |
-| Mini PC | `Cpp_Files/Cpp_ReadWriteSerial-2.0-ENU-NMPC/` |
-| Dokumen ini | `Pythonfile/Way_Points_Tracking/Ship Auto Way Maps Points Tracking.md` |
+| Peran | Proyek | Path (dari root repo) |
+|-------|--------|------------------------|
+| Dashboard | `Local Monitor Dashboard-1.6.py` | `Pythonfile/Way_Points_Tracking/` |
+| Laptop, jembatan ESP-NOW | `ESP-Now_ESP32-S3_User-Side-05` | `PlatformIO/Way_Points_Tracking/` |
+| Kapal | `ESP-Now_ESP32-S3_Remote-Side-05.1` | `PlatformIO/Way_Points_Tracking/` |
+| Mini PC | `Cpp_ReadWriteSerial-2.2-ENU-NMPC` | `Cpp_Files/` |
+| Dokumen ini | `Ship Auto Way Maps Points Tracking.md` | `Pythonfile/Way_Points_Tracking/` |
 
-`Cpp_ReadWriteSerial-2.1-ENU-NMPC-beta` adalah cabang yang menghitung `u`,`v` dari GPS. Stack di dokumen ini memakai **2.0** (`v = 0`, `u0 = 0.6114` m/s).
+2.2 turunan **2.0**, bukan 2.1: `v = 0`, `u0 = 0.6114` m/s. Tambahannya adalah kolom bearing pada balasan serial. `Cpp_ReadWriteSerial-2.1-ENU-NMPC-beta` menghitung `u`,`v` dari GPS dan **bukan** pasangan kapal ini.
 
 ---
 
@@ -86,39 +87,42 @@ Mini PC — Cpp_ReadWriteSerial-2.0-ENU-NMPC
 1. Dashboard: `$WPSET,...`
 2. User-Side → ESP-NOW `0xA1` → Remote simpan RAM + cetak `[WP] ...`
 3. User-Side balas `$WACK,OK` / `$WACK,ERR,...`
-4. Mini PC 2.0 memakai `[WP] Home` sebagai origin ENU dan `[WP] #n` sebagai target
+4. Mini PC 2.2 memakai `[WP] Home` sebagai origin ENU dan `[WP] #n` sebagai target
 
 ### 3.3 Rudder NMPC (auto alg 2)
 
 1. Remote (CH6 auto) kirim CSV 8 kolom ke mini PC
-2. 2.0 memakai `timestamp`, `lat`, `lon`, `yaw`, `yaw_rate`, dan daftar `[WP]`
-3. 2.0 mengabaikan `calc_deg_servo_*` dan `gyro_z`
-4. Mini PC kirim `$HB` (~1 Hz) + `timestamp,result` (offset rudder, derajat)
-5. Remote set `mini_pc_link` dari heartbeat; pakai `result` sebagai offset rudder
+2. 2.2 memakai `timestamp`, `lat`, `lon`, `yaw`, `yaw_rate`, dan daftar `[WP]`
+3. 2.2 mengabaikan `calc_deg_servo_*` dan `gyro_z`
+4. Mini PC kirim `$HB` (~1 Hz). Jika GPS dan waypoint siap, balasan `timestamp,result,bearing`; jika tidak, `timestamp,result` saja
+5. Remote set `mini_pc_link` dari heartbeat, memakai `result` sebagai offset rudder, dan — bila kolom ketiga ada — menyalin `bearing` ke `heading_setpoint`
 
-`ψ`, bearing, `u`, dan `v` tidak dikirim balik ke Remote.
+`u` dan `v` tidak dikirim balik ke Remote. Bearing dihitung di mini PC (`wrap360(90° − θ)`), skala kompas CW.
 
 ### 3.4 Shutdown mini PC
 
 1. Dashboard tombol **Shutdown** (hanya jika Mini PC CONNECTED)
 2. `$SHUTDOWN` → User → ESP-NOW `0xA2` → Remote → Serial `$SHUTDOWN`
-3. `Cpp_ReadWriteSerial-2.0` jalankan `shutdown /s /t 5`
+3. `Cpp_ReadWriteSerial-2.2` jalankan `shutdown /s /t 5`
 4. User balas `$SACK,OK` (forward ESP-NOW sukses — bukan konfirmasi OS mati)
 
 ---
 
-## 4. Remote-Side-05
+## 4. Remote-Side-05.1
 
-**Proyek:** `ESP-Now_ESP32-S3_Remote-Side-05`
+**Proyek:** `ESP-Now_ESP32-S3_Remote-Side-05.1`  
+Turunan Remote-Side-05. Pasangan mini PC: 2.2.
 
 - Sensor, actuator, RC PPM, waypoint RAM, telemetry ESP-NOW 24 kolom
 - Yaw kapal: raw JY901 (−180…180) → wrap 0…360 → +90° pasang → `360 − yaw` = kompas CW (0 Utara, 90 Timur, 270 Barat)
-- USB Serial ke mini PC: CSV 8 kolom, `[WP]`, `$SHUTDOWN`; terima `$HB` + `timestamp,result`
+- USB Serial ke mini PC: CSV 8 kolom, `[WP]`, `$SHUTDOWN`; terima `$HB` + `timestamp,result` atau `timestamp,result,bearing`
 - Default `#define AUTO_TRACK_ALG 2` (mini PC / NMPC)
-- Alg 2: `heading_setpoint` = salinan yaw, `heading_error` = 0
-- Alg 1: `heading_setpoint` = bearing ke waypoint aktif
+- Alg 2, ada kolom bearing: `heading_setpoint` = bearing, `heading_error` = bearing − yaw
+- Alg 2, tanpa kolom ketiga: `heading_setpoint` = salinan yaw, `heading_error` = 0
+- Alg 1: `heading_setpoint` = bearing haversine ke waypoint aktif (dihitung di Remote)
+- Propeller CH3 (kecepatan) dan CH5 (arah): saat manual mengikuti stik. Saat CH6 pindah ke auto, PWM menahan nilai tick manual terakhir. Gerakan CH3/CH5 selama auto diabaikan sampai mode kembali manual. Jika kapal dinyalakan sudah di auto, yang ditahan adalah pembacaan tick auto pertama
 
-Detail: `PlatformIO/.../Remote-Side-05/src/README.md`
+Detail: `PlatformIO/.../Remote-Side-05.1/src/README.md`
 
 ---
 
@@ -129,12 +133,13 @@ Detail: `PlatformIO/.../Remote-Side-05/src/README.md`
 - Gateway USB ↔ ESP-NOW. Tidak terhubung ke mini PC
 - Forward `$WPSET` → `0xA1`, `$SHUTDOWN` → `0xA2`
 - CSV 24 kolom ke dashboard. `yaw` dan `heading_setpoint` diteruskan mentah (×100)
+- Tidak perlu versi baru untuk bearing 2.2: kolom `heading_setpoint` sudah ada
 
 Detail: `PlatformIO/.../User-Side-05/src/README.md`
 
 ---
 
-## 6. Dashboard beta 1.6
+## 6. Dashboard 1.6
 
 **File:** `Local Monitor Dashboard-1.6.py`
 
@@ -142,27 +147,29 @@ Detail: `PlatformIO/.../User-Side-05/src/README.md`
 - Tombol **Shutdown** sebelah status Mini PC (enable jika Connect + `mini_pc_link=1`)
 - Map Points: Home + waypoints, **Send Way Points** (`$WPSET` / `$WACK`)
 - Live: **u surge**, **v sway** (hitung lokal; bukan dari firmware)
-- Logging & Analyze: CSV 24 kolom ditambah `u (m/s)`, `v (m/s)`
-- Plot Heading Setpoint pada alg 2 menempel pada yaw
+- Logging & Analyze: CSV telemetry ditambah `u (m/s)`, `v (m/s)`
+- Plot Heading Setpoint pada alg 2 mengikuti bearing dari 2.2. Saat manual, setpoint sama dengan yaw
 
 Detail: `README Local Monitor Dashboard-1.6.md`
 
 ---
 
-## 7. Mini PC — Cpp_ReadWriteSerial-2.0
+## 7. Mini PC — Cpp_ReadWriteSerial-2.2
 
-**Path:** `Cpp_Files/Cpp_ReadWriteSerial-2.0-ENU-NMPC/`
+**Path:** `Cpp_Files/Cpp_ReadWriteSerial-2.2-ENU-NMPC/`
 
 | Arah | Isi |
 |------|-----|
 | Terima | CSV 8 kolom saat CH6 auto; `[WP] Home` / `[WP] #n`; `$SHUTDOWN` |
 | Pakai | `timestamp`, `lat`, `lon`, `yaw`, `yaw_rate`, daftar WP |
 | Abaikan | `calc_deg_servo_1/2`, `gyro_z` |
-| Kirim | `$HB` tiap 1 s; `timestamp,result` (rudder °, ±45) |
+| Kirim | `$HB` tiap 1 s; `timestamp,result` atau `timestamp,result,bearing` |
+
+`result` = offset rudder (°), dibatasi solver ±45. `bearing` = haluan kompas ke waypoint aktif (0 Utara, 90 Timur). Kolom ketiga ada bila GPS fix dan daftar waypoint siap, termasuk saat misi sudah di dalam `r_tran` waypoint terakhir (bearing tetap ke WP itu).
 
 State NMPC: `v = 0`, `u0 = 0.6114` m/s, `ψ = π/2 − yaw`, `r` dari `yaw_rate` (tanda minus). `L = 1.0107` m.
 
-Detail: `Cpp_Files/Cpp_ReadWriteSerial-2.0-ENU-NMPC/README.md`
+Detail: `Cpp_Files/Cpp_ReadWriteSerial-2.2-ENU-NMPC/README.md`
 
 ---
 
@@ -186,6 +193,7 @@ timestamp,lat,lon,calc_deg_servo_1,calc_deg_servo_2,yaw,gyro_z,yaw_rate
 [WP] #1: lat, lon
 $HB
 timestamp,result
+timestamp,result,bearing
 $SHUTDOWN
 ```
 
@@ -199,22 +207,28 @@ $SHUTDOWN
 | `0xA1` | `waypoints_payload` ~180 B | User → Remote | Waypoint + home |
 | `0xA2` | `pc_command_payload` 4 B | User → Remote | Perintah mini PC (`cmd=1` shutdown) |
 
-**Catatan:** `0xA2` di versi 05 = shutdown mini PC (bukan tuning NVS dokumen lama).
+**Catatan:** `0xA2` di versi 05 / 05.1 = shutdown mini PC (bukan tuning NVS dokumen lama).
 
 ---
 
 ## 10. Telemetry 24 kolom
 
-Urutan sama di Remote `DatatoSend`, User CSV, dan dashboard:
+Urutan sama di Remote `DatatoSend`, User CSV, dan parser dashboard:
 
 1 timestamp, 2 lat, 3 lon, 4 speedMps×100, 5–6 servo×100, 7 yaw×100,  
 8 hdg_sp×100, 9 hdg_err×100, 10 rudder_cmd×100, 11 track_wp_index,  
 12 distance_to_wp×10, 13–18 IMU×100, 19–20 RPM, 21–22 battery×100,  
 23 mode_auto, **24 mini_pc_link**
 
-`mode_auto`: 0 Manual, 1 Auto PD, 2 Auto Mini PC.
+| Field | Arti |
+|-------|------|
+| `mode_auto` | 0 Manual, 1 Auto PD (alg 1), 2 Auto Mini PC (alg 2, default) |
+| `heading_setpoint` | Manual: sama dengan yaw. Alg 2 + bearing 2.2: bearing kompas. Alg 1: bearing haversine |
+| `track_wp_index` | Diisi alg 1: 0 tidak menjejak, 1…N nomor WP, 255 home. Manual dan alg 2 selalu 0 (indeks WP aktif ada di mini PC) |
+| `mini_pc_link` | 1 jika Remote menerima `$HB` dalam 3 detik; 0 jika putus. Dashboard CONNECTED membaca kolom ini |
+| RPM | Hasil ukur encoder, bukan perintah. Perintah propeller tetap dari RC (lihat bagian 4) |
 
-Log dashboard menambah `u (m/s)` dan `v (m/s)` setelah `speedMps`. Kedua kolom itu tidak ada di firmware.
+Log dashboard menambah `u (m/s)` dan `v (m/s)` setelah `speedMps`. Di file log, `mode_auto` menjadi kolom 25 dan `mini_pc_link` kolom 26. Kedua kolom `u`,`v` tidak ada di firmware.
 
 ---
 
@@ -228,7 +242,14 @@ raw (−180…180) → wrap 0…360 → +90° → 360 − yaw
 
 Hasil di CSV: 0 = Utara, 90 = Timur, 270 = Barat. User-Side dan dashboard hanya ÷100.
 
-**Heading setpoint** bukan mode zigzag. Pada alg 2 isinya salinan yaw. Bearing ke waypoint hanya diisi jika firmware di-compile dengan `AUTO_TRACK_ALG 1`.
+**Heading setpoint** bukan mode zigzag.
+
+| Kondisi | Isi |
+|---------|-----|
+| CH6 manual | sama dengan yaw, error 0 |
+| Alg 2 + baris `timestamp,result,bearing` | bearing kompas dari 2.2 |
+| Alg 2 tanpa kolom ketiga | salinan yaw |
+| Alg 1 | bearing haversine di Remote |
 
 **`u`, `v` di dashboard 1.6** (kompas CW):
 
@@ -237,7 +258,7 @@ u = ẋ sinψ + ẏ cosψ
 v = ẋ cosψ − ẏ sinψ
 ```
 
-2.0 tidak memakai rumus ini.
+2.2 tidak memakai rumus ini (`v = 0`, `u0 = 0.6114`).
 
 ---
 
@@ -248,11 +269,11 @@ Dipilih compile-time di Remote (`AUTO_TRACK_ALG`):
 | Nilai | Perilaku |
 |-------|----------|
 | 1 | Waypoint haversine + PD rudder. `heading_setpoint` = bearing |
-| 2 (default) | Rudder dari mini PC `timestamp,result`. Setpoint = yaw |
+| 2 (default) | Rudder dari mini PC `result`. `heading_setpoint` dari kolom `bearing` bila ada |
 
-CH6 ≥ 1750 = Auto; jika alg 2 dan `mini_pc_link=0` → rudder netral + warning.
+CH6 ≥ 1750 = Auto. Jika alg 2 dan `mini_pc_link=0` → rudder netral + warning. Propeller saat auto tetap pada kunci CH3/CH5, tidak ikut stik.
 
-CH6 manual ↔ auto tidak mereset indeks waypoint. Reset ke WP1 hanya lewat **Send Way Points** baru atau restart program 2.0.
+CH6 manual ↔ auto tidak mereset indeks waypoint di mini PC. Reset ke WP1 hanya lewat **Send Way Points** baru atau restart program 2.2.
 
 ---
 
@@ -260,13 +281,13 @@ CH6 manual ↔ auto tidak mereset indeks waypoint. Reset ke WP1 hanya lewat **Se
 
 ```bash
 # Firmware
-cd PlatformIO/Way_Points_Tracking/ESP-Now_ESP32-S3_Remote-Side-05
+cd PlatformIO/Way_Points_Tracking/ESP-Now_ESP32-S3_Remote-Side-05.1
 pio run --target upload
 cd ../ESP-Now_ESP32-S3_User-Side-05
 pio run --target upload
 
-# Mini PC 2.0
-cd Cpp_Files/Cpp_ReadWriteSerial-2.0-ENU-NMPC
+# Mini PC 2.2
+cd Cpp_Files/Cpp_ReadWriteSerial-2.2-ENU-NMPC
 g++ -std=c++17 -Iinclude -Inmpc src/main.cpp src/serial_port.cpp nmpc/nmpc_kapal_waypoint.c nmpc/geo_enu.c nmpc/waypoint_manager.c -o read_write_serial.exe
 .\read_write_serial.exe --port COMx --baud 115200 --rudder-mode nmpc --print all
 
@@ -275,18 +296,18 @@ cd Pythonfile/Way_Points_Tracking
 python "Local Monitor Dashboard-1.6.py"
 ```
 
-Sesuaikan MAC ESP-NOW di kedua `main.cpp` dan port COM.
+Port COM mini PC ada di `start_read_write_serial.bat` (ubah sendiri). Sesuaikan MAC ESP-NOW di kedua `main.cpp`.
 
 ---
 
 ## 14. Prosedur uji lapangan
 
-1. Flash **Remote-05** (rantai yaw CW) + **User-05** berpasangan
-2. Jalankan **read_write_serial.exe** 2.0 di mini PC (auto-start opsional)
-3. Connect dashboard beta **1.6** ke User-Side
+1. Flash **Remote-05.1** + **User-05** berpasangan
+2. Jalankan **read_write_serial.exe** 2.2 di mini PC (auto-start opsional)
+3. Connect dashboard **1.6** ke User-Side
 4. Verifikasi Live: telemetry + Mini PC **CONNECTED**
-5. Map Points → Set Home + ≥1 WP → **Send Way Points** → `$WACK,OK`; cek `[WP]` di stderr/stdout 2.0
-6. RC CH6 Auto → pantau rudder dari `timestamp,result`
+5. Map Points → Set Home + ≥1 WP → **Send Way Points** → `$WACK,OK`; cek `[WP]` di stderr/stdout 2.2
+6. Set kecepatan dan arah propeller di CH3/CH5 saat masih manual, lalu RC CH6 Auto. Propeller menahan nilai itu; pantau rudder dari `result` dan heading setpoint dari `bearing`
 7. (Opsional) **Shutdown** → konfirmasi → `$SACK,OK` → mini PC mati ~5 s
 
 ---
@@ -295,34 +316,36 @@ Sesuaikan MAC ESP-NOW di kedua `main.cpp` dan port COM.
 
 | Gejala | Tindakan |
 |--------|----------|
-| Mini PC DISCONNECTED | Cek USB Remote↔PC, jalankan exe 2.0, baud 115200 |
+| Mini PC DISCONNECTED | Cek USB Remote↔PC, jalankan exe 2.2, baud 115200. Dashboard Connect saja tidak mengisi `mini_pc_link` |
 | `$WACK` TIMEOUT | MAC ESP-NOW, Remote power, jarak |
 | Auto Mini PC tidak gerak | CH6 high, `mini_pc_link=1`, timestamp CSV cocok dengan balasan |
-| Heading setpoint = yaw | Normal pada alg 2. Bearing hanya ada di alg 1 |
+| Heading setpoint = yaw saat auto | 2.2 belum mengirim kolom bearing (GPS atau waypoint belum siap), atau Remote yang ter-flash masih 05 |
+| Propeller tidak ikut CH3/CH5 | CH6 masih auto: kunci PWM. Kembalikan ke manual |
 | `u`,`v` aneh | Remote belum di-flash yaw CW, atau log lama (skala IMU) |
 | Shutdown tombol abu-abu | Harus Connect + CONNECTED |
-| `$SACK,OK` tapi PC tidak mati | Pastikan exe **2.0** yang menangani `$SHUTDOWN` |
-| Telemetry 23 kolom | Flash User/Remote-05; dashboard 1.6 tetap terima 23/24 |
+| `$SACK,OK` tapi PC tidak mati | Pastikan exe **2.2** yang menangani `$SHUTDOWN` |
+| Telemetry 23 kolom | Flash User-05 / Remote-05.1; dashboard 1.6 tetap terima 23/24 |
 
 ---
 
 ## Diagram alur
 
 ```text
-┌──────────────────┐  $WPSET / $SHUTDOWN  ┌──────────────┐  0xA1 / 0xA2  ┌───────────────┐
-│ Dashboard beta   │ ───────────────────► │ User-Side-05 │ ────────────► │ Remote-Side-05│
-│ 1.6              │ ◄─────────────────── │              │ ◄──────────── │ yaw kompas CW │
-└──────────────────┘  CSV24 / $WACK/$SACK └──────────────┘  telemetry 24 └───────┬───────┘
+┌──────────────────┐  $WPSET / $SHUTDOWN  ┌──────────────┐  0xA1 / 0xA2  ┌────────────────┐
+│ Dashboard 1.6    │ ───────────────────► │ User-Side-05 │ ────────────► │ Remote-Side-05.1│
+│                  │ ◄─────────────────── │              │ ◄──────────── │ yaw kompas CW  │
+└──────────────────┘  CSV24 / $WACK/$SACK └──────────────┘  telemetry 24 └───────┬────────┘
                                                                                   │ USB
                                                                                   ▼
-                                                                          ┌───────────────┐
-                                                                          │ Mini PC 2.0   │
-                                                                          │ NMPC          │
-                                                                          │ CSV8 / [WP] / │
-                                                                          │ $HB, result   │
-                                                                          └───────────────┘
+                                                                          ┌────────────────┐
+                                                                          │ Mini PC 2.2    │
+                                                                          │ NMPC           │
+                                                                          │ CSV8 / [WP] /  │
+                                                                          │ $HB, result,   │
+                                                                          │ bearing        │
+                                                                          └────────────────┘
 ```
 
 ---
 
-*Dokumen ini: Ship Auto Way Maps Points Tracking — dashboard 1.6, Remote/User-05, Cpp_ReadWriteSerial-2.0-ENU-NMPC*
+*Dokumen ini: Ship Auto Way Maps Points Tracking — dashboard 1.6, User-Side-05, Remote-Side-05.1, Cpp_ReadWriteSerial-2.2-ENU-NMPC*
