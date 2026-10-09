@@ -8,7 +8,7 @@ Clone dari **User-Side-04** dengan tambahan perintah **`$SHUTDOWN`** (ESP-NOW `p
 |----------|------|
 | Remote-Side | `ESP-Now_ESP32-S3_Remote-Side-05` (struct 24 field / 64 byte identik) |
 | Dashboard | `Local Monitor Dashboard-beta1.6.py` |
-| Mini PC | `Cpp_Files/Cpp_ReadWriteSerial-1.0` (via Remote USB Serial) |
+| Mini PC | `Cpp_Files/Cpp_ReadWriteSerial-2.0-ENU-NMPC-beta` (USB Remote, bukan User-Side) |
 
 ---
 
@@ -20,7 +20,9 @@ Clone dari **User-Side-04** dengan tambahan perintah **`$SHUTDOWN`** (ESP-NOW `p
 | PC → User → Remote | `$WPSET,...` → ESP-NOW `waypoints_payload` (`0xA1`) |
 | PC → User → Remote | `$SHUTDOWN` → ESP-NOW `pc_command_payload` (`0xA2`) |
 
-User-Side **tidak** terhubung ke mini PC. Remote yang menulis `[WP]` / `$SHUTDOWN` ke USB Serial mini PC.
+User-Side **tidak** terhubung ke mini PC. CSV 8 kolom ke `Cpp_ReadWriteSerial-2.0` dan balasan `$HB` / `timestamp,result` hanya lewat USB Remote.
+
+`yaw` dan `heading_setpoint` di CSV 24 kolom diteruskan mentah (×100). User-Side tidak mengubah sudut. Pada auto alg 2, Remote mengisi `heading_setpoint` = yaw (bukan bearing zigzag).
 
 ---
 
@@ -56,7 +58,7 @@ $SACK,ERR,<reason>
 
 ```text
 Dashboard ($WPSET) → User-Side-05 → ESP-NOW 0xA1 → Remote-Side-05
-  → [WP] di USB Serial → Cpp_ReadWriteSerial-1.0 (--print all|wp)
+  → [WP] di USB Serial → Cpp_ReadWriteSerial-2.0 (--print all|wp)
 ```
 
 **Shutdown Mini PC** (tanpa Wi‑Fi laptop↔mini PC)
@@ -64,7 +66,7 @@ Dashboard ($WPSET) → User-Side-05 → ESP-NOW 0xA1 → Remote-Side-05
 ```text
 Dashboard (tombol Live, hanya jika mini_pc_link=1)
   → $SHUTDOWN → User-Side-05 → ESP-NOW 0xA2 → Remote-Side-05
-  → Serial "$SHUTDOWN" → Cpp_ReadWriteSerial-1.0 → shutdown OS
+  → Serial "$SHUTDOWN" → Cpp_ReadWriteSerial-2.0 → shutdown OS
 ```
 
 `$WPSET` / `$SHUTDOWN` tidak mengganggu stream telemetry 24 kolom.

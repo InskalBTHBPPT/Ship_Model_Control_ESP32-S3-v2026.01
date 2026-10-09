@@ -118,6 +118,16 @@ $HB
 24.783,12.40
 ```
 
+`heading_setpoint` tidak masuk CSV ini. 2.0 tidak mengirim balik bearing, `ψ`, `u`, atau `v`. Pada auto alg 2, dashboard tetap melihat setpoint = yaw.
+
+| Diterima dari Remote | Dipakai | Balasan ke Remote |
+|----------------------|---------|-------------------|
+| `timestamp`, `lat`, `lon`, `yaw`, `yaw_rate` | state NMPC | `timestamp,result` (rudder °) |
+| `[WP] Home`, `[WP] #n` | origin + target | — |
+| `calc_deg_servo_*`, `gyro_z` | di-parse, tidak masuk solver | — |
+| `$SHUTDOWN` | matikan OS | — |
+| — | — | `$HB` tiap 1 s |
+
 ---
 
 ## Adaptor mentah → NMPC

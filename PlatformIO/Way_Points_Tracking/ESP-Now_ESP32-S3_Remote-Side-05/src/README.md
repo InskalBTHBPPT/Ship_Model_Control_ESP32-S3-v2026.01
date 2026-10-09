@@ -11,7 +11,7 @@ Mengumpulkan data sensor dan actuator, menjalankan kontrol rudder/propeller, men
 |----------|------|
 | User-Side | `ESP-Now_ESP32-S3_User-Side-05` |
 | Dashboard | `Local Monitor Dashboard-beta1.6.py` |
-| Mini PC | `Cpp_Files/Cpp_ReadWriteSerial-1.0` |
+| Mini PC | `Cpp_Files/Cpp_ReadWriteSerial-2.0-ENU-NMPC-beta` |
 
 ---
 
@@ -39,7 +39,7 @@ Mengumpulkan data sensor dan actuator, menjalankan kontrol rudder/propeller, men
 | Arah | Format | Keterangan |
 |------|--------|------------|
 | ESP32 → PC | CSV 8 kolom | Hanya saat CH6 auto |
-| ESP32 → PC | `[WP] ...` | Saat waypoint `0xA1` diterima; dibaca/print oleh `Cpp_ReadWriteSerial-1.0` (`--print all\|wp`) |
+| ESP32 → PC | `[WP] ...` | Saat waypoint `0xA1` diterima; dibaca `Cpp_ReadWriteSerial-2.0` (`--print all\|wp`) |
 | ESP32 → PC | `$SHUTDOWN` | Saat perintah `0xA2` SHUTDOWN; mini PC menjalankan shutdown OS |
 | PC → ESP32 | `$HB` | Heartbeat ~1 Hz (manual/auto) |
 | PC → ESP32 | `timestamp,result` | `result` = rudder offset (°), timestamp harus sama dengan baris CSV input |
@@ -51,17 +51,45 @@ Field telemetry ESP-NOW tambahan: `mini_pc_link` (kolom 24) — `1` jika heartbe
 ```text
 Dashboard ($WPSET) → User-Side-05 → ESP-NOW 0xA1 → Remote-Side-05
   → simpan g_lastWaypoints + printWaypoints() → USB Serial [WP]
-  → Cpp_ReadWriteSerial-1.0 (stdout, filter --print)
+  → Cpp_ReadWriteSerial-2.0 (stdout, filter --print)
 ```
 
 **Alur shutdown mini PC (tanpa Wi‑Fi laptop↔mini PC):**
 
 ```text
 Dashboard ($SHUTDOWN) → User-Side-05 → ESP-NOW 0xA2 → Remote-Side-05
-  → Serial.println("$SHUTDOWN") → Cpp_ReadWriteSerial-1.0 → shutdown OS
+  → Serial.println("$SHUTDOWN") → Cpp_ReadWriteSerial-2.0 → shutdown OS
 ```
 
 User-Side membalas dashboard dengan `$SACK,OK` / `$SACK,ERR,...` (sukses forward ESP-NOW).
+
+### CSV 8 kolom → 2.0, dan balasan
+
+Header (sekali saat boot):
+
+```text
+timestamp,lat,lon,calc_deg_servo_1,calc_deg_servo_2,yaw,gyro_z,yaw_rate
+```
+
+| Kolom | 2.0 memakainya? |
+|-------|-----------------|
+| `timestamp` | ya — di-echo di `timestamp,result` |
+| `lat`, `lon` | ya — posisi ENU |
+| `yaw` | ya — `ψ = π/2 − yaw` (kompas CW) |
+| `yaw_rate` | ya — `r` nondimensi |
+| `calc_deg_servo_1/2` | tidak |
+| `gyro_z` | tidak (`r` dari `yaw_rate`) |
+
+`heading_setpoint` **tidak** ada di CSV ini (hanya di telemetry 24 kolom ke dashboard).
+
+Balasan mini PC ke Remote, hanya:
+
+```text
+$HB
+timestamp,result
+```
+
+`result` = offset rudder (°). Tidak ada bearing, `ψ`, `u`, atau `v` yang dikirim balik. Karena itu pada **alg 2** `heading_setpoint` di dashboard = salinan yaw, `heading_error` = 0. Bearing ke waypoint hanya diisi jika `AUTO_TRACK_ALG` = 1.
 
 ---
 
@@ -226,8 +254,8 @@ struct DatatoSend {
   uint16_t speedMps;          // m/s × 100
   int16_t Calc_deg_servo_1;   // ° × 100 (feedback ADC, setelah filter)
   int16_t Calc_deg_servo_2;   // ° × 100
-  uint16_t yaw;               // ° × 100 (0–360). IMU: −90=Timur → 270°. Lihat Catatan.
-  uint16_t heading_setpoint;  // bearing ke WP aktif, ° × 100
+  uint16_t yaw;               // ° × 100. Haluan kapal kompas CW. Lihat Catatan 7.
+  uint16_t heading_setpoint;  // alg 1: bearing ke WP; alg 2 / manual: salinan yaw
   int16_t  heading_error;     // setpoint − yaw, ° × 100 (±180)
   int16_t  rudder_cmd;        // perintah rudder offset netral, ° × 100 (±40)
   uint8_t  track_wp_index;    // 0=idle, 1..N=WP#, 255=home
@@ -238,7 +266,7 @@ struct DatatoSend {
   uint16_t rpm_prop_2;
   uint16_t battery_1;         // V × 100
   uint16_t battery_2;         // V × 100
-  uint8_t mode_auto;          // 0=manual, 1=auto alg1, 2=auto alg2 stub
+  uint8_t mode_auto;          // 0=manual, 1=auto alg1, 2=auto alg2 mini PC
 };
 ```
 
@@ -248,7 +276,7 @@ struct DatatoSend {
 |-------|------|
 | 0 | Manual |
 | 1 | Auto alg 1 (PD waypoint) |
-| 2 | Auto alg 2 (stub) |
+| 2 | Auto alg 2 (mini PC / NMPC) |
 
 ---
 
@@ -368,7 +396,7 @@ Sesuaikan `upload_port` / `monitor_port` di `platformio.ini` (default: `COM14`).
 | Auto tidak gerak | CH6 ≥1750, GPS valid, waypoint sudah diterima (`[WP]` di serial) |
 | ESP-NOW gagal | MAC User-Side benar, jarak, mode WIFI_STA |
 | RPM 0 | Koneksi encoder GPIO 9/10, motor berputar |
-| `$SHUTDOWN` tidak sampai mini PC | Flash pasangan 05; `Cpp_ReadWriteSerial-1.0` jalan; cek `$SACK,OK` di dashboard |
+| `$SHUTDOWN` tidak sampai mini PC | Flash pasangan 05; `Cpp_ReadWriteSerial-2.0` jalan; cek `$SACK,OK` di dashboard |
 
 ---
 
