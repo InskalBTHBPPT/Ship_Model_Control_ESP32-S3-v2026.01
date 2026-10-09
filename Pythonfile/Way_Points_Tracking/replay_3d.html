@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<style>
+html, body { margin: 0; height: 100%; background: #0b1220; overflow: hidden; }
+canvas { display: block; }
+</style>
+</head>
+<body>
+<script src="vendor/three/three.min.js"></script>
+<script src="vendor/three/OrbitControls.js"></script>
+<script>
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0b1220);
+
+const camera = new THREE.PerspectiveCamera(55, 1, 0.05, 8000);
+camera.position.set(16, 12, 16);
+camera.up.set(0, 1, 0);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+document.body.appendChild(renderer.domElement);
+
+scene.add(new THREE.HemisphereLight(0xdbeafe, 0x0f2744, 0.95));
+const sun = new THREE.DirectionalLight(0xffffff, 0.65);
+sun.position.set(40, 60, 20);
+scene.add(sun);
+
+const water = new THREE.Mesh(
+  new THREE.PlaneGeometry(1, 1),
+  new THREE.MeshPhongMaterial({ color: 0x12324f, shininess: 18 })
+);
+water.rotation.x = -Math.PI / 2;
+scene.add(water);
+
+let grid = new THREE.GridHelper(40, 8, 0x94a3b8, 0x334155);
+scene.add(grid);
+let viewSpan = 40;
+
+function makeLabel(text, color) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, 256, 128);
+  ctx.fillStyle = color;
+  ctx.font = 'bold 64px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(text, 128, 64);
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: new THREE.CanvasTexture(canvas),
+    transparent: true,
+    depthTest: false
+  }));
+  sprite.scale.set(2.4, 1.2, 1);
+  return sprite;
+}
+
+const axes = new THREE.Group();
+scene.add(axes);
+function addAxis(dir, length, color, text, textPos) {
+  axes.add(new THREE.ArrowHelper(dir, new THREE.Vector3(0, 0.05, 0), length, color, 0.7, 0.4));
+  const label = makeLabel(text, color);
+  label.position.copy(textPos);
+  axes.add(label);
+}
+addAxis(new THREE.Vector3(1, 0, 0), 8, '#ef4444', 'E', new THREE.Vector3(9.2, 0.4, 0));
+addAxis(new THREE.Vector3(0, 0, -1), 8, '#22c55e', 'N', new THREE.Vector3(0, 0.4, -9.2));
+addAxis(new THREE.Vector3(0, 1, 0), 5, '#60a5fa', 'U', new THREE.Vector3(0, 6.2, 0));
+
+const ship = new THREE.Group();
+const hullMat = new THREE.MeshPhongMaterial({ color: 0xe2e8f0 });
+const deckMat = new THREE.MeshPhongMaterial({ color: 0x10b981 });
+const body = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.12, 0.72), hullMat);
+body.position.set(0, 0.12, 0.08);
+const deck = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.08, 0.28), deckMat);
+deck.position.set(0, 0.22, 0.12);
+const bow = new THREE.Mesh(new THREE.ConeGeometry(0.14, 0.34, 4), hullMat);
+bow.rotation.x = -Math.PI / 2;
+bow.position.set(0, 0.12, -0.45);
+ship.add(body);
+ship.add(deck);
+ship.add(bow);
+ship.visible = false;
+scene.add(ship);
+
+const overlay = new THREE.Group();
+scene.add(overlay);
+
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.target.set(0, 0.3, 0);
+controls.maxPolarAngle = Math.PI * 0.49;
+
+let camMode = 'orbit';
+let shipE = 0;
+let shipN = 0;
+let shipYaw = 0;
+
+function shipWorld() {
+  return new THREE.Vector3(shipE, 0.3, -shipN);
+}
+
+function applyShip() {
+  ship.position.set(shipE, 0, -shipN);
+  ship.rotation.y = -THREE.MathUtils.degToRad(shipYaw);
+  ship.updateMatrixWorld(true);
+}
+
+function applyPov() {
+  controls.enabled = false;
+  applyShip();
+  const eye = new THREE.Vector3(0, 0.42, 0.05);
+  const look = new THREE.Vector3(0, 0.36, -6);
+  eye.applyMatrix4(ship.matrixWorld);
+  look.applyMatrix4(ship.matrixWorld);
+  camera.position.copy(eye);
+  camera.up.set(0, 1, 0);
+  camera.lookAt(look);
+}
+
+function followOrbit() {
+  const offset = camera.position.clone().sub(controls.target);
+  if (offset.lengthSq() < 1) {
+    offset.set(14, 10, 14);
+  }
+  const target = shipWorld();
+  controls.target.copy(target);
+  camera.position.copy(target).add(offset);
+  controls.update();
+}
+
+function resizeGround(span) {
+  viewSpan = Math.max(40, span);
+  scene.remove(grid);
+  if (grid.geometry) grid.geometry.dispose();
+  const mats = Array.isArray(grid.material) ? grid.material : [grid.material];
+  mats.forEach(function (mat) { if (mat) mat.dispose(); });
+  const divisions = Math.max(8, Math.round(viewSpan / 10));
+  grid = new THREE.GridHelper(viewSpan, divisions, 0x94a3b8, 0x334155);
+  scene.add(grid);
+  water.scale.set(viewSpan, viewSpan, 1);
+}
+
+function disposeObject(obj) {
+  if (obj.geometry) obj.geometry.dispose();
+  if (obj.material) {
+    const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+    mats.forEach(function (mat) {
+      if (!mat) return;
+      if (mat.map) mat.map.dispose();
+      mat.dispose();
+    });
+  }
+}
+
+function clearOverlay() {
+  const doomed = [];
+  overlay.traverse(function (obj) { doomed.push(obj); });
+  doomed.forEach(disposeObject);
+  while (overlay.children.length) overlay.remove(overlay.children[0]);
+}
+
+function starMesh() {
+  const shape = new THREE.Shape();
+  const spikes = 5;
+  for (let i = 0; i < spikes * 2; i++) {
+    const radius = i % 2 === 0 ? 0.55 : 0.22;
+    const angle = -Math.PI / 2 + i * Math.PI / spikes;
+    const x = Math.cos(angle) * radius;
+    const y = Math.sin(angle) * radius;
+    if (i === 0) shape.moveTo(x, y);
+    else shape.lineTo(x, y);
+  }
+  const geo = new THREE.ShapeGeometry(shape);
+  geo.rotateX(-Math.PI / 2);
+  return new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+    color: 0xb45309, side: THREE.DoubleSide
+  }));
+}
+
+function circle3(east, north) {
+  const pts = [];
+  for (let i = 0; i <= 72; i++) {
+    const a = (i / 72) * Math.PI * 2;
+    pts.push(new THREE.Vector3(east + Math.cos(a) * 3, 0.05, -(north + Math.sin(a) * 3)));
+  }
+  return new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(pts),
+    new THREE.LineBasicMaterial({ color: 0xd97706 })
+  );
+}
+
+window.setCameraMode = function (name) {
+  if (name === 'pov') {
+    camMode = 'pov';
+    applyPov();
+    return;
+  }
+  const fromPov = camMode === 'pov';
+  camMode = 'orbit';
+  controls.enabled = true;
+  if (fromPov) window.snapOrbit('side');
+  else followOrbit();
+};
+
+window.snapOrbit = function (which) {
+  camMode = 'orbit';
+  controls.enabled = true;
+  const target = shipWorld();
+  controls.target.copy(target);
+  const dist = Math.max(18, viewSpan * 0.45);
+  if (which === 'top') {
+    camera.position.set(target.x, target.y + dist, target.z + 0.4);
+  } else {
+    camera.position.set(target.x + dist * 0.85, target.y + dist * 0.28, target.z);
+  }
+  camera.up.set(0, 1, 0);
+  controls.update();
+};
+
+window.setPose = function (east, north, yawDeg) {
+  shipE = east;
+  shipN = north;
+  shipYaw = yawDeg;
+  ship.visible = true;
+  if (camMode === 'pov') applyPov();
+  else {
+    applyShip();
+    followOrbit();
+  }
+};
+
+window.loadScene = function (data) {
+  clearOverlay();
+  const trail = data.trail || [];
+  let maxAbs = 12;
+  function note(east, north) {
+    maxAbs = Math.max(maxAbs, Math.abs(east), Math.abs(north));
+  }
+  if (trail.length) {
+    const pts = trail.map(function (p) {
+      note(p[0], p[1]);
+      return new THREE.Vector3(p[0], 0.04, -p[1]);
+    });
+    overlay.add(new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(pts),
+      new THREE.LineBasicMaterial({ color: 0x3b82f6 })
+    ));
+  }
+  if (data.home) {
+    note(data.home[0], data.home[1]);
+    const home = new THREE.Mesh(
+      new THREE.BoxGeometry(0.7, 0.18, 0.7),
+      new THREE.MeshPhongMaterial({ color: 0x10b981 })
+    );
+    home.position.set(data.home[0], 0.09, -data.home[1]);
+    overlay.add(home);
+    const tag = makeLabel('Home', '#10b981');
+    tag.position.set(data.home[0], 1.3, -data.home[1]);
+    overlay.add(tag);
+  }
+  const route = [];
+  (data.wps || []).forEach(function (wp) {
+    const num = wp[0];
+    const east = wp[1];
+    const north = wp[2];
+    note(east, north);
+    overlay.add(circle3(east, north));
+    const star = starMesh();
+    star.position.set(east, 0.08, -north);
+    overlay.add(star);
+    const tag = makeLabel(String(num), '#f8fafc');
+    tag.position.set(east, 1.5, -north);
+    overlay.add(tag);
+    route.push(new THREE.Vector3(east, 0.07, -north));
+  });
+  if (route.length >= 2) {
+    const line = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints(route),
+      new THREE.LineDashedMaterial({ color: 0xd97706, dashSize: 0.8, gapSize: 0.45 })
+    );
+    line.computeLineDistances();
+    overlay.add(line);
+  }
+  (data.events || []).forEach(function (ev) {
+    const kind = ev[0];
+    const east = ev[1];
+    const north = ev[2];
+    note(east, north);
+    let mesh;
+    let color = '#f59e0b';
+    let caption = 'aktif';
+    if (kind === 'start') {
+      mesh = new THREE.Mesh(new THREE.ConeGeometry(0.35, 1.2, 4), new THREE.MeshPhongMaterial({ color: 0x059669 }));
+      mesh.position.set(east, 0.7, -north);
+      color = '#059669';
+      caption = 'mulai';
+    } else if (kind === 'end') {
+      mesh = new THREE.Mesh(new THREE.ConeGeometry(0.35, 1.2, 4), new THREE.MeshPhongMaterial({ color: 0xdc2626 }));
+      mesh.rotation.x = Math.PI;
+      mesh.position.set(east, 0.7, -north);
+      color = '#dc2626';
+      caption = 'selesai';
+    } else {
+      mesh = new THREE.Mesh(new THREE.OctahedronGeometry(0.45), new THREE.MeshPhongMaterial({ color: 0xf59e0b }));
+      mesh.position.set(east, 0.6, -north);
+    }
+    overlay.add(mesh);
+    const tag = makeLabel(caption + ' ' + ev[3], color);
+    tag.position.set(east, 2.0, -north);
+    overlay.add(tag);
+  });
+  resizeGround(Math.ceil((maxAbs * 2 + 16) / 10) * 10);
+  ship.visible = !!data.hasShip;
+  if (camMode === 'orbit') followOrbit();
+};
+
+function onResize() {
+  const w = window.innerWidth || 1;
+  const h = window.innerHeight || 1;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h, false);
+}
+window.addEventListener('resize', onResize);
+window.onReplayResize = onResize;
+onResize();
+
+function tick() {
+  requestAnimationFrame(tick);
+  if (camMode === 'orbit') controls.update();
+  renderer.render(scene, camera);
+}
+tick();
+window.replayReady = true;
+</script>
+</body>
+</html>

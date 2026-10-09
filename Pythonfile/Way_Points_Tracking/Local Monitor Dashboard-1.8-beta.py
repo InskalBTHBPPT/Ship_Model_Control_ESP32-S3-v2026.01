@@ -3,7 +3,8 @@ Local Monitor Dashboard 1.8-beta
 
 Dari 1.7. Simbol peta: Home kotak hijau tanpa lingkaran; waypoint bintang
 bernomor plus lingkaran 3 m; garis rencana oranye putus-putus antar waypoint.
-Kapal berupa belah ketupat hijau. Alarm baterai 1.7 tetap. Tidak menambah kolom CSV.
+Kapal berupa belah ketupat hijau. Tab 3D memutar ulang log di bingkai ENU
+(Three.js lokal, tanpa satelit). Alarm baterai 1.7 tetap. Tidak menambah kolom CSV.
 
 Hitungan lokal (bukan dari firmware), rumus 1.2 kompas CW (0=Utara, 90=Timur):
   x,y ENU dari lat,lon; ẋ,ẏ LPF α=0.70; ψ=yaw·π/180
@@ -50,6 +51,7 @@ Catatan:
 
 import csv
 import io
+import json
 import math
 import os
 import sys
@@ -290,7 +292,7 @@ import serial
 from serial.tools import list_ports
 from PySide6.QtCore import Qt, QTimer, QUrl
 from PySide6.QtWebEngineWidgets import QWebEngineView
-from PySide6.QtWebEngineCore import QWebEnginePage
+from PySide6.QtWebEngineCore import QWebEnginePage, QWebEngineSettings
 from PySide6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -2515,9 +2517,11 @@ class MainWindow(QMainWindow):
         analyze_tab.layout().addWidget(analyze_right_panel, 1)
         
         # Tambahkan tab ke tab widget utama
+        view3d_tab = self._build_view3d_tab()
         self.tab_widget.addTab(map_points_tab, "Map Points")
         self.tab_widget.addTab(live_tab, "Live Data")
         self.tab_widget.addTab(analyze_tab, "Analize Data")
+        self.tab_widget.addTab(view3d_tab, "3D")
         self.tab_widget.setStyleSheet(
             """
             QTabWidget::pane {
@@ -4501,6 +4505,323 @@ class MainWindow(QMainWindow):
             }}
             """
             self.analyze_map_webview.page().runJavaScript(js_code)
+
+    def _build_view3d_tab(self) -> QWidget:
+        """Tab replay Three.js: bingkai ENU, tanpa petak satelit."""
+        tab = QWidget(self)
+        layout = QVBoxLayout(tab)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(6)
+
+        bar = QWidget(self)
+        bar_layout = QHBoxLayout(bar)
+        bar_layout.setContentsMargins(0, 0, 0, 0)
+        bar_layout.setSpacing(6)
+
+        self.view3d_load_btn = QPushButton("Load Log CSV", self)
+        self.view3d_load_btn.clicked.connect(self.load_view3d_csv)
+        self.view3d_wp_btn = QPushButton("Load Waypoints", self)
+        self.view3d_wp_btn.clicked.connect(self.load_view3d_waypoints)
+
+        self.view3d_time_slider_scale = 1000
+        self.view3d_time_slider = QSlider(Qt.Horizontal, self)
+        self.view3d_time_slider.setRange(0, 1)
+        self.view3d_time_slider.setValue(0)
+        self.view3d_time_slider.valueChanged.connect(self._on_view3d_slider)
+        self.view3d_time_label = QLabel("0.0 s", self)
+        self.view3d_time_label.setMinimumWidth(78)
+        self.view3d_time_label.setStyleSheet("color: #e5e7eb;")
+
+        cam_style = (
+            "QPushButton { padding: 6px 10px; background: #1f2937; color: #e5e7eb;"
+            " border: 1px solid #4b5563; border-radius: 6px; }"
+            "QPushButton:checked { background: #1d4ed8; color: white; border-color: #60a5fa; }"
+        )
+        self.view3d_pov_btn = QPushButton("POV kapal", self)
+        self.view3d_orbit_btn = QPushButton("Orbit", self)
+        self.view3d_top_btn = QPushButton("Atas", self)
+        self.view3d_side_btn = QPushButton("Samping", self)
+        for btn in (self.view3d_pov_btn, self.view3d_orbit_btn, self.view3d_top_btn, self.view3d_side_btn):
+            btn.setStyleSheet(cam_style)
+        self.view3d_pov_btn.setCheckable(True)
+        self.view3d_orbit_btn.setCheckable(True)
+        self.view3d_orbit_btn.setChecked(True)
+        self.view3d_pov_btn.clicked.connect(lambda: self._set_view3d_camera("pov"))
+        self.view3d_orbit_btn.clicked.connect(lambda: self._set_view3d_camera("orbit"))
+        self.view3d_top_btn.clicked.connect(lambda: self._snap_view3d("top"))
+        self.view3d_side_btn.clicked.connect(lambda: self._snap_view3d("side"))
+
+        bar_layout.addWidget(self.view3d_load_btn)
+        bar_layout.addWidget(self.view3d_wp_btn)
+        bar_layout.addWidget(self.view3d_time_slider, 1)
+        bar_layout.addWidget(self.view3d_time_label)
+        bar_layout.addWidget(self.view3d_pov_btn)
+        bar_layout.addWidget(self.view3d_orbit_btn)
+        bar_layout.addWidget(self.view3d_top_btn)
+        bar_layout.addWidget(self.view3d_side_btn)
+
+        self.view3d_time: list[float] = []
+        self.view3d_lat: list[float] = []
+        self.view3d_lon: list[float] = []
+        self.view3d_yaw: list[float] = []
+        self.view3d_mode: list[int] = []
+        self.view3d_east: list[float] = []
+        self.view3d_north: list[float] = []
+        self.view3d_home = None
+        self.view3d_wps: list[tuple[int, float, float]] = []
+        self.view3d_origin = None
+        self.view3d_ready = False
+        self.view3d_cam = "orbit"
+
+        self.view3d_view = QWebEngineView(self)
+        self.view3d_view.settings().setAttribute(
+            QWebEngineSettings.WebAttribute.LocalContentCanAccessFileUrls, True
+        )
+        html_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "replay_3d.html")
+        self.view3d_view.loadFinished.connect(self._on_view3d_ready)
+        self.view3d_view.load(QUrl.fromLocalFile(html_path))
+
+        layout.addWidget(bar)
+        layout.addWidget(self.view3d_view, 1)
+        self.tab_widget.currentChanged.connect(self._refresh_view3d_size)
+        return tab
+
+    def _refresh_view3d_size(self, _index: int = 0) -> None:
+        self._view3d_js("if (window.onReplayResize) window.onReplayResize();")
+
+    def _view3d_js(self, code: str) -> None:
+        if not getattr(self, "view3d_ready", False):
+            return
+        self.view3d_view.page().runJavaScript(code)
+
+    def _on_view3d_ready(self, ok: bool) -> None:
+        self.view3d_ready = bool(ok)
+        if not ok:
+            return
+        self._push_view3d_scene()
+        if self.view3d_time:
+            self._on_view3d_slider(self.view3d_time_slider.value())
+        else:
+            self._set_view3d_camera(self.view3d_cam)
+
+    def _view3d_pick_origin(self):
+        if self.view3d_home is not None:
+            return self.view3d_home
+        if self.view3d_lat:
+            return (self.view3d_lat[0], self.view3d_lon[0])
+        if self.view3d_wps:
+            return (self.view3d_wps[0][1], self.view3d_wps[0][2])
+        return None
+
+    def _view3d_enu(self, lat: float, lon: float) -> tuple[float, float]:
+        lat0, lon0 = self.view3d_origin
+        east = math.radians(lon - lon0) * _ENU_R_M * math.cos(math.radians(lat0))
+        north = math.radians(lat - lat0) * _ENU_R_M
+        return east, north
+
+    def _view3d_reframe(self) -> None:
+        self.view3d_origin = self._view3d_pick_origin()
+        self.view3d_east = []
+        self.view3d_north = []
+        if self.view3d_origin is None:
+            return
+        for lat, lon in zip(self.view3d_lat, self.view3d_lon):
+            east, north = self._view3d_enu(lat, lon)
+            self.view3d_east.append(east)
+            self.view3d_north.append(north)
+
+    def _view3d_events(self) -> list[list]:
+        modes = self.view3d_mode
+        east = self.view3d_east
+        north = self.view3d_north
+        count = min(len(modes), len(east), len(north))
+        if count == 0:
+            return []
+
+        def auto_on(index: int) -> bool:
+            return int(modes[index]) != 0
+
+        events: list[list] = []
+        session = 0
+        if auto_on(0):
+            session = 1
+            events.append(["start", round(east[0], 3), round(north[0], 3), session])
+        for index in range(1, count):
+            was_auto = auto_on(index - 1)
+            now_auto = auto_on(index)
+            if (not was_auto) and now_auto:
+                session += 1
+                events.append(["start", round(east[index], 3), round(north[index], 3), session])
+            elif was_auto and (not now_auto):
+                events.append(["end", round(east[index], 3), round(north[index], 3), session])
+        if auto_on(count - 1):
+            same_as_start = (
+                events
+                and events[-1][0] == "start"
+                and events[-1][1] == round(east[count - 1], 3)
+                and events[-1][2] == round(north[count - 1], 3)
+            )
+            if not same_as_start:
+                events.append(["open", round(east[count - 1], 3), round(north[count - 1], 3), max(session, 1)])
+        return events
+
+    def _push_view3d_scene(self) -> None:
+        home = None
+        if self.view3d_home is not None and self.view3d_origin is not None:
+            east, north = self._view3d_enu(self.view3d_home[0], self.view3d_home[1])
+            home = [round(east, 3), round(north, 3)]
+        wps = []
+        if self.view3d_origin is not None:
+            for num, lat, lon in self.view3d_wps:
+                east, north = self._view3d_enu(lat, lon)
+                wps.append([num, round(east, 3), round(north, 3)])
+        trail = [
+            [round(east, 3), round(north, 3)]
+            for east, north in zip(self.view3d_east, self.view3d_north)
+        ]
+        payload = {
+            "trail": trail,
+            "home": home,
+            "wps": wps,
+            "events": self._view3d_events(),
+            "hasShip": bool(trail),
+        }
+        self._view3d_js("window.loadScene(%s)" % json.dumps(payload, separators=(",", ":")))
+
+    def _view3d_index(self, timestamp: float) -> int:
+        times = self.view3d_time
+        if not times:
+            return -1
+        index = bisect_left(times, timestamp)
+        if index <= 0:
+            return 0
+        if index >= len(times):
+            return len(times) - 1
+        if abs(times[index - 1] - timestamp) <= abs(times[index] - timestamp):
+            return index - 1
+        return index
+
+    def _on_view3d_slider(self, value: int) -> None:
+        if not self.view3d_time:
+            self.view3d_time_label.setText("0.0 s")
+            return
+        timestamp = value / float(self.view3d_time_slider_scale)
+        index = self._view3d_index(timestamp)
+        if index < 0:
+            return
+        self.view3d_time_label.setText("%.1f s" % self.view3d_time[index])
+        self._view3d_js(
+            "window.setPose(%s,%s,%s)" % (
+                round(self.view3d_east[index], 3),
+                round(self.view3d_north[index], 3),
+                round(self.view3d_yaw[index], 3),
+            )
+        )
+
+    def _set_view3d_camera(self, mode: str) -> None:
+        self.view3d_cam = mode
+        self.view3d_pov_btn.setChecked(mode == "pov")
+        self.view3d_orbit_btn.setChecked(mode == "orbit")
+        self._view3d_js("window.setCameraMode('%s')" % mode)
+
+    def _snap_view3d(self, which: str) -> None:
+        self.view3d_cam = "orbit"
+        self.view3d_pov_btn.setChecked(False)
+        self.view3d_orbit_btn.setChecked(True)
+        self._view3d_js("window.snapOrbit('%s')" % which)
+
+    def load_view3d_csv(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(self, "Load Log CSV", "", "CSV Files (*.csv)")
+        if not path:
+            return
+        try:
+            with open(path, "r", encoding="utf-8") as handle:
+                reader = csv.DictReader(handle)
+                if not reader.fieldnames:
+                    raise ValueError("Header CSV tidak ditemukan")
+                fmt = _detect_analyze_csv_format(set(reader.fieldnames))
+                times: list[float] = []
+                lats: list[float] = []
+                lons: list[float] = []
+                yaws: list[float] = []
+                modes: list[int] = []
+                for row in reader:
+                    parsed = _parse_analyze_csv_row(row, fmt)
+                    if parsed is None:
+                        continue
+                    lat = parsed["lat"]
+                    lon = parsed["lon"]
+                    if lat == 0.0 and lon == 0.0:
+                        continue
+                    if not (-90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0):
+                        continue
+                    times.append(parsed["timestamp"])
+                    lats.append(lat)
+                    lons.append(lon)
+                    yaws.append(parsed["yaw"])
+                    modes.append(int(parsed["mode_auto"]))
+        except Exception as exc:
+            QMessageBox.critical(self, "Load Log CSV", f"Gagal membaca file:\n{exc}")
+            return
+        if not times:
+            QMessageBox.warning(self, "Load Log CSV", "Tidak ada baris posisi yang bisa dipakai.")
+            return
+        self.view3d_time = times
+        self.view3d_lat = lats
+        self.view3d_lon = lons
+        self.view3d_yaw = yaws
+        self.view3d_mode = modes
+        self._view3d_reframe()
+        scale = self.view3d_time_slider_scale
+        slider_min = int(times[0] * scale)
+        slider_max = int(times[-1] * scale)
+        if slider_min == slider_max:
+            slider_max = slider_min + 1
+        self.view3d_time_slider.blockSignals(True)
+        self.view3d_time_slider.setRange(slider_min, slider_max)
+        self.view3d_time_slider.setValue(slider_min)
+        self.view3d_time_slider.blockSignals(False)
+        self._push_view3d_scene()
+        self._on_view3d_slider(slider_min)
+
+    def load_view3d_waypoints(self) -> None:
+        start_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "WayPoints")
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Load Waypoints", start_dir, "CSV Files (*.csv)")
+        if not path:
+            return
+        home = None
+        wps: list[tuple[int, float, float]] = []
+        try:
+            with open(path, "r", encoding="utf-8-sig", newline="") as handle:
+                reader = csv.DictReader(handle)
+                for row in reader:
+                    if not row:
+                        continue
+                    label = str(row.get("No") or "").strip()
+                    if not label:
+                        continue
+                    lat = float(str(row.get("Lat") or "").strip())
+                    lon = float(str(row.get("Long") or "").strip())
+                    if not (-90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0):
+                        continue
+                    if label.lower() == "home":
+                        home = (lat, lon)
+                    else:
+                        wps.append((int(float(label)), lat, lon))
+        except Exception as exc:
+            QMessageBox.critical(self, "Load Waypoints", f"Gagal membaca file:\n{exc}")
+            return
+        wps.sort(key=lambda item: item[0])
+        if home is None and not wps:
+            QMessageBox.warning(self, "Load Waypoints", "Tidak ada Home atau waypoint di file.")
+            return
+        self.view3d_home = home
+        self.view3d_wps = wps
+        self._view3d_reframe()
+        self._push_view3d_scene()
+        if self.view3d_time:
+            self._on_view3d_slider(self.view3d_time_slider.value())
 
     def closeEvent(self, event):
         self.disconnect_serial()
