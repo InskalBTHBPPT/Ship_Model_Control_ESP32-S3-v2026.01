@@ -11,7 +11,7 @@ Program C++ mini-PC: baca telemetry USB dari **ESP-Now_ESP32-S3_Remote-Side-05**
 | Dashboard | `Pythonfile/Way_Points_Tracking/Local Monitor Dashboard-beta1.6.py` |
 | Versi sebelumnya | `Cpp_Files/Cpp_ReadWriteSerial-1.1-ENU-beta` |
 | Varian NED | `Cpp_Files/Cpp_ReadWriteSerial-1.2-NED-beta` |
-| Penerus NMPC | `Cpp_Files/Cpp_ReadWriteSerial-2.0-ENU-NMPC-beta` |
+| Penerus NMPC | `Cpp_Files/Cpp_ReadWriteSerial-2.0-ENU-NMPC` |
 
 **Firmware Remote tidak diubah.** CSV stdout dan serial TX sama seperti 1.1.
 

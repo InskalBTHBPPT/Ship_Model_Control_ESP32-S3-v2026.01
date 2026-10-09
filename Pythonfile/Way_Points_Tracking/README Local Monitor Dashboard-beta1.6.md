@@ -8,7 +8,7 @@ Dashboard PySide6 di laptop. Membaca telemetry **24 kolom** dari User-Side-05. T
 |----------|------|
 | User-Side | `PlatformIO/Way_Points_Tracking/ESP-Now_ESP32-S3_User-Side-05` |
 | Remote-Side | `PlatformIO/Way_Points_Tracking/ESP-Now_ESP32-S3_Remote-Side-05` |
-| Mini PC | `Cpp_Files/Cpp_ReadWriteSerial-2.0-ENU-NMPC-beta` (USB Remote) |
+| Mini PC | `Cpp_Files/Cpp_ReadWriteSerial-2.0-ENU-NMPC` (USB Remote) |
 
 ---
 

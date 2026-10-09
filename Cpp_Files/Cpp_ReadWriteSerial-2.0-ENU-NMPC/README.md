@@ -1,8 +1,6 @@
-# Cpp_ReadWriteSerial-2.1-ENU-NMPC-beta
+# Cpp_ReadWriteSerial-2.0-ENU-NMPC
 
-Clone **2.0**. Keluaran ke ESP32 tetap `timestamp,result` (rudder derajat).
-
-Beda dari 2.0: **surge `u` dan sway `v` dihitung dari GPS**, bukan `v = 0` dan `u0 = 0.6114` tetap.
+Bridge USB **1.2** (data mentah) + **NMPC C Sep 2026**. Keluaran ke ESP32 tetap `timestamp,result` (rudder derajat).
 
 | Pasangan | Path |
 |----------|------|
@@ -11,35 +9,23 @@ Beda dari 2.0: **surge `u` dan sway `v` dihitung dari GPS**, bukan `v = 0` dan `
 | Dashboard | `Pythonfile/Way_Points_Tracking/Local Monitor Dashboard-beta1.6.py` |
 | Serial / CSV | `Cpp_Files/Cpp_ReadWriteSerial-1.2-ENU-beta` |
 | Solver NMPC | `MPC NMPC Agus/Coding_NMPC_Sep2026/C code NMPC` |
-| Dasar | `Cpp_Files/Cpp_ReadWriteSerial-2.0-ENU-NMPC` (`v=0`, `u0` tetap) |
+| Simulasi (tanpa COM) | `Cpp_Files/Cpp_ReadWriteSerial-2.0-ENU-NMPC-simulasi` |
+| `u`,`v` terukur | `Cpp_Files/Cpp_ReadWriteSerial-2.1-ENU-NMPC-beta` |
 
-Remote-05 mengirim yaw **kompas CW**. `gyro_z` dan `calc_deg_servo_*` tidak dipakai solver.
+Remote-05 mengirim yaw **kompas CW**. `gyro_z` dan `calc_deg_servo_*` tidak dipakai solver. `v = 0`.
 
 ---
 
-## Revisi — `u`, `v` terukur (bukan konstanta)
+## Revisi — yaw kompas CW (0 = Utara, 90° = Timur)
 
-Rumus sama dashboard 1.6 / 1.2. `ψ` di sini yaw kompas (bukan `ψ` NMPC):
+Remote-05 mengirim **haluan kapal** kompas CW. 2.0 **tidak** menghitung `u`,`v`. Yang dipakai: `ψ` NMPC (0 = Timur, CCW) dari yaw CSV.
 
-```text
-u = ẋ sinψ + ẏ cosψ
-v = ẋ cosψ − ẏ sinψ
-```
-
-`ẋ`,`ẏ` dari ΔEast/ΔNorth, LPF α = 0.70. State NMPC:
-
-```text
-v' = v / u_scale
-r' = −yaw_rate · π/180 · L / u_scale
-```
-
-`u_scale` = `u` terukur. Bila `u < 0.15` m/s (atau kecepatan belum siap), pembagi dan langkah horizon memakai lantai **0.15** m/s supaya `v'` tidak meledak. `0.6114` m/s hanya acuan identifikasi: suku model `u·cosψ` dan `u·sinψ` diskalakan `u_scale / 0.6114`.
-
-| | 2.1 |
-|--|-----|
-| `u`, `v` | dihitung tiap sampel GPS |
-| `ψ` NMPC | **`π/2 − yaw`** (tetap) |
-| `r_nd` | **`−yaw_rate · π/180 · L/u_scale`** |
+| | Sekarang |
+|--|----------|
+| `yaw` CSV | **0 = Utara, 90° = Timur, 270° = Barat** (CW) |
+| `ψ` ke NMPC | **`π/2 − yaw`** |
+| `r_nd` | **`−yaw_rate · π/180 · L/u0`** |
+| `u`, `v` dari GPS | tidak dipakai (`v = 0`) |
 
 ```text
 ψ_nmpc = wrap(π/2 − deg2rad(yaw))
@@ -57,7 +43,7 @@ Kode: `src/main.cpp` — `compass_yaw_to_nmpc_psi()`, `yaw_rate_to_r_nd()`. Sama
 flowchart LR
   Dash["Dashboard 1.6"] -->|"$WPSET / $SHUTDOWN"| User["User-Side-05"]
   User -->|"ESP-NOW"| Remote["Remote-Side-05"]
-  Remote -->|"USB 115200"| Bridge["2.1 mini-PC"]
+  Remote -->|"USB 115200"| Bridge["2.0 mini-PC"]
   Bridge -->|"$HB + timestamp,result"| Remote
 ```
 
@@ -78,8 +64,8 @@ flowchart TD
 
   State --> S1["x,y = ENU / L"]
   State --> S2["psi = pi/2 - yaw  kompas 90=Timur"]
-  State --> S3["r_nd = -yaw_rate · pi/180 · L/u"]
-  State --> S4["v_nd = v_ukur / u"]
+  State --> S3["r_nd = -yaw_rate · pi/180 · L/u0"]
+  State --> S4["v = 0"]
   State --> Hor["Horizon ke WP aktif"]
 
   S1 --> Solve["NMPC_Solve"]
@@ -100,7 +86,7 @@ flowchart TD
 ```mermaid
 sequenceDiagram
   participant R as Remote ESP32
-  participant P as 2.1 mini-PC
+  participant P as 2.0 mini-PC
   participant N as NMPC_Solve
 
   P->>R: $HB (tiap 1 s)
@@ -132,6 +118,16 @@ $HB
 24.783,12.40
 ```
 
+`heading_setpoint` tidak masuk CSV ini. 2.0 tidak mengirim balik bearing, `ψ`, `u`, atau `v`. Pada auto alg 2, dashboard tetap melihat setpoint = yaw.
+
+| Diterima dari Remote | Dipakai | Balasan ke Remote |
+|----------------------|---------|-------------------|
+| `timestamp`, `lat`, `lon`, `yaw`, `yaw_rate` | state NMPC | `timestamp,result` (rudder °) |
+| `[WP] Home`, `[WP] #n` | origin + target | — |
+| `calc_deg_servo_*`, `gyro_z` | di-parse, tidak masuk solver | — |
+| `$SHUTDOWN` | matikan OS | — |
+| — | — | `$HB` tiap 1 s |
+
 ---
 
 ## Adaptor mentah → NMPC
@@ -141,8 +137,7 @@ $HB
 | `timestamp` | ya | echo TX |
 | `lat`, `lon` | ya | East, North → `x/L`, `y/L` |
 | `yaw` ° kompas CW | ya | `ψ = π/2 − deg2rad(yaw)` (0 NMPC = Timur) |
-| `lat`, `lon`, `yaw`, `timestamp` | ya | `u`, `v` badan; `v' = v/u` |
-| `yaw_rate` °/s | ya | `r_nd = −deg2rad(yaw_rate)·L/u` |
+| `yaw_rate` °/s | ya | `r_nd = −deg2rad(yaw_rate)·L/u0` |
 | `[WP]` | ya | origin + target + horizon N=20 |
 | `gyro_z` | **tidak** | — |
 | `calc_deg_servo_*` | **tidak** | — |
@@ -166,7 +161,7 @@ Cek: `yaw = 0` → Utara = π/2; `yaw = 90°` → Timur = 0.
 
 Karena `dψ/dt = −yaw_rate`, tanda `yaw_rate` **dibalik**.
 
-Konstanta: `L=1.0107` m, `u0` acuan model `0.6114` m/s, lantai surge `0.15` m/s, `T_sim=0.1` s, `N=20`, `r_tran=3` m, rudder ±45°. Kecepatan kapal = `u` terukur.
+Konstanta solver (demo C): `L=1.0107` m, `u0=0.6114` m/s, `T_sim=0.1` s, `N=20`, `r_tran=3` m, rudder ±45°.
 
 Tanpa GPS fix, tanpa WP, atau misi selesai (`r_tran` di WP terakhir) → `result = 0`.
 
@@ -199,7 +194,7 @@ Urutan biasa: 2.0 sudah jalan → Send Way Points (boleh manual) → CH6 auto.
 ## Build
 
 ```powershell
-cd "Cpp_Files\Cpp_ReadWriteSerial-2.1-ENU-NMPC-beta"
+cd "Cpp_Files\Cpp_ReadWriteSerial-2.0-ENU-NMPC"
 g++ -std=c++17 -Iinclude -Inmpc src/main.cpp src/serial_port.cpp nmpc/nmpc_kapal_waypoint.c nmpc/geo_enu.c nmpc/waypoint_manager.c -o read_write_serial.exe
 ```
 
@@ -222,14 +217,14 @@ g++ -std=c++17 -Iinclude -Inmpc src/main.cpp src/serial_port.cpp nmpc/nmpc_kapal
 
 Auto-start: [`startup_guide.md`](startup_guide.md).
 
-Log stderr ~1 Hz: `[NMPC] WP2 d=4.2 m | E=... N=... | u=... v=... m/s | psi=... | d=12.4 deg | status=1`
+Log stderr ~1 Hz: `[NMPC] WP2 d=4.2 m | E=... N=... | psi=... | d=12.4 deg | status=1`
 
 ---
 
 ## Catatan
 
 1. Port COM hanya satu aplikasi.
-2. `u` dan `v` dari ΔENU / yaw (LPF α=0.70). `v' = v/u`. Lantai surge 0.15 m/s.
+2. `v` tidak diestimasi dari GPS (isi 0, seperti demo C).
 3. Heading CSV: **0 = Utara, 90° = Timur** (kompas CW). Lihat **Revisi**: `ψ = π/2 − yaw`.
 4. User Windows perlu hak `shutdown` untuk `$SHUTDOWN`.
 5. Manual → auto tanpa kirim ulang WP = lanjut titik aktif, bukan ulang WP1.

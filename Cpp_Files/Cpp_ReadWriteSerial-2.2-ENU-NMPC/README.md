@@ -1,10 +1,21 @@
-# Cpp_ReadWriteSerial-2.0-ENU-NMPC-beta
+# Cpp_ReadWriteSerial-2.2-ENU-NMPC
 
-Bridge USB **1.2** (data mentah) + **NMPC C Sep 2026**. Keluaran ke ESP32 tetap `timestamp,result` (rudder derajat).
+Turunan **`Cpp_ReadWriteSerial-2.0-ENU-NMPC`**, bukan 2.1. `v` tetap 0 dan `u0` tetap `0.6114` m/s.
+
+Tambahan dibanding 2.0: bila GPS dan waypoint siap, balasan serial membawa **bearing kompas** ke waypoint aktif.
+
+```text
+timestamp,result,bearing
+24.783,12.40,87.50
+```
+
+`bearing` dalam derajat, **0 = Utara, 90 = Timur**. Dihitung dari `θ` NMPC: `wrap360(90° − θ)`. Tanpa GPS atau tanpa waypoint, baris tetap `timestamp,result` saja.
+
+Pasangan firmware: `ESP-Now_ESP32-S3_Remote-Side-05.1` (alg 2 mengisi `heading_setpoint` dari kolom ini).
 
 | Pasangan | Path |
 |----------|------|
-| Firmware Remote | `PlatformIO/Way_Points_Tracking/ESP-Now_ESP32-S3_Remote-Side-05` |
+| Firmware Remote | `PlatformIO/Way_Points_Tracking/ESP-Now_ESP32-S3_Remote-Side-05.1` |
 | Firmware User | `PlatformIO/Way_Points_Tracking/ESP-Now_ESP32-S3_User-Side-05` |
 | Dashboard | `Pythonfile/Way_Points_Tracking/Local Monitor Dashboard-beta1.6.py` |
 | Serial / CSV | `Cpp_Files/Cpp_ReadWriteSerial-1.2-ENU-beta` |
@@ -115,8 +126,10 @@ $SHUTDOWN
 
 ```text
 $HB
-24.783,12.40
+24.783,12.40,87.50
 ```
+
+Kolom ketiga = bearing kompas ke WP aktif. Remote-05 (tanpa 05.1) hanya membaca dua kolom pertama, jadi rudder tetap jalan.
 
 `heading_setpoint` tidak masuk CSV ini. 2.0 tidak mengirim balik bearing, `ψ`, `u`, atau `v`. Pada auto alg 2, dashboard tetap melihat setpoint = yaw.
 
@@ -194,7 +207,7 @@ Urutan biasa: 2.0 sudah jalan → Send Way Points (boleh manual) → CH6 auto.
 ## Build
 
 ```powershell
-cd "Cpp_Files\Cpp_ReadWriteSerial-2.0-ENU-NMPC-beta"
+cd "Cpp_Files\Cpp_ReadWriteSerial-2.2-ENU-NMPC"
 g++ -std=c++17 -Iinclude -Inmpc src/main.cpp src/serial_port.cpp nmpc/nmpc_kapal_waypoint.c nmpc/geo_enu.c nmpc/waypoint_manager.c -o read_write_serial.exe
 ```
 

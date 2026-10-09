@@ -4,6 +4,14 @@ Catatan perubahan utama antar versi firmware dan dashboard **Way Points Tracking
 
 ---
 
+## [Cpp_ReadWriteSerial-2.2-ENU-NMPC] + Remote-Side-05.1 — bearing alg 2
+
+2.2 turunan **2.0** (bukan 2.1): `v = 0`, `u0 = 0.6114`. TX menambah bearing kompas: `timestamp,result,bearing`. Remote-05.1 pada alg 2 menyalin bearing itu ke `heading_setpoint`.
+
+Folder 2.0 berganti nama: `Cpp_ReadWriteSerial-2.0-ENU-NMPC` (tanpa `-beta`).
+
+---
+
 ## [Cpp_ReadWriteSerial-2.1-ENU-NMPC-beta] — `u`, `v` terukur
 
 Clone 2.0. Surge dan sway tidak lagi konstanta: `u`, `v` dari ΔENU dan yaw kompas (rumus 1.6), `v' = v/u`. `0.6114` m/s hanya acuan model. Lantai surge `0.15` m/s.
@@ -117,7 +125,7 @@ Folder baru: posisi ENU (x=East, y=North) plus **kecepatan** peta `ẋ,ẏ` dan 
 
 ---
 
-## [Cpp_ReadWriteSerial-2.0-ENU-NMPC-beta] — dari `1.2-ENU-beta` + NMPC C
+## [Cpp_ReadWriteSerial-2.0-ENU-NMPC] — dari `1.2-ENU-beta` + NMPC C
 
 ### Ringkasan
 
@@ -125,7 +133,7 @@ Folder baru: serial mentah seperti 1.2, `result` dari **NMPC C Sep 2026**. `v=0`
 
 ### File baru / inti
 
-- `Cpp_Files/Cpp_ReadWriteSerial-2.0-ENU-NMPC-beta/`
+- `Cpp_Files/Cpp_ReadWriteSerial-2.0-ENU-NMPC/`
 - `nmpc/` (salinan `Coding_NMPC_Sep2026/C code NMPC`)
 - `src/main.cpp` adaptor serial → `NMPC_Solve` → `timestamp,result`
 
@@ -312,7 +320,7 @@ Clone folder dengan handler **`$SHUTDOWN`**: menutup port serial lalu menjalanka
 - `Cpp_ReadWriteSerial-1.1-NED-beta` — + NED internal
 - `Cpp_ReadWriteSerial-1.2-NED-beta` — + `Ẋ,Ẏ,u,v` internal
 - `Cpp_ReadWriteSerial-1.2-ENU-beta` — + `ẋ,ẏ,u,v` internal (ENU)
-- `Cpp_ReadWriteSerial-2.0-ENU-NMPC-beta` — serial 1.2 + NMPC C → `result`
+- `Cpp_ReadWriteSerial-2.0-ENU-NMPC` — serial 1.2 + NMPC C → `result`
 - `Cpp_ReadWriteSerial-2.0-ENU-NMPC-simulasi` — replay file → `result` (tanpa COM)
 
 ---

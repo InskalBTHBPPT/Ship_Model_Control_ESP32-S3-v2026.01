@@ -1,4 +1,4 @@
-# Panduan Auto-Start Windows — `read_write_serial.exe` (2.0 NMPC)
+# Panduan Auto-Start Windows — `read_write_serial.exe` (2.2 NMPC + bearing)
 
 ## File batch
 
@@ -29,7 +29,7 @@ set PRINT_MODE=none
 ## Opsi B — Path absolut di Startup
 
 ```batch
-cd /d "D:\Pengujian\Ship_Model_Control_ESP32-S3 v2026.01\Cpp_Files\Cpp_ReadWriteSerial-2.0-ENU-NMPC-beta"
+cd /d "D:\Pengujian\Ship_Model_Control_ESP32-S3 v2026.01\Cpp_Files\Cpp_ReadWriteSerial-2.2-ENU-NMPC"
 read_write_serial.exe --port COM16 --baud 115200 --rudder-mode nmpc
 ```
 

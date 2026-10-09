@@ -53,7 +53,7 @@ User-Side-05  (ESP-Now_ESP32-S3_User-Side-05)
 Remote-Side-05 (ESP-Now_ESP32-S3_Remote-Side-05) — di kapal
     │ USB Serial 115200
     ▼
-Mini PC — Cpp_ReadWriteSerial-2.0-ENU-NMPC-beta
+Mini PC — Cpp_ReadWriteSerial-2.0-ENU-NMPC
 ```
 
 ---
@@ -65,7 +65,7 @@ Mini PC — Cpp_ReadWriteSerial-2.0-ENU-NMPC-beta
 | Dashboard | `Pythonfile/Way_Points_Tracking/Local Monitor Dashboard-beta1.6.py` |
 | User-Side | `PlatformIO/Way_Points_Tracking/ESP-Now_ESP32-S3_User-Side-05/` |
 | Remote-Side | `PlatformIO/Way_Points_Tracking/ESP-Now_ESP32-S3_Remote-Side-05/` |
-| Mini PC | `Cpp_Files/Cpp_ReadWriteSerial-2.0-ENU-NMPC-beta/` |
+| Mini PC | `Cpp_Files/Cpp_ReadWriteSerial-2.0-ENU-NMPC/` |
 | Dokumen ini | `Pythonfile/Way_Points_Tracking/Ship Auto Way Maps Points Tracking.md` |
 
 `Cpp_ReadWriteSerial-2.1-ENU-NMPC-beta` adalah cabang yang menghitung `u`,`v` dari GPS. Stack di dokumen ini memakai **2.0** (`v = 0`, `u0 = 0.6114` m/s).
@@ -151,7 +151,7 @@ Detail: `README Local Monitor Dashboard-beta1.6.md`
 
 ## 7. Mini PC — Cpp_ReadWriteSerial-2.0
 
-**Path:** `Cpp_Files/Cpp_ReadWriteSerial-2.0-ENU-NMPC-beta/`
+**Path:** `Cpp_Files/Cpp_ReadWriteSerial-2.0-ENU-NMPC/`
 
 | Arah | Isi |
 |------|-----|
@@ -162,7 +162,7 @@ Detail: `README Local Monitor Dashboard-beta1.6.md`
 
 State NMPC: `v = 0`, `u0 = 0.6114` m/s, `ψ = π/2 − yaw`, `r` dari `yaw_rate` (tanda minus). `L = 1.0107` m.
 
-Detail: `Cpp_Files/Cpp_ReadWriteSerial-2.0-ENU-NMPC-beta/README.md`
+Detail: `Cpp_Files/Cpp_ReadWriteSerial-2.0-ENU-NMPC/README.md`
 
 ---
 
@@ -266,7 +266,7 @@ cd ../ESP-Now_ESP32-S3_User-Side-05
 pio run --target upload
 
 # Mini PC 2.0
-cd Cpp_Files/Cpp_ReadWriteSerial-2.0-ENU-NMPC-beta
+cd Cpp_Files/Cpp_ReadWriteSerial-2.0-ENU-NMPC
 g++ -std=c++17 -Iinclude -Inmpc src/main.cpp src/serial_port.cpp nmpc/nmpc_kapal_waypoint.c nmpc/geo_enu.c nmpc/waypoint_manager.c -o read_write_serial.exe
 .\read_write_serial.exe --port COMx --baud 115200 --rudder-mode nmpc --print all
 
@@ -325,4 +325,4 @@ Sesuaikan MAC ESP-NOW di kedua `main.cpp` dan port COM.
 
 ---
 
-*Dokumen ini: Ship Auto Way Maps Points Tracking — dashboard 1.6, Remote/User-05, Cpp_ReadWriteSerial-2.0-ENU-NMPC-beta*
+*Dokumen ini: Ship Auto Way Maps Points Tracking — dashboard 1.6, Remote/User-05, Cpp_ReadWriteSerial-2.0-ENU-NMPC*

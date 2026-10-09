@@ -1,17 +1,14 @@
-# ESP-Now_ESP32-S3_Remote-Side-05
+# ESP-Now_ESP32-S3_Remote-Side-05.1
 
-Firmware sisi kapal (Remote-Side) untuk sistem **Way Points Tracking**.
+Turunan **Remote-Side-05**. Pasangan mini PC: `Cpp_Files/Cpp_ReadWriteSerial-2.2-ENU-NMPC` (bukan 2.1).
 
-Clone dari **Remote-Side-04** dengan tambahan forward perintah **`$SHUTDOWN`** ke mini PC (ESP-NOW `0xA2`) dan **filter compile-time** untuk feedback sudut servo rudder (`RUDDER_DEG_FILTER`, default oversample).
+Alg 2 mengisi `heading_setpoint` dari kolom bearing pada baris `timestamp,result,bearing`. Skala sama dengan yaw: kompas CW, 0 = Utara, 90 = Timur, disimpan ×100. `heading_error` = bearing − yaw. Tanpa kolom ketiga, setpoint tetap salinan yaw seperti Remote-05.
 
-Mengumpulkan data sensor dan actuator, menjalankan kontrol rudder/propeller, menerima waypoint dari User-Side via ESP-NOW, lalu mengirim telemetry **24 kolom** ke User-Side @ 10 Hz.
-
-**Pasangan:**
 | Komponen | Path |
 |----------|------|
 | User-Side | `ESP-Now_ESP32-S3_User-Side-05` |
 | Dashboard | `Local Monitor Dashboard-beta1.6.py` |
-| Mini PC | `Cpp_Files/Cpp_ReadWriteSerial-2.0-ENU-NMPC` |
+| Mini PC | `Cpp_Files/Cpp_ReadWriteSerial-2.2-ENU-NMPC` |
 
 ---
 

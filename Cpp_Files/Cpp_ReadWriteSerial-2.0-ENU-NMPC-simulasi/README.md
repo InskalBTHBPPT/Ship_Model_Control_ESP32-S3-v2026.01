@@ -1,6 +1,6 @@
 # Cpp_ReadWriteSerial-2.0-ENU-NMPC-simulasi
 
-Versi **simulasi only** dari `Cpp_ReadWriteSerial-2.0-ENU-NMPC-beta`.
+Versi **simulasi only** dari `Cpp_ReadWriteSerial-2.0-ENU-NMPC`.
 
 - **Tidak** membuka COM, **tidak** kirim `$HB`, **bukan** untuk kapal.
 - Input = file teks berformat sama dengan USB Remote.
@@ -9,7 +9,7 @@ Versi **simulasi only** dari `Cpp_ReadWriteSerial-2.0-ENU-NMPC-beta`.
 
 | Live | Simulasi |
 |------|----------|
-| `Cpp_ReadWriteSerial-2.0-ENU-NMPC-beta` | folder ini |
+| `Cpp_ReadWriteSerial-2.0-ENU-NMPC` | folder ini |
 | USB CSV + `[WP]` | `scenarios/*.txt` |
 | TX ke ESP32 | stdout / file |
 

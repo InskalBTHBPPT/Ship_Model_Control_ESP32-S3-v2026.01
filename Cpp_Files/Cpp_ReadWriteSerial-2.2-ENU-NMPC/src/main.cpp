@@ -1,9 +1,9 @@
 /**
  * @file main.cpp
- * @brief Cpp_ReadWriteSerial-2.0-ENU-NMPC-beta
+ * @brief Cpp_ReadWriteSerial-2.2-ENU-NMPC
  *
- * Bridge USB seperti 1.2 (mentah) + NMPC C Sep 2026 → timestamp,result.
- * gyro_z diabaikan; r dari yaw_rate. v = 0. ψ = π/2 − yaw kompas (0=N, 90=E).
+ * Turunan 2.0 (bukan 2.1). v = 0, u0 tetap.
+ * Tambahan TX: timestamp,result,bearing (bearing kompas CW, 0=Utara, 90=Timur).
  */
 
 #include "serial_port.hpp"
@@ -58,7 +58,9 @@ void print_usage(const char *program_name) {
       << "  --r-tran <m>             Radius ganti waypoint (default: 3.0)\n"
       << "  --help                   Tampilkan bantuan ini\n\n"
       << "Serial RX: CSV 8 kolom, [WP] Home / [WP] #n, $SHUTDOWN\n"
-      << "Serial TX: $HB tiap 1 s, timestamp,result (rudder deg)\n"
+      << "Serial TX: $HB tiap 1 s, timestamp,result,bearing\n"
+      << "      bearing = haluan kompas ke WP aktif (0=Utara, 90=Timur)\n"
+      << "      tanpa WP/GPS: timestamp,result saja\n"
       << "NMPC: v=0, r dari yaw_rate (bukan gyro_z), psi = pi/2 - yaw\n"
       << "      yaw kompas CW: 0=Utara, 90=Timur, 270=Barat\n";
 }
@@ -111,6 +113,26 @@ std::string format_result_line(double timestamp, double result) {
   oss << std::fixed << std::setprecision(3) << timestamp << ","
       << std::setprecision(2) << result;
   return oss.str();
+}
+
+std::string format_result_line(double timestamp, double result, double bearing_deg) {
+  std::ostringstream oss;
+  oss << std::fixed << std::setprecision(3) << timestamp << ","
+      << std::setprecision(2) << result << "," << bearing_deg;
+  return oss.str();
+}
+
+double wrap360(double deg) {
+  deg = std::fmod(deg, 360.0);
+  if (deg < 0.0) {
+    deg += 360.0;
+  }
+  return deg;
+}
+
+// ψ NMPC (0=Timur, CCW) → bearing kompas (0=Utara, CW)
+double nmpc_psi_to_compass_deg(double psi_rad) {
+  return wrap360(90.0 - (psi_rad * (180.0 / M_PI)));
 }
 
 double clamp_deg(double value, double min_deg, double max_deg) {
@@ -365,6 +387,8 @@ int main(int argc, char **argv) {
     }
 
     double rudder_deg = 0.0;
+    bool have_bearing = false;
+    double bearing_compass_deg = 0.0;
 
     if (rudder_mode == "zero") {
       rudder_deg = 0.0;
@@ -392,6 +416,13 @@ int main(int argc, char **argv) {
         }
         last_dist = dist;
 
+        double wp_e = 0.0;
+        double wp_n = 0.0;
+        WP_GetActiveTarget(&wp_mgr, &wp_e, &wp_n);
+        const double theta_target = std::atan2(wp_n - north, wp_e - east);
+        bearing_compass_deg = nmpc_psi_to_compass_deg(theta_target);
+        have_bearing = true;
+
         if (WP_IsMissionComplete(&wp_mgr, dist)) {
           if (!mission_done) {
             std::cerr << "[INFO] Misi selesai (WP terakhir dalam r_tran)\n";
@@ -401,11 +432,6 @@ int main(int argc, char **argv) {
           last_status = 0;
           ++nmpc_hold;
         } else {
-          double wp_e = 0.0;
-          double wp_n = 0.0;
-          WP_GetActiveTarget(&wp_mgr, &wp_e, &wp_n);
-          const double theta_target = std::atan2(wp_n - north, wp_e - east);
-
           double x_ref[NMPC_MAX_HORIZON];
           double y_ref[NMPC_MAX_HORIZON];
           double psi_ref[NMPC_MAX_HORIZON];
@@ -447,6 +473,7 @@ int main(int argc, char **argv) {
                       << "[NMPC] WP" << (wp_mgr.active_idx + 1u)
                       << " d=" << dist << " m | E=" << east << " N=" << north
                       << " | psi=" << (psi * (180.0 / M_PI))
+                      << " deg | brg=" << bearing_compass_deg
                       << " deg | d=" << rudder_deg << " deg | status="
                       << last_status << "\n";
             last_nmpc_log = log_now;
@@ -457,7 +484,8 @@ int main(int argc, char **argv) {
 
     last_result_deg = rudder_deg;
     const std::string result_line =
-        format_result_line(row->timestamp, rudder_deg);
+        have_bearing ? format_result_line(row->timestamp, rudder_deg, bearing_compass_deg)
+                     : format_result_line(row->timestamp, rudder_deg);
     if (!serial.write_line(result_line)) {
       ++write_errors;
       std::cerr << "[ERROR] Gagal tulis serial: " << serial.last_error()
