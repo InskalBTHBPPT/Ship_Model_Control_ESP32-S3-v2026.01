@@ -4,6 +4,12 @@ Catatan perubahan utama antar versi firmware dan dashboard **Way Points Tracking
 
 ---
 
+## [Remote-Side-05.2] + [Cpp 2.3] + [Dashboard 1.7] — pulang Home saat baterai rendah
+
+Hanya `battery_1` dan `battery_2` yang diukur Remote. Di bawah 10,8 V selama 10 detik terus-menerus saat CH6 auto → Remote mengirim `$RTL` tiap 1 detik. 2.3 (turunan 2.2) mengalihkan target NMPC ke Home. Dashboard 1.7 mengedipkan label dan membunyikan alarm dari dua kolom tegangan yang sudah ada. User-Side tetap 05.
+
+---
+
 ## [Remote-Side-05.1] — propeller terkunci saat auto
 
 CH6 manual: kecepatan CH3 dan arah CH5 mengikuti stik. Saat pindah ke auto, PWM propeller menahan nilai tick manual terakhir. Gerakan CH3/CH5 selama auto diabaikan sampai mode kembali manual.
