@@ -1,12 +1,94 @@
 # Changelog
 
-Catatan perubahan utama antar versi firmware dan dashboard **Way Points Tracking**.
+Catatan perubahan utama antar versi firmware dan dashboard **Way Points Tracking**. Yang terbaru di atas. Pasangan kapal saat ini: dashboard **1.8**, User-Side-**05**, Remote-Side-**05.2**, mini PC **2.3-ENU-NMPC**.
 
 ---
 
-## [Remote-Side-05.2] + [Cpp 2.3] + [Dashboard 1.7] — pulang Home saat baterai rendah
+## [Dashboard 1.8] — simbol peta, replay 3D, prediksi lintasan
 
-Hanya `battery_1` dan `battery_2` yang diukur Remote. Di bawah 10,8 V selama 10 detik terus-menerus saat CH6 auto → Remote mengirim `$RTL` tiap 1 detik. 2.3 (turunan 2.2) mengalihkan target NMPC ke Home. Dashboard 1.7 mengedipkan label dan membunyikan alarm dari dua kolom tegangan yang sudah ada. User-Side tetap 05.
+Dari 1.7. User-Side tetap 05. Telemetry tetap 24 kolom.
+
+- Live Data, Map Points, dan Analyze memakai simbol yang sama: Home kotak hijau (tanpa lingkaran), waypoint bintang bernomor + lingkaran 3 m, garis rencana oranye putus-putus antar waypoint, kapal belah ketupat hijau, jejak biru
+- Heading: Live merah putus-putus 5 m; Map Points oranye solid 5 m; Analyze merah putus-putus pada slider, plus checkbox **Heading Line**
+- Tab **3D** (`replay_3d.html`, Three.js lokal): Play memutar log uji saja. Jejak log hitam
+- Tombol **Prediksi** menjalankan `predict_track.exe` (model NMPC 2.3: Home, yaw awal 90° timur, `u0 = 0.6114`, `v = 0`) dan menggambar garis merah di scene yang sama
+
+File: `Pythonfile/Way_Points_Tracking/Local Monitor Dashboard-1.8.py`  
+Dokumen: `README Local Monitor Dashboard-1.8.md`
+
+---
+
+## [Remote-Side-05.2] + [Cpp 2.3-ENU-NMPC] + [Dashboard 1.7] — pulang Home saat baterai rendah
+
+Hanya `battery_1` dan `battery_2` yang diukur Remote. Di bawah 10,8 V selama 10 detik terus-menerus saat CH6 auto → Remote mengirim `$RTL` tiap 1 detik. 2.3 (turunan **2.2-ENU**, bukan 2.1) mengalihkan target NMPC ke Home. Dashboard 1.7 mengedipkan label dan membunyikan alarm dari dua kolom tegangan yang sudah ada. User-Side tetap 05.
+
+Pada 1.7, Analyze juga menambah **Load Waypoints** (Home kotak hijau, bintang + lingkaran 3 m, jumlah titik dari file) dan penanda mode: segitiga hijau = auto mulai, segitiga merah = auto selesai, belah ketupat oranye = log berakhir masih auto.
+
+---
+
+## Daftar versi
+
+Entri panjang di bawah ini tetap berlaku. Tabel ini menutup versi yang belum punya bagian sendiri.
+
+### Local Monitor (PySide6)
+
+| Versi | File | Inti |
+|-------|------|------|
+| 1.0 | `Pythonfile/Misc_2/Local Monitor Dashboard 1.0.py` | 15 kolom (termasuk roll, pitch, zigzag_yaw). Peta, plot, log, Analyze |
+| beta 1.1 | `.../Local Monitor Dashboard-beta1.1.py` | Tetap 15 kolom. Home Points dari GPS terakhir |
+| beta 1.1.1 | `.../Local Monitor Dashboard-beta1.1.1.py` | 23 kolom fixed-point dari User-Side-01. RPM integer |
+| beta 1.2 (cabang) | `Pythonfile/Misc_2/Local Monitor Dashboard beta 1.2.py` | 7 kolom: waktu, GPS, yaw, accel. Bukan jalur waypoint |
+| beta 1.2 | `.../Local Monitor Dashboard-beta1.2.py` | `$WPSET`, `$TUNSET`, `$TUNGET`. Snapshot folder `WayPoints/`. Pasangan User-02. RPM di docstring ×100 |
+| beta 1.3 | `.../Local Monitor Dashboard-beta1.3.py` | 23 kolom User-03. RPM integer. Protokol tuning tidak dipakai |
+| beta 1.4 | `.../Local Monitor Dashboard-beta1.4.py` | 24 kolom, status Mini PC. Parser tetap terima 23 |
+| beta 1.5 | `.../Local Monitor Dashboard-beta1.5.py` | Tombol Shutdown → `$SHUTDOWN` |
+| 1.6 | `.../Local Monitor Dashboard-1.6.py` | `u`,`v` lokal di Live dan log. Nama file bukan lagi `beta1.6` |
+| 1.7 | `.../Local Monitor Dashboard-1.7.py` | Alarm baterai 10,8 V. Analyze: waypoint + penanda mulai/selesai auto |
+| 1.8 | `.../Local Monitor Dashboard-1.8.py` | Simbol peta disatukan. Tab 3D + garis prediksi merah |
+
+Path `.../` = `Pythonfile/Way_Points_Tracking/`.
+
+### User-Side
+
+| Versi | Inti |
+|-------|------|
+| 00 | Gateway. Telemetry **15** kolom ke PC. `$WPSET` / `$WACK` → ESP-NOW waypoint |
+| 01 | Telemetry **23** kolom fixed-point. `$WPSET` tetap |
+| 02 | `$WPSET`, `$TUNSET`, `$TUNGET`. ACK setelah Remote membalas `0xC1` |
+| 03 | 23 kolom, `$WPSET` saja (tanpa tuning). Pasangan Remote-03 |
+| 04 | Kolom ke-24 `mini_pc_link`. User tidak bicara langsung ke mini PC |
+| 05 | `$SHUTDOWN` / `$SACK`. CSV 24 kolom tidak berubah. Masih pasangan dashboard 1.8 |
+
+### Remote-Side
+
+| Versi | Inti |
+|-------|------|
+| 00 | Telemetry **15** kolom @ 10 Hz. Waypoint disimpan dan dicetak; belum dipakai kontrol |
+| 01 | PPM, servo, GPS, IMU, RPM, baterai. README: terima waypoint masih pending |
+| 02 | 23 kolom. Alg 1 waypoint+PD, alg 2 stub. Tuning NVS lewat `0xA2` / `0xB1` |
+| 03 | Auto waypoint + PD, terima `0xA1`, telemetry 23 kolom |
+| 04 | USB mini PC. Telemetry **24** kolom (`mini_pc_link`). Default alg 2 = rudder dari `timestamp,result` |
+| 05 | `$SHUTDOWN` (`0xA2`). Filter `RUDDER_DEG_FILTER`. Offset pasang AHRS, lalu yaw kompas CW |
+| 05.1 | Propeller CH3/CH5 terkunci saat auto. `heading_setpoint` dari bearing 2.2 |
+| 05.2 | Di bawah 10,8 V selama 10 detik saat auto → `$RTL` ke Home. Pasangan 2.3 |
+
+### Cpp ReadWriteSerial
+
+Jalur **ENU** yang dipakai kapal: 1.1-ENU → 1.2-ENU → 2.0-ENU-NMPC → 2.2-ENU-NMPC → **2.3-ENU-NMPC**. 2.1-ENU menghitung `u`,`v` dari GPS dan **bukan** pasangan kapal.
+
+| Versi | Frame | Inti |
+|-------|-------|------|
+| `Cpp_ReadWriteSerial` | — | Dasar. Baca CSV 8 kolom Remote-04, `$HB`, tulis `timestamp,result` |
+| 1.0 | — | `$SHUTDOWN` → `shutdown /s /t 5`. `--print none` |
+| **1.1-ENU-beta** | ENU | lat/lon → East/North internal. Stdout serial sama seperti 1.0 |
+| 1.1-NED-beta | NED | Sama seperti 1.1-ENU, sumbu North/East |
+| **1.2-ENU-beta** | ENU | Posisi + `ẋ,ẏ` dan `u`,`v`, LPF α=0.70. Rudder belum NMPC |
+| 1.2-NED-beta | NED | Sama, frame NED |
+| **2.0-ENU-NMPC** | ENU | `result` dari NMPC C. `v=0`, `u0=0.6114`, `ψ=π/2−yaw`. Parse `[WP]` |
+| 2.0-ENU-NMPC-simulasi | ENU | Replay file skenario, tanpa COM |
+| **2.1-ENU-NMPC-beta** | ENU | `u`,`v` dari ΔGPS. Bukan pasangan Remote-05.2 |
+| **2.2-ENU-NMPC** | ENU | Dari 2.0, bukan 2.1. TX: `timestamp,result,bearing` |
+| **2.3-ENU-NMPC** | ENU | Dari 2.2. `$RTL` mengunci target ke Home sampai program di-restart |
 
 ---
 
@@ -250,11 +332,11 @@ User-Side-05 (dari **User-Side-04**) menambahkan perintah serial **`$SHUTDOWN`**
 
 ---
 
-## [Dashboard beta 1.6] — dari `Local Monitor Dashboard-beta1.5.py`
+## [Dashboard 1.6] — dari `Local Monitor Dashboard-beta1.5.py`
 
 ### Ringkasan
 
-Beta 1.6 (nama baru dari 1.51) menampilkan dan men-log **surge `u` / sway `v`** di tab Live. Hitungan lokal dari `lat, lon, yaw, timestamp` (rumus 1.2 kompas CW **0 = Utara, 90° = Timur**).
+1.6 (nama baru dari 1.51) menampilkan dan men-log **surge `u` / sway `v`** di tab Live. Hitungan lokal dari `lat, lon, yaw, timestamp` (rumus 1.2 kompas CW **0 = Utara, 90° = Timur**).
 
 ```text
 u =  ẋ sinψ + ẏ cosψ
@@ -267,11 +349,11 @@ v =  ẋ cosψ − ẏ sinψ
 
 - Label Live: **u surge (m/s)**, **v sway (m/s)**
 - CSV: kolom baru `u (m/s)`, `v (m/s)` setelah `speedMps`
-- Judul window: `Ship Model Local Dashboard — beta 1.6`
+- Judul window: `Ship Model Local Dashboard — 1.6`
 
 ### File
 
-- `Pythonfile/Way_Points_Tracking/Local Monitor Dashboard-beta1.6.py`
+- `Pythonfile/Way_Points_Tracking/Local Monitor Dashboard-1.6.py`
 
 ---
 
