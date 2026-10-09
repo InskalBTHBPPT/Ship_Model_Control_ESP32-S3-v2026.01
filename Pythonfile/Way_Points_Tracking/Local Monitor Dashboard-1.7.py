@@ -3356,6 +3356,7 @@ class MainWindow(QMainWindow):
         self.analyze_map_webview.clear_markers()
         self.analyze_map_webview.trail_coords = []
         self.analyze_map_webview.marker_count = 0
+        self._clear_analyze_mode_markers()
 
         if hasattr(self, "analyze_time_slider"):
             max_default = 500 * getattr(self, "analyze_time_slider_scale", 1)
@@ -4258,6 +4259,99 @@ class MainWindow(QMainWindow):
         parts.append("})();")
         self.analyze_map_webview.page().runJavaScript("\n".join(parts))
 
+    def _clear_analyze_mode_markers(self) -> None:
+        if not hasattr(self, "analyze_map_webview"):
+            return
+        map_name = self.analyze_map_webview.folium_map.get_name()
+        self.analyze_map_webview.page().runJavaScript(
+            f"if (window.analyzeModeGroup) {{ {map_name}.removeLayer(window.analyzeModeGroup); window.analyzeModeGroup = null; }}"
+        )
+
+    def _analyze_mode_events(self) -> list[tuple[str, int, float, float, float]]:
+        """Titik pindah mode: start, end, atau masih auto di baris terakhir."""
+        modes = self.analyze_mode_auto_data
+        coords = self.analyze_map_coords
+        times = self.analyze_time_data
+        count = min(len(modes), len(coords), len(times))
+        if count == 0:
+            return []
+
+        def auto_on(index: int) -> bool:
+            return int(modes[index]) != 0
+
+        events: list[tuple[str, int, float, float, float]] = []
+        session = 0
+        if auto_on(0):
+            session = 1
+            lat, lon = coords[0]
+            events.append(("start", session, lat, lon, times[0]))
+        for index in range(1, count):
+            was_auto = auto_on(index - 1)
+            now_auto = auto_on(index)
+            lat, lon = coords[index]
+            if (not was_auto) and now_auto:
+                session += 1
+                events.append(("start", session, lat, lon, times[index]))
+            elif was_auto and (not now_auto):
+                events.append(("end", session, lat, lon, times[index]))
+        if auto_on(count - 1):
+            lat, lon = coords[count - 1]
+            same_as_start = (
+                events
+                and events[-1][0] == "start"
+                and events[-1][3] == lon
+                and events[-1][2] == lat
+                and events[-1][4] == times[count - 1]
+            )
+            if not same_as_start:
+                events.append(("open", session, lat, lon, times[count - 1]))
+        return events
+
+    def _draw_analyze_mode_markers(self) -> None:
+        """Segitiga hijau = auto mulai, segitiga merah = selesai, belah ketupat = masih auto."""
+        if not hasattr(self, "analyze_map_webview"):
+            return
+        map_name = self.analyze_map_webview.folium_map.get_name()
+        parts = [
+            "(function() {",
+            f"if (window.analyzeModeGroup) {{ {map_name}.removeLayer(window.analyzeModeGroup); }}",
+            f"window.analyzeModeGroup = L.layerGroup().addTo({map_name});",
+        ]
+        icons = {
+            "start": (
+                "'<div style=\"width:0;height:0;border-left:9px solid transparent;"
+                "border-right:9px solid transparent;border-bottom:16px solid #059669;\"></div>'",
+                "[18, 16]",
+                "[9, 0]",
+                "Auto mulai",
+            ),
+            "end": (
+                "'<div style=\"width:0;height:0;border-left:9px solid transparent;"
+                "border-right:9px solid transparent;border-top:16px solid #dc2626;\"></div>'",
+                "[18, 16]",
+                "[9, 16]",
+                "Auto selesai",
+            ),
+            "open": (
+                "'<div style=\"width:12px;height:12px;background:#f59e0b;"
+                "transform:rotate(45deg);border:2px solid #92400e;box-sizing:border-box;\"></div>'",
+                "[16, 16]",
+                "[8, 8]",
+                "Auto masih aktif di akhir log",
+            ),
+        }
+        for kind, session, lat, lon, timestamp in self._analyze_mode_events():
+            html, size, anchor, label = icons[kind]
+            tip = "%s #%s (%.1f s)" % (label, session, timestamp)
+            parts.append(
+                "window.analyzeModeGroup.addLayer(L.marker([%s, %s], {"
+                "zIndexOffset: 800, icon: L.divIcon({className: '', html: %s, "
+                "iconSize: %s, iconAnchor: %s})}).bindTooltip('%s'));"
+                % (lat, lon, html, size, anchor, tip)
+            )
+        parts.append("})();")
+        self.analyze_map_webview.page().runJavaScript("\n".join(parts))
+
     def load_analyze_csv(self):
         """Load CSV rekaman (display v23, raw v23, atau legacy) ke tab Analyze."""
         path, _ = QFileDialog.getOpenFileName(self, "Load Log CSV", "", "CSV Files (*.csv)")
@@ -4369,6 +4463,7 @@ class MainWindow(QMainWindow):
                 map_name = self.analyze_map_webview.folium_map.get_name()
                 self.analyze_map_webview.page().runJavaScript(f'{map_name}.setView({list(last_coord)})')
                 self._draw_analyze_plan()
+                self._draw_analyze_mode_markers()
 
             print(f"[ANALYZE] Loaded {loaded}/{row_count} rows (format={fmt}) into graphs and map.")
         except Exception as e:

@@ -151,6 +151,8 @@ Detail: `PlatformIO/.../User-Side-05/src/README.md`
 - Map Points: Home + waypoints, **Send Way Points** (`$WPSET` / `$WACK`)
 - Live: **u surge**, **v sway** (hitung lokal; bukan dari firmware)
 - Logging & Analyze: CSV telemetry ditambah `u (m/s)`, `v (m/s)`
+- Analyze: **Load Log CSV** (jejak) dan **Load Waypoints** (Home kotak hijau, bintang + lingkaran 3 m, jumlah titik dari file)
+- Analyze: segitiga hijau = auto mulai, segitiga merah = auto selesai, belah ketupat oranye = log berakhir masih auto
 - Plot Heading Setpoint pada alg 2 mengikuti bearing dari 2.3 (waypoint, atau Home setelah `$RTL`). Saat manual, setpoint sama dengan yaw
 - Alarm Live: jika `battery_1` atau `battery_2` < 10,8 V, label berkedip dan bunyi berulang. Tombol Diamkan alarm mematikan bunyi saja. Dashboard tidak mengirim `$RTL`
 

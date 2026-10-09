@@ -45,6 +45,22 @@ Tampil di Live dan masuk log sebagai `u (m/s)`, `v (m/s)`. Mini PC 2.3 tidak mem
 
 ---
 
+## Analyze
+
+**Load Log CSV** menggambar jejak kapal. **Load Waypoints** membaca CSV `No,Lat,Long` (jumlah titik mengikuti isi file). Home berupa kotak hijau. Setiap waypoint berupa bintang bernomor, lingkaran radius 3 m, dan garis putus-putus antar waypoint.
+
+Pada jejak log, pindah mode dari kolom `mode_auto` ditandai terpisah dari waypoint:
+
+| Tanda | Arti |
+|-------|------|
+| Segitiga hijau ke atas | Auto mulai (`mode_auto` 1 atau 2) |
+| Segitiga merah ke bawah | Auto selesai, kembali manual |
+| Belah ketupat oranye | Log berakhir saat masih auto |
+
+Setiap sesi punya nomor di tooltip, plus waktu dalam detik. Log yang dibuka sudah dalam mode auto menandai baris pertama sebagai mulai.
+
+---
+
 ## Perintah yang keluar dari dashboard
 
 | Tombol | Serial ke User-Side | Lanjut ke |
