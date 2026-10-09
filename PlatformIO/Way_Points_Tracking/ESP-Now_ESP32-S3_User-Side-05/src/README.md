@@ -7,7 +7,7 @@ Clone dari **User-Side-04** dengan tambahan perintah **`$SHUTDOWN`** (ESP-NOW `p
 | Pasangan | Path |
 |----------|------|
 | Remote-Side | `ESP-Now_ESP32-S3_Remote-Side-05` (struct 24 field / 64 byte identik) |
-| Dashboard | `Local Monitor Dashboard-beta1.6.py` |
+| Dashboard | `Local Monitor Dashboard-1.6.py` |
 | Mini PC | `Cpp_Files/Cpp_ReadWriteSerial-2.0-ENU-NMPC` (USB Remote, bukan User-Side) |
 
 ---

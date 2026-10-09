@@ -8,7 +8,7 @@ Beda dari 2.0: **surge `u` dan sway `v` dihitung dari GPS**, bukan `v = 0` dan `
 |----------|------|
 | Firmware Remote | `PlatformIO/Way_Points_Tracking/ESP-Now_ESP32-S3_Remote-Side-05` |
 | Firmware User | `PlatformIO/Way_Points_Tracking/ESP-Now_ESP32-S3_User-Side-05` |
-| Dashboard | `Pythonfile/Way_Points_Tracking/Local Monitor Dashboard-beta1.6.py` |
+| Dashboard | `Pythonfile/Way_Points_Tracking/Local Monitor Dashboard-1.6.py` |
 | Serial / CSV | `Cpp_Files/Cpp_ReadWriteSerial-1.2-ENU-beta` |
 | Solver NMPC | `MPC NMPC Agus/Coding_NMPC_Sep2026/C code NMPC` |
 | Dasar | `Cpp_Files/Cpp_ReadWriteSerial-2.0-ENU-NMPC` (`v=0`, `u0` tetap) |

@@ -7,7 +7,7 @@ Alg 2 mengisi `heading_setpoint` dari kolom bearing pada baris `timestamp,result
 | Komponen | Path |
 |----------|------|
 | User-Side | `ESP-Now_ESP32-S3_User-Side-05` |
-| Dashboard | `Local Monitor Dashboard-beta1.6.py` |
+| Dashboard | `Local Monitor Dashboard-1.6.py` |
 | Mini PC | `Cpp_Files/Cpp_ReadWriteSerial-2.2-ENU-NMPC` |
 
 ---

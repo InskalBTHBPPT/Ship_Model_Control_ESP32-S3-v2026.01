@@ -5,7 +5,7 @@ Dokumentasi sistem **Ship Auto Way Maps Points Tracking** — kontrol kapal mode
 **Versi dokumen:** dashboard 1.6 + Remote/User-05 + Cpp 2.0  
 **Last update:** 2026-10
 
-Dokumen dashboard: `README Local Monitor Dashboard-beta1.6.md`
+Dokumen dashboard: `README Local Monitor Dashboard-1.6.md`
 
 ---
 
@@ -62,7 +62,7 @@ Mini PC — Cpp_ReadWriteSerial-2.0-ENU-NMPC
 
 | Komponen | Path (dari root repo) |
 |----------|----------------------|
-| Dashboard | `Pythonfile/Way_Points_Tracking/Local Monitor Dashboard-beta1.6.py` |
+| Dashboard | `Pythonfile/Way_Points_Tracking/Local Monitor Dashboard-1.6.py` |
 | User-Side | `PlatformIO/Way_Points_Tracking/ESP-Now_ESP32-S3_User-Side-05/` |
 | Remote-Side | `PlatformIO/Way_Points_Tracking/ESP-Now_ESP32-S3_Remote-Side-05/` |
 | Mini PC | `Cpp_Files/Cpp_ReadWriteSerial-2.0-ENU-NMPC/` |
@@ -136,7 +136,7 @@ Detail: `PlatformIO/.../User-Side-05/src/README.md`
 
 ## 6. Dashboard beta 1.6
 
-**File:** `Local Monitor Dashboard-beta1.6.py`
+**File:** `Local Monitor Dashboard-1.6.py`
 
 - Live: mode, Mini PC CONNECTED/DISCONNECTED, warning auto tanpa mini PC
 - Tombol **Shutdown** sebelah status Mini PC (enable jika Connect + `mini_pc_link=1`)
@@ -145,7 +145,7 @@ Detail: `PlatformIO/.../User-Side-05/src/README.md`
 - Logging & Analyze: CSV 24 kolom ditambah `u (m/s)`, `v (m/s)`
 - Plot Heading Setpoint pada alg 2 menempel pada yaw
 
-Detail: `README Local Monitor Dashboard-beta1.6.md`
+Detail: `README Local Monitor Dashboard-1.6.md`
 
 ---
 
@@ -272,7 +272,7 @@ g++ -std=c++17 -Iinclude -Inmpc src/main.cpp src/serial_port.cpp nmpc/nmpc_kapal
 
 # Dashboard
 cd Pythonfile/Way_Points_Tracking
-python "Local Monitor Dashboard-beta1.6.py"
+python "Local Monitor Dashboard-1.6.py"
 ```
 
 Sesuaikan MAC ESP-NOW di kedua `main.cpp` dan port COM.

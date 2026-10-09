@@ -1,6 +1,6 @@
-# Local Monitor Dashboard beta 1.6
+# Local Monitor Dashboard 1.6
 
-File: `Local Monitor Dashboard-beta1.6.py`
+File: `Local Monitor Dashboard-1.6.py`
 
 Dashboard PySide6 di laptop. Membaca telemetry **24 kolom** dari User-Side-05. Tidak terhubung ke mini PC.
 
@@ -56,5 +56,5 @@ Balasan: `$WACK,...` dan `$SACK,...`. `$SACK,OK` berarti paket terkirim, bukan O
 
 ```powershell
 cd Pythonfile\Way_Points_Tracking
-python "Local Monitor Dashboard-beta1.6.py"
+python "Local Monitor Dashboard-1.6.py"
 ```
