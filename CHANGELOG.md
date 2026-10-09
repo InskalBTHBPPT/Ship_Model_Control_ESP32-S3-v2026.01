@@ -4,6 +4,12 @@ Catatan perubahan utama antar versi firmware dan dashboard **Way Points Tracking
 
 ---
 
+## [Remote-Side-05.1] — propeller terkunci saat auto
+
+CH6 manual: kecepatan CH3 dan arah CH5 mengikuti stik. Saat pindah ke auto, PWM propeller menahan nilai tick manual terakhir. Gerakan CH3/CH5 selama auto diabaikan sampai mode kembali manual.
+
+---
+
 ## [Cpp_ReadWriteSerial-2.2-ENU-NMPC] + Remote-Side-05.1 — bearing alg 2
 
 2.2 turunan **2.0** (bukan 2.1): `v = 0`, `u0 = 0.6114`. TX menambah bearing kompas: `timestamp,result,bearing`. Remote-05.1 pada alg 2 menyalin bearing itu ke `heading_setpoint`.

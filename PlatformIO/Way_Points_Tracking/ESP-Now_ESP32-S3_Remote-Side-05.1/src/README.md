@@ -16,7 +16,7 @@ Alg 2 mengisi `heading_setpoint` dari kolom bearing pada baris `timestamp,result
 
 - Pembacaan PPM dari receiver RC (FS-iA6B)
 - Kontrol rudder: manual (CH1) atau auto mini PC (default alg 2)
-- Kontrol propeller speed/direction via LEDC (CH3, CH5)
+- Kontrol propeller speed/direction via LEDC (CH3, CH5). Manual mengikuti stik; auto menahan nilai terakhir sebelum CH6 pindah ke auto
 - GNSS u-blox @ 115200 baud, 10 Hz (UBX)
 - IMU HWT905TTL / JY901 @ 115200 baud
 - RPM motor propeller (2× rotary encoder)
@@ -96,8 +96,10 @@ Dipilih via **CH6** receiver RC:
 
 | CH6 | Mode | Perilaku |
 |-----|------|----------|
-| `< 1750` | Manual | Rudder dari CH1 (−40° … +40° offset netral) |
-| `≥ 1750` | Auto | Algoritma dipilih compile-time `AUTO_TRACK_ALG` |
+| `< 1750` | Manual | Rudder dari CH1 (−40° … +40° offset netral). Propeller mengikuti CH3 dan CH5 |
+| `≥ 1750` | Auto | Rudder dari algoritma `AUTO_TRACK_ALG`. Propeller menahan CH3 dan CH5 terakhir saat masih manual |
+
+Saat CH6 pindah manual → auto, firmware menyimpan kecepatan (CH3) dan arah (CH5) dari tick manual terakhir, lalu menahan PWM itu. Menggerakkan tuas CH3 atau CH5 selama auto tidak mengubah propeller. Nilai stik baru dipakai lagi setelah CH6 kembali manual. Kalau kapal dinyalakan sudah di posisi auto, yang ditahan adalah pembacaan CH3 dan CH5 pada tick auto pertama.
 
 ### `AUTO_TRACK_ALG` (ubah di `main.cpp` sebelum upload)
 
@@ -169,8 +171,8 @@ Oversample merata-ratakan **millivolt** dulu, baru konversi ke derajat. SMA/EMA/
 | Channel | Fungsi |
 |---------|--------|
 | CH1 | Rudder (mode manual) |
-| CH3 | Kecepatan propeller |
-| CH5 | Arah propeller |
+| CH3 | Kecepatan propeller. Manual: langsung. Auto: nilai terakhir sebelum pindah mode |
+| CH5 | Arah propeller. Sama seperti CH3 |
 | CH6 | Auto (`≥1750`) / Manual (`<1750`) |
 
 PPM mentah 600–1600 µs (FS-iA6B) → dimapping ke 1000–2000 µs.
@@ -376,7 +378,7 @@ Sesuaikan `upload_port` / `monitor_port` di `platformio.ini` (default: `COM14`).
 
 1. Power ON → inisialisasi PPM, ADC, LEDC, GNSS (re-baud 115200, 10 Hz), IMU, ESP-NOW
 2. User-Side kirim waypoint via ESP-NOW → Remote simpan + cetak `[WP]` ke mini PC
-3. Operator pilih Manual/Auto lewat CH6 (ganti mode **tidak** reset WP aktif)
+3. Operator pilih Manual/Auto lewat CH6 (ganti mode **tidak** reset WP aktif). Masuk auto mengunci CH3/CH5; kembali manual melepas kunci itu
 4. Loop 10 Hz: baca sensor (ADC rudder + filter) → kontrol rudder/propeller → isi `dataToSend` → `esp_now_send`
 5. Serial CSV ke mini PC saat RC auto; `$HB` / `timestamp,result` dari `Cpp_ReadWriteSerial-1.2` / `2.0-ENU-NMPC`
 6. Ulang dari WP1: manual → Send Way Points → auto (lihat di atas)
@@ -393,6 +395,7 @@ Sesuaikan `upload_port` / `monitor_port` di `platformio.ini` (default: `COM14`).
 | Auto tidak gerak | CH6 ≥1750, GPS valid, waypoint sudah diterima (`[WP]` di serial) |
 | ESP-NOW gagal | MAC User-Side benar, jarak, mode WIFI_STA |
 | RPM 0 | Koneksi encoder GPIO 9/10, motor berputar |
+| Propeller tidak ikut CH3/CH5 | CH6 masih auto: itu perilaku kunci. Kembalikan ke manual |
 | `$SHUTDOWN` tidak sampai mini PC | Flash pasangan 05; `Cpp_ReadWriteSerial-2.0` jalan; cek `$SACK,OK` di dashboard |
 
 ---

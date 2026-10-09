@@ -26,6 +26,7 @@
  * - Mode Manual: Kontrol rudder langsung dari RC (CH1)
  * - Mode Auto alg 1: waypoint + PD rudder (AUTO_TRACK_ALG=1, opsional)
  * - Mode Auto alg 2: rudder dari mini PC via serial timestamp,result (default)
+ * - Propeller: manual mengikuti CH3/CH5; auto menahan nilai terakhir sebelum pindah mode
  * - Filter Calc_deg_servo_1/2 (hanya telemetry; PWM rudder tidak difilter)
  *
  * Waypoint & mini PC (USB Serial 115200):
@@ -116,6 +117,11 @@ static bool timestampsMatch(double a, double b) {
 static bool isAutoRcMode(uint16_t modeCh6) {
   return modeCh6 >= 1750;
 }
+
+// Nilai CH3/CH5 terakhir saat manual. Dipakai terus selama CH6 auto.
+static uint16_t g_propSpeedHoldUs = 1500;
+static uint16_t g_propDirHoldUs = 1500;
+static bool g_propHoldValid = false;
 
 typedef struct waypoints_payload {
   uint8_t  msg_type;
@@ -866,6 +872,13 @@ uint32_t microsecondsToDuty(uint16_t microseconds) {
   return duty;
 }
 
+static void applyPropellerPwm(uint16_t speedUs, uint16_t dirUs) {
+  controlInput.propSpeed = speedUs;
+  controlInput.propDirection = dirUs;
+  ledcWrite(PROP_SPEED_pin, microsecondsToDuty(speedUs));
+  ledcWrite(PROP_DIRECTION_pin, microsecondsToDuty(dirUs));
+}
+
 static float wrapHeadingError(float setpointDeg, float currentDeg) {
   float err = setpointDeg - currentDeg;
   while (err > 180.0f) err -= 360.0f;
@@ -1313,21 +1326,23 @@ void loop() {
         float Calc_deg_servo_2 = applyRudderDegFilter(
             adc_millivolts_servo_2 * 0.0594f - 98.801f, g_rudderDegFilt2);
 
-        // Set PWM for PropSpeed dan PropDirection
-        controlInput.propSpeed = ppm_mapped[2];           // CH3
-        controlInput.propDirection = ppm_mapped[4];       // CH5
-        
-        // Generate PWM for PropSpeed (menggunakan LEDC)
-        // Konversi microseconds ke duty cycle menggunakan fungsi yang sama
-        uint32_t prop_speed_duty = microsecondsToDuty(controlInput.propSpeed);
-        // Generate PWM menggunakan LEDC
-        bool write_result_prop_speed = ledcWrite(PROP_SPEED_pin, prop_speed_duty);
-        
-        // Generate PWM for PropDirection (menggunakan LEDC)
-        // Konversi microseconds ke duty cycle menggunakan fungsi yang sama
-        uint32_t prop_dir_duty = microsecondsToDuty(controlInput.propDirection);
-        // Generate PWM menggunakan LEDC
-        bool write_result_prop_dir = ledcWrite(PROP_DIRECTION_pin, prop_dir_duty); 
+        // CH3 kecepatan, CH5 arah. Manual: ikut stik dan simpan nilai terakhir.
+        // Auto: tahan nilai itu; gerakan stik CH3/CH5 tidak mengubah PWM.
+        const uint16_t ch3_us = ppm_mapped[2];
+        const uint16_t ch5_us = ppm_mapped[4];
+        if (!isAutoRcMode(controlInput.mode_auto_manual)) {
+          g_propSpeedHoldUs = ch3_us;
+          g_propDirHoldUs = ch5_us;
+          g_propHoldValid = true;
+          applyPropellerPwm(ch3_us, ch5_us);
+        } else {
+          if (!g_propHoldValid) {
+            g_propSpeedHoldUs = ch3_us;
+            g_propDirHoldUs = ch5_us;
+            g_propHoldValid = true;
+          }
+          applyPropellerPwm(g_propSpeedHoldUs, g_propDirHoldUs);
+        } 
 
         // Buat payload ringkas untuk pengiriman/logging
         // Konversi servo angle ke int16_t (Ã— 100)
