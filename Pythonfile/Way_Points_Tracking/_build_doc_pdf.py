@@ -5,8 +5,8 @@ import markdown
 from xhtml2pdf import pisa
 
 BASE = Path(__file__).resolve().parent
-MD_PATH = BASE / "Ship Auto Way Maps Points Tracking.md"
-PDF_PATH = BASE / "Ship Auto Way Maps Points Tracking.pdf"
+MD_PATH = BASE / "Ship Auto Way Maps Points Tracking-1.1.0.md"
+PDF_PATH = BASE / "Ship Auto Way Maps Points Tracking-1.1.0.pdf"
 
 text = MD_PATH.read_text(encoding="utf-8")
 html_body = markdown.markdown(text, extensions=["tables", "fenced_code"])

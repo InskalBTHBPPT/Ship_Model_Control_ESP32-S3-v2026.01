@@ -1,0 +1,99 @@
+# ESP-Now_ESP32-S3_User-Side-06
+
+Firmware **gateway USB ↔ ESP-NOW** di sisi darat (User-Side) untuk sistem **Way Points Tracking**.
+
+Clone dari **User-Side-05** dengan tambahan perintah **`$GOHOME`** (ESP-NOW `pc_command_payload` / `0xA2`, `cmd = 2`). `$SHUTDOWN` tetap `cmd = 1`.
+
+| Pasangan | Path |
+|----------|------|
+| Remote-Side | `ESP-Now_ESP32-S3_Remote-Side-05.3` (struct 24 field / 64 byte identik) |
+| Dashboard | `Local Monitor Dashboard-1.9.py` |
+| Mini PC | `Cpp_Files/Cpp_ReadWriteSerial-2.4-ENU-NMPC` (USB Remote, bukan User-Side) |
+
+---
+
+## Peran
+
+| Arah | Fungsi |
+|------|--------|
+| Remote → User → PC | Telemetry CSV **24 kolom** @ ~10 Hz (Serial 115200) |
+| PC → User → Remote | `$WPSET,...` → ESP-NOW `waypoints_payload` (`0xA1`) |
+| PC → User → Remote | `$SHUTDOWN` → ESP-NOW `pc_command_payload` (`0xA2`, cmd=1) |
+| PC → User → Remote | `$GOHOME` → ESP-NOW `pc_command_payload` (`0xA2`, cmd=2) |
+
+User-Side **tidak** terhubung ke mini PC. CSV 8 kolom ke `Cpp_ReadWriteSerial-2.0` dan balasan `$HB` / `timestamp,result` hanya lewat USB Remote.
+
+`yaw` dan `heading_setpoint` di CSV 24 kolom diteruskan mentah (×100). User-Side tidak mengubah sudut. Pada auto alg 2, Remote mengisi `heading_setpoint` = yaw (bukan bearing zigzag).
+
+---
+
+## Protokol Serial (PC ↔ User-Side)
+
+### Telemetry (User → PC)
+
+CSV 24 kolom (fixed-point), termasuk `mode_auto` dan `mini_pc_link`.
+
+### Waypoint
+
+```text
+$WPSET,<home_lat>,<home_lon>,<wp_count>,<lat1>,<lon1>,...,<latN>,<lonN>
+$WACK,OK
+$WACK,ERR,<reason>
+```
+
+### Shutdown mini PC
+
+```text
+$SHUTDOWN
+$SACK,OK
+$SACK,ERR,<reason>
+```
+
+`$SACK,OK` = paket `0xA2` sudah dikirim ESP-NOW (bukan konfirmasi OS sudah mati).
+
+### Pulang ke Home (perintah operator)
+
+```text
+$GOHOME
+$HACK,OK
+$HACK,ERR,<reason>
+```
+
+`$HACK,OK` = paket `0xA2` cmd=2 sudah dikirim ESP-NOW. Remote-05.3 yang menulis `$GOHOME` ke USB mini PC. User-Side tidak menunggu kapal sampai Home.
+
+---
+
+## Alur
+
+**Send Way Points**
+
+```text
+Dashboard ($WPSET) → User-Side-05 → ESP-NOW 0xA1 → Remote-Side-05
+  → [WP] di USB Serial → Cpp_ReadWriteSerial-2.0 (--print all|wp)
+```
+
+**Shutdown Mini PC** (tanpa Wi‑Fi laptop↔mini PC)
+
+```text
+Dashboard (tombol Live, hanya jika mini_pc_link=1)
+  → $SHUTDOWN → User-Side-05 → ESP-NOW 0xA2 → Remote-Side-05
+  → Serial "$SHUTDOWN" → Cpp_ReadWriteSerial-2.0 → shutdown OS
+```
+
+`$WPSET` / `$SHUTDOWN` tidak mengganggu stream telemetry 24 kolom.
+
+---
+
+## Build & Upload
+
+```text
+PlatformIO/Way_Points_Tracking/ESP-Now_ESP32-S3_User-Side-06
+```
+
+```bash
+pio run
+pio run --target upload
+pio device monitor
+```
+
+Sesuaikan MAC `remote_side_Address` di `main.cpp` dan port di `platformio.ini`.

@@ -1,0 +1,384 @@
+# Ship Auto Way Maps Points Tracking
+
+Dokumentasi sistem **Ship Auto Way Maps Points Tracking** — kontrol kapal model ESP32-S3 dengan waypoint, telemetry real-time, NMPC di mini PC, dan dashboard PySide6.
+
+**Versi dokumen:** 1.1.0 — dashboard 1.9 + User-06 + Remote-05.3 + Cpp 2.4  
+**Last update:** 2026-10-10
+
+Dokumen 1.0.0 (dashboard 1.8 + User-05 + Remote-05.2 + Cpp 2.3) tetap di `Ship Auto Way Maps Points Tracking-1.0.0.md`.
+
+Dokumen dashboard: `README Local Monitor Dashboard-1.9.md`
+
+---
+
+## Daftar isi
+
+1. [Ringkasan sistem](#1-ringkasan-sistem)
+2. [Komponen & path proyek](#2-komponen--path-proyek)
+3. [Arsitektur & alur data](#3-arsitektur--alur-data)
+4. [Remote-Side-05.3](#4-remote-side-053)
+5. [User-Side-06](#5-user-side-06)
+6. [Dashboard 1.9](#6-dashboard-19)
+7. [Mini PC — Cpp_ReadWriteSerial-2.4](#7-mini-pc--cpp_readwriteserial-24)
+8. [Protokol serial (Dashboard ↔ User-Side)](#8-protokol-serial-dashboard--user-side)
+9. [Protokol ESP-NOW](#9-protokol-esp-now)
+10. [Telemetry 24 kolom](#10-telemetry-24-kolom)
+11. [Yaw, setpoint, u dan v](#11-yaw-setpoint-u-dan-v)
+12. [Algoritma auto track](#12-algoritma-auto-track)
+13. [Build, upload & menjalankan](#13-build-upload--menjalankan)
+14. [Prosedur uji lapangan](#14-prosedur-uji-lapangan)
+15. [Troubleshooting](#15-troubleshooting)
+
+---
+
+## 1. Ringkasan sistem
+
+Sistem ini memungkinkan:
+
+- **Monitoring live** posisi, yaw kompas, rudder, RPM, baterai, status Mini PC, serta surge `u` / sway `v` (dihitung di dashboard)
+- **Perencanaan waypoint** di peta (Home + hingga 10 waypoint navigasi)
+- **Pengiriman waypoint** ke kapal via ESP-NOW (`0xA1`)
+- **Kontrol auto alg 2** — rudder dan bearing dari NMPC mini PC (`timestamp,result,bearing`)
+- **Baterai rendah** — Remote-05.3 mengirim `$RTL` setelah 10 detik di bawah 10,8 V saat auto; 2.4 mengarahkan ke Home. Dashboard 1.9 hanya alarm
+- **Akhir misi** — masuk radius titik terakhir: rudder 0, propeller netral, kapal boleh hanyut. Dashboard menanyakan Manual atau Auto pulang ke Home (`$GOHOME`)
+- **Kontrol auto alg 1** — waypoint + PD (opsional, compile-time)
+- **Propeller** — manual dari CH3/CH5; saat auto menahan nilai terakhir sebelum pindah mode
+- **Shutdown mini PC** dari dashboard (ESP-NOW `0xA2`, tanpa Wi‑Fi laptop↔mini PC)
+- **Analisis log CSV** — replay data dengan peta dan plot
+- **Replay 3D dan prediksi lintasan** — jejak uji di bingkai ENU; garis merah dari model NMPC (Home, yaw awal timur)
+
+Alur end-to-end:
+
+```text
+Dashboard 1.9 (PySide6)
+    │ USB serial 115200
+    ▼
+User-Side-06  (ESP-Now_ESP32-S3_User-Side-06)
+    │ ESP-NOW peer-to-peer
+    ▼
+Remote-Side-05.3 (ESP-Now_ESP32-S3_Remote-Side-05.3) — di kapal
+    │ USB Serial 115200
+    ▼
+Mini PC — Cpp_ReadWriteSerial-2.4-ENU-NMPC
+```
+
+---
+
+## 2. Komponen & path proyek
+
+| Peran | Proyek | Path (dari root repo) |
+|-------|--------|------------------------|
+| Dashboard | `Local Monitor Dashboard-1.9.py` | `Pythonfile/Way_Points_Tracking/` |
+| Laptop, jembatan ESP-NOW | `ESP-Now_ESP32-S3_User-Side-06` | `PlatformIO/Way_Points_Tracking/` |
+| Kapal | `ESP-Now_ESP32-S3_Remote-Side-05.3` | `PlatformIO/Way_Points_Tracking/` |
+| Mini PC | `Cpp_ReadWriteSerial-2.4-ENU-NMPC` | `Cpp_Files/` |
+| Dokumen ini | `Ship Auto Way Maps Points Tracking-1.1.0.md` | `Pythonfile/Way_Points_Tracking/` |
+
+2.4 turunan **2.3**, dan 2.3 turunan **2.2** (2.2 turunan 2.0, bukan 2.1): `v = 0`, `u0 = 0.6114` m/s. `$RTL` tetap mengunci target ke Home. 2.4 menambah akhir misi (`$DONE`) dan pulang operator (`$GOHOME` / `$ATHOME`). `Cpp_ReadWriteSerial-2.1-ENU-NMPC-beta` menghitung `u`,`v` dari GPS dan **bukan** pasangan kapal ini.
+
+---
+
+## 3. Arsitektur & alur data
+
+### 3.1 Telemetry (kapal → laptop)
+
+1. Remote baca sensor ~10 Hz → struct `DatatoSend` (64 byte, 24 field)
+2. ESP-NOW ke User-Side
+3. User-Side cetak CSV 24 kolom ke USB
+4. Dashboard parse → Live / log / plot, lalu hitung `u`,`v` lokal
+
+### 3.2 Waypoint (laptop → kapal → mini PC)
+
+1. Dashboard: `$WPSET,...`
+2. User-Side → ESP-NOW `0xA1` → Remote simpan RAM + cetak `[WP] ...`
+3. User-Side balas `$WACK,OK` / `$WACK,ERR,...`
+4. Mini PC 2.4 memakai `[WP] Home` sebagai origin ENU dan `[WP] #n` sebagai target
+
+### 3.3 Rudder NMPC (auto alg 2)
+
+1. Remote (CH6 auto) kirim CSV 8 kolom ke mini PC
+2. 2.4 memakai `timestamp`, `lat`, `lon`, `yaw`, `yaw_rate`, dan daftar `[WP]`
+3. 2.4 mengabaikan `calc_deg_servo_*` dan `gyro_z`
+4. Mini PC kirim `$HB` (~1 Hz). Jika GPS dan waypoint siap, balasan `timestamp,result,bearing`; jika tidak, `timestamp,result` saja
+5. Remote set `mini_pc_link` dari heartbeat, memakai `result` sebagai offset rudder, dan — bila kolom ketiga ada — menyalin `bearing` ke `heading_setpoint`
+6. Jika Remote sudah mengunci baterai rendah, ia mengirim `$RTL`. 2.4 mengganti target menjadi Home dan bearing mengikuti Home
+7. Masuk radius titik terakhir: 2.4 mengirim `$DONE` sekali, rudder tetap 0. Remote menahan propeller di 1500 µs dan mengisi `track_wp_index` = 254. Dashboard membuka dialog Manual / Auto
+8. Auto pada dialog: dashboard `$GOHOME` → User-06 → Remote menulis `$GOHOME`. 2.4 mengarahkan ke Home. Sampai radius Home, `$ATHOME`, propeller netral lagi, `track_wp_index` = 255
+
+`u` dan `v` tidak dikirim balik ke Remote. Bearing dihitung di mini PC (`wrap360(90° − θ)`), skala kompas CW.
+
+### 3.4 Shutdown mini PC
+
+1. Dashboard tombol **Shutdown** (hanya jika Mini PC CONNECTED)
+2. `$SHUTDOWN` → User → ESP-NOW `0xA2` → Remote → Serial `$SHUTDOWN`
+3. `Cpp_ReadWriteSerial-2.4` jalankan `shutdown /s /t 5`
+4. User balas `$SACK,OK` (forward ESP-NOW sukses — bukan konfirmasi OS mati)
+
+---
+
+## 4. Remote-Side-05.3
+
+**Proyek:** `ESP-Now_ESP32-S3_Remote-Side-05.3`  
+Turunan Remote-Side-05.2. Pasangan mini PC: 2.4. Pasangan darat: User-Side-06.
+
+- Sensor, actuator, RC PPM, waypoint RAM, telemetry ESP-NOW 24 kolom
+- Yaw kapal: raw JY901 (−180…180) → wrap 0…360 → +90° pasang → `360 − yaw` = kompas CW (0 Utara, 90 Timur, 270 Barat)
+- USB Serial ke mini PC: CSV 8 kolom, `[WP]`, `$SHUTDOWN`, `$RTL`, `$GOHOME`; terima `$HB`, `timestamp,result` atau `timestamp,result,bearing`, `$DONE`, `$ATHOME`
+- Default `#define AUTO_TRACK_ALG 2` (mini PC / NMPC)
+- Alg 2, ada kolom bearing: `heading_setpoint` = bearing, `heading_error` = bearing − yaw
+- Alg 2, tanpa kolom ketiga: `heading_setpoint` = salinan yaw, `heading_error` = 0
+- Alg 1: `heading_setpoint` = bearing haversine ke waypoint aktif (dihitung di Remote)
+- Propeller CH3 (kecepatan) dan CH5 (arah): saat manual mengikuti stik. Saat CH6 pindah ke auto, PWM menahan nilai tick manual terakhir. Gerakan CH3/CH5 selama auto diabaikan sampai mode kembali manual. Jika kapal dinyalakan sudah di auto, yang ditahan adalah pembacaan tick auto pertama
+- `$DONE`: saat auto, PWM propeller 1500 µs dan `track_wp_index` = 254. Kunci tetap saat pindah manual lalu kembali auto, sampai waypoint baru, `$GOHOME`, atau `$RTL`
+- `$ATHOME`: sama, `track_wp_index` = 255
+- `$GOHOME` (ESP-NOW `0xA2` cmd=2): lepas kunci propeller, tulis `$GOHOME` ke USB
+- Baterai: `battery_1` atau `battery_2` di bawah 10,8 V selama 10 detik terus-menerus saat CH6 auto → kunci pulang Home, lepas kunci propeller netral, kirim `$RTL` tiap 1 detik. Kunci `$RTL` tidak lepas jika tegangan naik. `$ATHOME` menahan propeller lagi
+
+Detail: `PlatformIO/.../Remote-Side-05.3/src/README.md`
+
+---
+
+## 5. User-Side-06
+
+**Proyek:** `ESP-Now_ESP32-S3_User-Side-06`
+
+- Gateway USB ↔ ESP-NOW. Tidak terhubung ke mini PC
+- Forward `$WPSET` → `0xA1`, `$SHUTDOWN` → `0xA2` cmd=1, `$GOHOME` → `0xA2` cmd=2
+- Balasan `$WACK`, `$SACK`, `$HACK`
+- CSV 24 kolom ke dashboard. `yaw` dan `heading_setpoint` diteruskan mentah (×100)
+- `$RTL`, `$DONE`, dan `$ATHOME` tidak lewat User-Side. Mereka hanya USB Remote ↔ mini PC. Dashboard melihat akhir misi lewat `track_wp_index` 254 / 255
+
+Detail: `PlatformIO/.../User-Side-06/src/README.md`
+
+---
+
+## 6. Dashboard 1.9
+
+**File:** `Local Monitor Dashboard-1.9.py`
+
+- Live: mode, Mini PC CONNECTED/DISCONNECTED, warning auto tanpa mini PC
+- Tombol **Shutdown** sebelah status Mini PC (enable jika Connect + `mini_pc_link=1`)
+- Map Points: Home + waypoints, **Send Way Points** (`$WPSET` / `$WACK`)
+- Live: **u surge**, **v sway** (hitung lokal; bukan dari firmware)
+- Logging & Analyze: CSV telemetry ditambah `u (m/s)`, `v (m/s)`
+- Peta Live, Map Points, dan Analyze memakai simbol yang sama: Home kotak hijau (tanpa lingkaran), waypoint bintang bernomor + lingkaran 3 m, garis rencana oranye putus-putus antar waypoint, kapal belah ketupat hijau
+- Analyze: **Load Log CSV** (jejak biru) dan **Load Waypoints**. Segitiga hijau = auto mulai, segitiga merah = auto selesai, belah ketupat oranye = log berakhir masih auto
+- Heading: Live merah putus-putus 5 m; Map Points oranye solid 5 m; Analyze merah putus-putus pada slider, plus checkbox **Heading Line**
+- Tab **3D**: replay log (jejak hitam) dengan Play. **Prediksi** menggambar lintasan NMPC sebagai garis merah di scene yang sama. Play tidak memutar prediksi
+- Prediksi memakai `predict_track.exe` (Home, yaw awal 90° timur, `u0 = 0.6114`, `v = 0`)
+- Plot Heading Setpoint pada alg 2 mengikuti bearing dari 2.4 (waypoint, atau Home setelah `$RTL` / `$GOHOME`). Saat manual, setpoint sama dengan yaw
+- Alarm Live: jika `battery_1` atau `battery_2` < 10,8 V, label berkedip dan bunyi berulang. Tombol Diamkan alarm mematikan bunyi saja. Dashboard tidak mengirim `$RTL`
+- `track_wp_index` 254 tampil **Selesai**, 255 tampil **Home**
+- Dialog non-modal saat 254 dan masih auto: **Manual** (operator pindah CH6) atau **Auto** (`$GOHOME`). CH6 ke manual sebelum tombol dipilih menutup dialog dan stik langsung berlaku
+
+Detail: `README Local Monitor Dashboard-1.9.md`
+
+---
+
+## 7. Mini PC — Cpp_ReadWriteSerial-2.4
+
+**Path:** `Cpp_Files/Cpp_ReadWriteSerial-2.4-ENU-NMPC/`
+
+| Arah | Isi |
+|------|-----|
+| Terima | CSV 8 kolom saat CH6 auto; `[WP] Home` / `[WP] #n`; `$SHUTDOWN`; `$RTL`; `$GOHOME` |
+| Pakai | `timestamp`, `lat`, `lon`, `yaw`, `yaw_rate`, daftar WP |
+| Abaikan | `calc_deg_servo_1/2`, `gyro_z` |
+| Kirim | `$HB` tiap 1 s; `timestamp,result` atau `timestamp,result,bearing`; `$DONE` sekali; `$ATHOME` sekali |
+
+`result` = offset rudder (°), dibatasi solver ±45. `bearing` = haluan kompas ke target (0 Utara, 90 Timur). Saat `$RTL` atau `$GOHOME`, targetnya Home. Kolom ketiga ada bila GPS fix dan ada target. Di dalam `r_tran` target, rudder = 0.
+
+Masuk `r_tran` waypoint terakhir mengunci misi: rudder 0 dan `$DONE`, meskipun kapal hanyut keluar. `$GOHOME` menjalankan NMPC ke Home tanpa kunci `$RTL`, dan diabaikan jika `$RTL` sudah terkunci. Sampai Home: `$ATHOME` dan rudder tetap 0. `[WP] Home` baru melepas kunci misi dan `$GOHOME`. `$RTL` baru lepas saat program 2.4 di-restart. Tanpa `[WP] Home`, rudder netral.
+
+State NMPC: `v = 0`, `u0 = 0.6114` m/s, `ψ = π/2 − yaw`, `r` dari `yaw_rate` (tanda minus). `L = 1.0107` m.
+
+Detail: `Cpp_Files/Cpp_ReadWriteSerial-2.4-ENU-NMPC/README.md`
+
+---
+
+## 8. Protokol serial (Dashboard ↔ User-Side)
+
+| Arah | Format |
+|------|--------|
+| User → PC | CSV 24 kolom telemetry |
+| PC → User | `$WPSET,<home_lat>,<home_lon>,<count>,...` |
+| User → PC | `$WACK,OK` / `$WACK,ERR,<reason>` |
+| PC → User | `$SHUTDOWN` |
+| User → PC | `$SACK,OK` / `$SACK,ERR,<reason>` |
+| PC → User | `$GOHOME` |
+| User → PC | `$HACK,OK` / `$HACK,ERR,<reason>` |
+
+Baud: **115200**.
+
+Serial Remote ↔ mini PC terpisah (bukan lewat User-Side):
+
+```text
+timestamp,lat,lon,calc_deg_servo_1,calc_deg_servo_2,yaw,gyro_z,yaw_rate
+[WP] Home: lat, lon
+[WP] #1: lat, lon
+$HB
+timestamp,result
+timestamp,result,bearing
+$RTL
+$GOHOME
+$DONE
+$ATHOME
+$SHUTDOWN
+```
+
+---
+
+## 9. Protokol ESP-NOW
+
+| msg_type | Payload | Arah | Fungsi |
+|----------|---------|------|--------|
+| (telemetry) | `DatatoSend` 64 B | Remote → User | Telemetry 24 field |
+| `0xA1` | `waypoints_payload` ~180 B | User → Remote | Waypoint + home |
+| `0xA2` | `pc_command_payload` 4 B | User → Remote | `cmd=1` shutdown, `cmd=2` pulang Home |
+
+**Catatan:** `0xA2` di versi 05 ke atas = perintah mini PC (bukan tuning NVS dokumen lama). cmd=1 shutdown, cmd=2 `$GOHOME`.
+
+---
+
+## 10. Telemetry 24 kolom
+
+Urutan sama di Remote `DatatoSend`, User CSV, dan parser dashboard:
+
+1 timestamp, 2 lat, 3 lon, 4 speedMps×100, 5–6 servo×100, 7 yaw×100,  
+8 hdg_sp×100, 9 hdg_err×100, 10 rudder_cmd×100, 11 track_wp_index,  
+12 distance_to_wp×10, 13–18 IMU×100, 19–20 RPM, 21–22 battery×100,  
+23 mode_auto, **24 mini_pc_link**
+
+| Field | Arti |
+|-------|------|
+| `mode_auto` | 0 Manual, 1 Auto PD (alg 1), 2 Auto Mini PC (alg 2, default) |
+| `heading_setpoint` | Manual: sama dengan yaw. Alg 2 + bearing 2.4: bearing kompas (WP atau Home). Alg 1: bearing haversine |
+| `track_wp_index` | Alg 1: 0 tidak menjejak, 1…N nomor WP, 255 home. Alg 2: 0 saat menjejak (indeks aktif di mini PC), 254 misi selesai, 255 sampai Home |
+| `mini_pc_link` | 1 jika Remote menerima `$HB` dalam 3 detik; 0 jika putus. Dashboard CONNECTED membaca kolom ini |
+| RPM | Hasil ukur encoder, bukan perintah. Perintah propeller dari RC, atau 1500 µs saat misi selesai / sampai Home (lihat bagian 4) |
+
+Log dashboard menambah `u (m/s)` dan `v (m/s)` setelah `speedMps`. Di file log, `mode_auto` menjadi kolom 25 dan `mini_pc_link` kolom 26. Kedua kolom `u`,`v` tidak ada di firmware.
+
+---
+
+## 11. Yaw, setpoint, u dan v
+
+**Yaw** hanya diubah di Remote:
+
+```text
+raw (−180…180) → wrap 0…360 → +90° → 360 − yaw
+```
+
+Hasil di CSV: 0 = Utara, 90 = Timur, 270 = Barat. User-Side dan dashboard hanya ÷100.
+
+**Heading setpoint** bukan mode zigzag.
+
+| Kondisi | Isi |
+|---------|-----|
+| CH6 manual | sama dengan yaw, error 0 |
+| Alg 2 + baris `timestamp,result,bearing` | bearing kompas dari 2.4 |
+| Alg 2 tanpa kolom ketiga | salinan yaw |
+| Alg 1 | bearing haversine di Remote |
+
+**`u`, `v` di dashboard 1.9** (kompas CW, rumus sama dengan 1.6):
+
+```text
+u = ẋ sinψ + ẏ cosψ
+v = ẋ cosψ − ẏ sinψ
+```
+
+2.4 tidak memakai rumus ini (`v = 0`, `u0 = 0.6114`).
+
+---
+
+## 12. Algoritma auto track
+
+Dipilih compile-time di Remote (`AUTO_TRACK_ALG`):
+
+| Nilai | Perilaku |
+|-------|----------|
+| 1 | Waypoint haversine + PD rudder. `heading_setpoint` = bearing |
+| 2 (default) | Rudder dari mini PC `result`. `heading_setpoint` dari kolom `bearing` bila ada |
+
+CH6 ≥ 1750 = Auto. Jika alg 2 dan `mini_pc_link=0` → rudder netral + warning. Propeller saat auto tetap pada kunci CH3/CH5, tidak ikut stik.
+
+CH6 manual ↔ auto tidak mereset indeks waypoint di mini PC. Reset ke WP1 hanya lewat **Send Way Points** baru atau restart program 2.4. `$RTL` yang sudah terkunci tidak dilepas oleh Send Way Points; lepasnya saat program 2.4 di-restart. Kunci misi selesai (`$DONE`) dilepas oleh waypoint baru, `$GOHOME`, atau `$RTL`.
+
+---
+
+## 13. Build, upload & menjalankan
+
+```bash
+# Firmware
+cd PlatformIO/Way_Points_Tracking/ESP-Now_ESP32-S3_Remote-Side-05.3
+pio run --target upload
+cd ../ESP-Now_ESP32-S3_User-Side-06
+pio run --target upload
+
+# Mini PC 2.4
+cd Cpp_Files/Cpp_ReadWriteSerial-2.4-ENU-NMPC
+g++ -std=c++17 -Iinclude -Inmpc src/main.cpp src/serial_port.cpp nmpc/nmpc_kapal_waypoint.c nmpc/geo_enu.c nmpc/waypoint_manager.c -o read_write_serial.exe
+.\read_write_serial.exe --port COMx --baud 115200 --rudder-mode nmpc --print all
+
+# Dashboard
+cd Pythonfile/Way_Points_Tracking
+python "Local Monitor Dashboard-1.9.py"
+```
+
+Port COM mini PC ada di `start_read_write_serial.bat` (ubah sendiri). Sesuaikan MAC ESP-NOW di kedua `main.cpp`.
+
+---
+
+## 14. Prosedur uji lapangan
+
+1. Flash **Remote-05.3** + **User-06** berpasangan
+2. Jalankan **read_write_serial.exe** 2.4 di mini PC (auto-start opsional)
+3. Connect dashboard **1.9** ke User-Side
+4. Verifikasi Live: telemetry + Mini PC **CONNECTED**
+5. Map Points → Set Home + ≥1 WP → **Send Way Points** → `$WACK,OK`; cek `[WP]` di stderr/stdout 2.4
+6. Set kecepatan dan arah propeller di CH3/CH5 saat masih manual, lalu RC CH6 Auto. Propeller menahan nilai itu; pantau rudder dari `result` dan heading setpoint dari `bearing`
+7. Di radius titik terakhir: rudder 0, propeller netral, dialog **Misi selesai**. Manual = pindah CH6. Auto = `$GOHOME` sampai Home lalu propeller netral lagi
+8. (Opsional) **Shutdown** → konfirmasi → `$SACK,OK` → mini PC mati ~5 s
+
+---
+
+## 15. Troubleshooting
+
+| Gejala | Tindakan |
+|--------|----------|
+| Mini PC DISCONNECTED | Cek USB Remote↔PC, jalankan exe 2.4, baud 115200. Dashboard Connect saja tidak mengisi `mini_pc_link` |
+| `$WACK` TIMEOUT | MAC ESP-NOW, Remote power, jarak |
+| Auto Mini PC tidak gerak | CH6 high, `mini_pc_link=1`, timestamp CSV cocok dengan balasan |
+| Heading setpoint = yaw saat auto | 2.4 belum mengirim kolom bearing (GPS atau waypoint belum siap), atau Remote yang ter-flash masih 05 |
+| Propeller tidak ikut CH3/CH5 | CH6 masih auto: kunci PWM. Kembalikan ke manual |
+| `u`,`v` aneh | Remote belum di-flash yaw CW, atau log lama (skala IMU) |
+| Shutdown tombol abu-abu | Harus Connect + CONNECTED |
+| `$SACK,OK` tapi PC tidak mati | Pastikan exe **2.4** yang menangani `$SHUTDOWN` |
+| Telemetry 23 kolom | Flash User-06 / Remote-05.3; dashboard 1.9 tetap terima 23/24 |
+| Tidak pulang saat baterai rendah | CH6 harus auto, tegangan < 10,8 V selama 10 detik terus, dan `[WP] Home` sudah terkirim. Cek baris `$RTL` di serial mini PC |
+| Dialog misi tidak muncul | `track_wp_index` harus 254 dan mode masih auto. Pasangan Remote-05.3 + 2.4 |
+| Propeller tetap jalan di titik terakhir | Remote belum 05.3, atau `$DONE` belum sampai di USB mini PC |
+
+---
+
+## Diagram alur
+
+```text
+┌──────────────────┐  $WPSET / $SHUTDOWN / $GOHOME  ┌──────────────┐  0xA1 / 0xA2  ┌────────────────┐
+│ Dashboard 1.9    │ ────────────────────────────► │ User-Side-06 │ ────────────► │ Remote-Side-05.3│
+│                  │ ◄──────────────────────────── │              │ ◄──────────── │ yaw kompas CW  │
+└──────────────────┘  CSV24 / $WACK/$SACK/$HACK    └──────────────┘  telemetry 24 └───────┬────────┘
+                                                                                          │ USB
+                                                                                          ▼
+                                                                                  ┌────────────────┐
+                                                                                  │ Mini PC 2.4    │
+                                                                                  │ NMPC           │
+                                                                                  │ CSV8 / [WP] /  │
+                                                                                  │ $HB, result,   │
+                                                                                  │ bearing, $DONE │
+                                                                                  └────────────────┘
+```
+
+---
+
+*Dokumen 1.1.0: Ship Auto Way Maps Points Tracking — dashboard 1.9, User-Side-06, Remote-Side-05.3, Cpp_ReadWriteSerial-2.4-ENU-NMPC*

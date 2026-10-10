@@ -1,6 +1,23 @@
 # Changelog
 
-Catatan perubahan utama antar versi firmware dan dashboard **Way Points Tracking**. Yang terbaru di atas. Pasangan kapal saat ini: dashboard **1.8**, User-Side-**05**, Remote-Side-**05.2**, mini PC **2.3-ENU-NMPC**.
+Catatan perubahan utama antar versi firmware dan dashboard **Way Points Tracking**. Yang terbaru di atas. Pasangan kapal saat ini: dashboard **1.9**, User-Side-**06**, Remote-Side-**05.3**, mini PC **2.4-ENU-NMPC**.
+
+---
+
+## [Dashboard 1.9] + [User-Side-06] + [Remote-Side-05.3] + [Cpp 2.4-ENU-NMPC] — misi selesai di titik terakhir
+
+Dari dashboard 1.8, User-05, Remote-05.2, dan mini PC 2.3. Telemetry tetap 24 kolom.
+
+- Masuk radius titik terakhir mengunci misi di 2.4: rudder 0 dan satu baris `$DONE`, meskipun kapal hanyut keluar
+- Remote-05.3 saat auto menahan propeller di 1500 µs dan mengisi `track_wp_index` = 254
+- Dashboard 1.9 membuka dialog **Misi selesai**: Manual (operator pindah CH6) atau Auto (`$GOHOME`)
+- User-06 meneruskan `$GOHOME` sebagai ESP-NOW `0xA2` cmd=2 dan membalas `$HACK`
+- `$GOHOME` melepas kunci propeller dan menjalankan NMPC ke Home. Sampai Home: `$ATHOME`, propeller netral, `track_wp_index` = 255
+- `$RTL` baterai tetap ada. Saat kunci itu mulai, propeller netral dilepas supaya kapal bisa pulang
+- CH6 ke manual sebelum dialog dijawab menutup dialog dan stik langsung berlaku. Kunci misi di mini PC tidak dilepas
+
+File: `Local Monitor Dashboard-1.9.py`, `ESP-Now_ESP32-S3_User-Side-06`, `ESP-Now_ESP32-S3_Remote-Side-05.3`, `Cpp_ReadWriteSerial-2.4-ENU-NMPC`  
+Dokumen: `README Local Monitor Dashboard-1.9.md`, `Ship Auto Way Maps Points Tracking-1.1.0.md`
 
 ---
 
@@ -45,6 +62,7 @@ Entri panjang di bawah ini tetap berlaku. Tabel ini menutup versi yang belum pun
 | 1.6 | `.../Local Monitor Dashboard-1.6.py` | `u`,`v` lokal di Live dan log. Nama file bukan lagi `beta1.6` |
 | 1.7 | `.../Local Monitor Dashboard-1.7.py` | Alarm baterai 10,8 V. Analyze: waypoint + penanda mulai/selesai auto |
 | 1.8 | `.../Local Monitor Dashboard-1.8.py` | Simbol peta disatukan. Tab 3D + garis prediksi merah |
+| 1.9 | `.../Local Monitor Dashboard-1.9.py` | Dialog misi selesai: Manual atau Auto (`$GOHOME`). Indeks 254 = Selesai |
 
 Path `.../` = `Pythonfile/Way_Points_Tracking/`.
 
@@ -57,7 +75,8 @@ Path `.../` = `Pythonfile/Way_Points_Tracking/`.
 | 02 | `$WPSET`, `$TUNSET`, `$TUNGET`. ACK setelah Remote membalas `0xC1` |
 | 03 | 23 kolom, `$WPSET` saja (tanpa tuning). Pasangan Remote-03 |
 | 04 | Kolom ke-24 `mini_pc_link`. User tidak bicara langsung ke mini PC |
-| 05 | `$SHUTDOWN` / `$SACK`. CSV 24 kolom tidak berubah. Masih pasangan dashboard 1.8 |
+| 05 | `$SHUTDOWN` / `$SACK`. CSV 24 kolom tidak berubah. Pasangan dashboard 1.8 |
+| 06 | `$GOHOME` / `$HACK` (`0xA2` cmd=2). Pasangan dashboard 1.9 dan Remote-05.3 |
 
 ### Remote-Side
 
@@ -71,10 +90,11 @@ Path `.../` = `Pythonfile/Way_Points_Tracking/`.
 | 05 | `$SHUTDOWN` (`0xA2`). Filter `RUDDER_DEG_FILTER`. Offset pasang AHRS, lalu yaw kompas CW |
 | 05.1 | Propeller CH3/CH5 terkunci saat auto. `heading_setpoint` dari bearing 2.2 |
 | 05.2 | Di bawah 10,8 V selama 10 detik saat auto → `$RTL` ke Home. Pasangan 2.3 |
+| 05.3 | `$DONE` / `$ATHOME` menahan propeller 1500 µs. `$GOHOME` melepas kunci itu. Indeks 254 / 255. Pasangan 2.4 |
 
 ### Cpp ReadWriteSerial
 
-Jalur **ENU** yang dipakai kapal: 1.1-ENU → 1.2-ENU → 2.0-ENU-NMPC → 2.2-ENU-NMPC → **2.3-ENU-NMPC**. 2.1-ENU menghitung `u`,`v` dari GPS dan **bukan** pasangan kapal.
+Jalur **ENU** yang dipakai kapal: 1.1-ENU → 1.2-ENU → 2.0-ENU-NMPC → 2.2-ENU-NMPC → 2.3-ENU-NMPC → **2.4-ENU-NMPC**. 2.1-ENU menghitung `u`,`v` dari GPS dan **bukan** pasangan kapal.
 
 | Versi | Frame | Inti |
 |-------|-------|------|
@@ -89,6 +109,7 @@ Jalur **ENU** yang dipakai kapal: 1.1-ENU → 1.2-ENU → 2.0-ENU-NMPC → 2.2-E
 | **2.1-ENU-NMPC-beta** | ENU | `u`,`v` dari ΔGPS. Bukan pasangan Remote-05.2 |
 | **2.2-ENU-NMPC** | ENU | Dari 2.0, bukan 2.1. TX: `timestamp,result,bearing` |
 | **2.3-ENU-NMPC** | ENU | Dari 2.2. `$RTL` mengunci target ke Home sampai program di-restart |
+| **2.4-ENU-NMPC** | ENU | Dari 2.3. `$DONE` di titik terakhir. `$GOHOME` ke Home. `$ATHOME` saat sampai |
 
 ---
 
